@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function swapDoc(id) { return get(/databases/$(database)/documents/swaps/$(id)).data; }
+    function isMember(id) { return signedIn() && request.auth.uid in swapDoc(id).members; }
+    function profile(u) { return get(/databases/$(database)/documents/users/$(u)).data; }
+    function countryOk(want, country) { return want == '' || want == country; }
+    function compatible(a, b) {
+      return countryOk(profile(b).app.get('want', ''), profile(a).country)
+          && countryOk(profile(a).app.get('want', ''), profile(b).country);
+    }
+    // Per provare l'app senza aspettare, cambia temporaneamente in duration.value(1, 'm').
+    function testDuration() { return duration.value(14, 'd'); }
+
+    // Profilo pubblico: lo leggono tutti gli utenti loggati, lo scrive solo il proprietario.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.nick is string
+        && request.resource.data.nick.size() > 0 && request.resource.data.nick.size() <= 30
+        && request.resource.data.country is string && request.resource.data.country.size() > 0
+        && request.resource.data.get('bio', '').size() <= 200
+        && request.resource.data.app.name.size() <= 50
+        && request.resource.data.app.get('desc', '').size() <= 500
+        && request.resource.data.app.get('want', '').size() <= 40;
+      allow delete: if false;
+    }
+
+    // Email personale: leggibile e scrivibile solo da te.
+    match /userPrivate/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if signedIn() && request.auth.uid == uid
+        && request.resource.data.email is string && request.resource.data.email.size() <= 100;
+    }
+
+    // Scambi: visibili solo ai due partecipanti.
+    match /swaps/{id} {
+      function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+      function ownKeyOnly(field) {
+        return request.resource.data[field].diff(resource.data[field]).affectedKeys().hasOnly([request.auth.uid]);
+      }
+
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+
+      // Si può proporre uno scambio solo se i paesi richiesti da entrambi combaciano.
+      allow create: if signedIn()
+        && request.resource.data.a == request.auth.uid
+        && request.resource.data.a != request.resource.data.b
+        && request.resource.data.members.size() == 2
+        && request.resource.data.members[0] == request.resource.data.a
+        && request.resource.data.members[1] == request.resource.data.b
+        && request.resource.data.status == 'proposed'
+        && request.resource.data.start.size() == 0
+        && request.resource.data.fb.size() == 0
+        && compatible(request.resource.data.a, request.resource.data.b);
+
+      allow update: if signedIn() && request.auth.uid in resource.data.members
+        && changed().hasOnly(['status', 'acceptedAt', 'start', 'fb'])
+        // Solo chi riceve la richiesta può accettare o rifiutare.
+        && (!('status' in changed()) || (
+              resource.data.status == 'proposed'
+              && request.auth.uid == resource.data.b
+              && request.resource.data.status in ['active', 'declined']))
+        && (!('acceptedAt' in changed()) || request.auth.uid == resource.data.b)
+        // L'avvio del test usa l'orario del server e si imposta una sola volta, solo per sé.
+        && (!('start' in changed()) || (
+              resource.data.status == 'active'
+              && ownKeyOnly('start')
+              && !(request.auth.uid in resource.data.start)
+              && request.resource.data.start[request.auth.uid] == request.time))
+        && (!('fb' in changed()) || (
+              ownKeyOnly('fb')
+              && request.resource.data.fb[request.auth.uid] == true));
+      allow delete: if false;
+    }
+
+    match /swaps/{id}/messages/{mid} {
+      allow read: if isMember(id);
+      allow create: if isMember(id)
+        && swapDoc(id).status == 'active'
+        && request.resource.data.from == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500;
+    }
+
+    // Email dello scambio: la sua si legge solo dopo aver condiviso la tua.
+    match /swaps/{id}/emails/{uid} {
+      allow read: if isMember(id)
+        && (uid == request.auth.uid
+            || exists(/databases/$(database)/documents/swaps/$(id)/emails/$(request.auth.uid)));
+      allow create, update: if isMember(id)
+        && uid == request.auth.uid
+        && swapDoc(id).status == 'active'
+        && request.resource.data.email is string && request.resource.data.email.size() <= 100;
+    }
+
+    // Feedback: visibili a tutti gli utenti loggati, creabili solo dopo 14 giorni di test.
+    match /feedback/{fid} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && fid == request.resource.data.swapId + '_' + request.auth.uid
+        && request.resource.data.from == request.auth.uid
+        && request.auth.uid in swapDoc(request.resource.data.swapId).members
+        && request.resource.data.to in swapDoc(request.resource.data.swapId).members
+        && request.resource.data.to != request.auth.uid
+        && request.resource.data.stars is int
+        && request.resource.data.stars >= 1 && request.resource.data.stars <= 5
+        && request.resource.data.get('text', '').size() <= 600
+        && request.auth.uid in swapDoc(request.resource.data.swapId).start
+        && swapDoc(request.resource.data.swapId).start[request.auth.uid] + testDuration() <= request.time;
+      allow update, delete: if false;
+    }
+  }
+}

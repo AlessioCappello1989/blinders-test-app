@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Blinders Test App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --bg:#EDF1EE; --surface:#FFFFFF; --ink:#13201A; --muted:#5A6A61; --line:#D3DCD6;
+  --accent:#2748D8; --accent-ink:#FFFFFF; --ok:#1B8750; --warn:#A8690F; --cell:#D9E1DB;
+  --f-display:"Bricolage Grotesque","Trebuchet MS",sans-serif;
+  --f-body:"Instrument Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1411; --surface:#161E1A; --ink:#E5EDE8; --muted:#92A399; --line:#27332D;
+  --accent:#8AA2FF; --accent-ink:#0E1411; --ok:#4FCB8A; --warn:#E3AE48; --cell:#27332C; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1411; --surface:#161E1A; --ink:#E5EDE8; --muted:#92A399; --line:#27332D;
+  --accent:#8AA2FF; --accent-ink:#0E1411; --ok:#4FCB8A; --warn:#E3AE48; --cell:#27332C; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);margin:0;
+  padding-block:14px 104px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.app{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;line-height:1.15}
+h1{font-size:26px;letter-spacing:-.01em}
+h2{font-size:20px}
+h3{font-size:17px}
+p{margin:0}
+.muted{color:var(--muted)} .small{font-size:13px}
+.mono{font-family:var(--f-mono);font-size:13px}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand .tag{font:500 12px/1.4 var(--f-mono);color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.row.between{justify-content:space-between}
+.stack{display:flex;flex-direction:column;gap:12px}
+.av{width:36px;height:36px;border-radius:50%;object-fit:cover;flex:none;background:var(--cell)}
+.av.ph{display:inline-flex;align-items:center;justify-content:center;font:700 15px var(--f-display);text-transform:uppercase}
+.who{display:flex;align-items:center;gap:10px;background:none;border:0;padding:0;color:inherit;font:inherit;font-weight:600;cursor:pointer;text-align:left;min-width:0}
+.who span.n{overflow-wrap:anywhere}
+.chip{display:inline-block;font:500 12px var(--f-mono);border:1px solid var(--line);border-radius:6px;padding:1px 8px;color:var(--muted)}
+.pill{display:inline-block;font:600 12px var(--f-body);border-radius:999px;padding:2px 10px;background:var(--cell);color:var(--ink)}
+.pill.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.btn{font:600 14px var(--f-body);border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:9px 14px;cursor:pointer;min-height:40px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent}
+.btn.sm{min-height:34px;padding:6px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.btn:focus-visible,.who:focus-visible,.navb:focus-visible,.star:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--accent)}
+.appname{font-size:18px}
+.desc{overflow-wrap:anywhere}
+.rate{font:500 13px var(--f-mono);color:var(--muted);white-space:nowrap}
+.tracker{display:grid;grid-template-columns:repeat(14,1fr);gap:3px}
+.tracker i{height:14px;border-radius:3px;background:var(--cell)}
+.tracker i.on{background:var(--ok)}
+.tracker i.now{background:var(--warn)}
+.meter{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
+.meter i{aspect-ratio:1;border-radius:50%;background:var(--cell)}
+.meter i.on{background:var(--accent)}
+.step{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.step h3{display:flex;align-items:center;gap:8px}
+.step h3 .k{font:500 12px var(--f-mono);color:var(--muted)}
+.box{border:1px dashed var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.mail{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.mail code{font:500 13px var(--f-mono);overflow-wrap:anywhere}
+label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:13px}
+input,textarea,select{font:400 15px var(--f-body);background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+textarea{min-height:84px;resize:vertical}
+.field-note{font-weight:400;color:var(--muted);font-size:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:420px){.grid2{grid-template-columns:1fr}}
+.chat{display:flex;flex-direction:column;gap:8px}
+#msgs{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;padding:2px}
+.msg{max-width:84%;align-self:flex-start;background:var(--cell);border-radius:10px 10px 10px 2px;padding:6px 10px}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--accent-ink);border-radius:10px 10px 2px 10px}
+.msg p{overflow-wrap:anywhere}
+.msg time{display:block;font:500 11px var(--f-mono);opacity:.7}
+.send{display:flex;gap:8px}
+.stars{display:flex;gap:4px}
+.star{background:none;border:0;font-size:30px;line-height:1;color:var(--cell);cursor:pointer;padding:2px}
+.star.on{color:var(--warn)}
+.fbitem{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:4px}
+.fbitem .st{color:var(--warn);letter-spacing:2px}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:20px 16px;display:flex;flex-direction:column;gap:6px}
+.banner{border:1px solid var(--warn);border-radius:8px;padding:10px 12px;font-size:14px;background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;
+  padding:6px max(16px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.nav-in{display:flex;gap:4px;width:100%;max-width:640px}
+.navb{flex:1;background:none;border:0;border-radius:8px;padding:10px 6px;font:600 14px var(--f-body);color:var(--muted);cursor:pointer;position:relative}
+.navb.on{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.dot{display:inline-block;min-width:18px;height:18px;border-radius:9px;background:var(--accent);color:var(--accent-ink);font:600 11px/18px var(--f-body);text-align:center;margin-left:4px;padding:0 5px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:14px;z-index:9;max-width:calc(100% - 32px)}
+.back{align-self:flex-start}
+@media (prefers-reduced-motion:no-preference){.btn,.navb{transition:background .15s}}
+
+html{color-scheme:light}
+[hidden]{display:none!important}
+img{max-width:100%}
+.login{align-items:flex-start}
+.setup code{font:500 13px var(--f-mono);overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="row between">
+    <div class="brand">
+      <h1>Blinders Test App</h1>
+      <span class="tag">1 a 1 · 14 giorni · 12 tester</span>
+    </div>
+    <button id="out" class="btn ghost sm" data-act="logout" hidden>Esci</button>
+  </header>
+  <main id="view" class="stack" aria-live="polite"><div class="empty"><h3>Caricamento</h3><p class="muted">Sto aprendo i profili e gli scambi.</p></div></main>
+</div>
+<nav class="nav" id="nav" hidden><div class="nav-in" id="navin"></div></nav>
+<div id="toast" hidden role="status"></div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
