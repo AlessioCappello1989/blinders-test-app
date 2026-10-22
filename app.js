@@ -197,7 +197,9 @@ function swapView(id) {
   let step2 = '<div class="step"><h3><span class="k">2</span>Test di 14 giorni</h3>'
     + '<div class="stack" style="gap:6px"><div class="row between"><b class="small">Tu su ' + esc(oApp.name || 'la sua app') + '</b><span class="small mono muted">' + esc(dayLabel(el)) + '</span></div>' + tracker(el) + '</div>'
     + '<div class="stack" style="gap:6px"><div class="row between"><b class="small">Lui su ' + esc(mApp.name || 'la tua app') + '</b><span class="small mono muted">' + esc(dayLabel(oel)) + '</span></div>' + tracker(oel) + '</div>';
-  if (el === null) step2 += '<div><button class="btn primary" data-act="startTest" data-id="' + esc(id) + '">Ho installato l\'app, avvia i 14 giorni</button></div>';
+  if (el === null) step2 += S.theirLink
+    ? '<div><button class="btn primary" data-act="startTest" data-id="' + esc(id) + '">Ho installato l\'app, avvia i 14 giorni</button></div>'
+    : '<p class="small muted">Potrai avviare il test quando avrai il link dell\'app da installare.</p>';
   step2 += '</div>';
   let step3 = '<div class="step"><h3><span class="k">3</span>Feedback reciproco</h3>';
   if (s.fb && s.fb[me]) step3 += '<p class="small">Hai inviato il tuo feedback. ' + (done ? 'Scambio completato: conta come un tester per entrambi.' : 'Aspetto quello di ' + esc(nameOf(o)) + '.') + '</p>';
@@ -337,7 +339,9 @@ document.addEventListener('click', async e => {
     else if (act === 'shareEmail') {
       if (!S.priv.email) { toast('Aggiungi la tua email nel profilo.'); return; }
       await setDoc(doc(db, 'swaps', id, 'emails', me), { email: S.priv.email, at: Date.now() }); toast('Email condivisa');
-    } else if (act === 'startTest') { await updateDoc(doc(db, 'swaps', id), { ['start.' + me]: serverTimestamp() }); toast('Test avviato'); }
+    } else if (act === 'startTest') {
+      if (!S.theirLink) { toast('Prima ti serve il link dell\'app da installare.'); return; }
+      await updateDoc(doc(db, 'swaps', id), { ['start.' + me]: serverTimestamp() }); toast('Test avviato'); }
     else if (act === 'fb') {
       const n = S.star[id] || 0; if (!n) { toast('Scegli da 1 a 5 stelle.'); return; }
       const o = s.a === me ? s.b : s.a; const tx = (($('#fbtext') || {}).value || '').trim().slice(0, 600);
