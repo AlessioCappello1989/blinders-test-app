@@ -1,6 +1,6 @@
 import { firebaseConfig, TEST_DAYS } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { getFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const $ = (s, r) => (r || document).querySelector(s);
@@ -177,13 +177,36 @@ function swapView(id) {
   return h + '<div class="card">' + step1 + step2 + step3 + chat + '</div>';
 }
 
+function authErr(x) {
+  const m = {
+    'auth/invalid-email': 'L\'email non è valida.',
+    'auth/missing-password': 'Scrivi la password.',
+    'auth/weak-password': 'La password deve avere almeno 6 caratteri.',
+    'auth/email-already-in-use': 'Esiste già un account con questa email. Usa Accedi.',
+    'auth/invalid-credential': 'Email o password sbagliate.',
+    'auth/wrong-password': 'Email o password sbagliate.',
+    'auth/user-not-found': 'Email o password sbagliate.',
+    'auth/too-many-requests': 'Troppi tentativi. Aspetta qualche minuto e riprova.',
+    'auth/operation-not-allowed': 'Accesso con email non attivo: abilitalo in Firebase > Authentication.',
+    'auth/network-request-failed': 'Connessione assente. Riprova.'
+  };
+  toast(m[x && x.code] || 'Accesso non riuscito. Riprova.');
+  console.error(x);
+}
+const loginForm = '<div class="stack" style="width:100%"><div><button class="btn primary" data-act="login">Accedi con Google</button></div>'
+  + '<p class="small muted">oppure con email e password</p>'
+  + '<form id="af" class="stack" autocomplete="on" novalidate>'
+  + '<label for="a-email">Email<input id="a-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="nome@esempio.it"></label>'
+  + '<label for="a-pass">Password<input id="a-pass" name="password" type="password" autocomplete="current-password" minlength="6" placeholder="Almeno 6 caratteri"></label>'
+  + '<div class="row"><button class="btn primary" type="submit" data-mode="signin">Accedi</button><button class="btn" type="submit" data-mode="signup">Registrati</button></div>'
+  + '<div><button class="btn ghost sm" type="button" data-act="reset">Password dimenticata</button></div></form></div>';
 function gate(t, p, extra) { view.innerHTML = '<div class="empty login"><h3>' + t + '</h3><p class="muted">' + p + '</p>' + (extra || '') + '</div>'; $('#nav').hidden = true; $('#out').hidden = !me; }
 
 /* ---------- Render ---------- */
 function render(force) {
   if (!force) { const a = document.activeElement; if (a && view.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) { dirty = true; return; } }
   dirty = false;
-  if (!me) return gate('Accedi per iniziare', 'Con il tuo account Google crei il profilo, proponi scambi e chatti con gli altri sviluppatori.', '<div><button class="btn primary" data-act="login">Accedi con Google</button></div>');
+  if (!me) return gate('Accedi per iniziare', 'Crei il profilo, proponi scambi e chatti con gli altri sviluppatori. Se è la prima volta con email e password, tocca Registrati.', loginForm);
   if (!(loaded.users && loaded.swaps && loaded.fb && loaded.priv)) return;
   if (!firstRoute) { firstRoute = true; if (!S.users.get(me)) S.tab = 'profile'; }
   const rec = mine().filter(s => s.status === 'proposed' && s.b === me).length;
@@ -235,6 +258,12 @@ document.addEventListener('click', async e => {
   try {
     if (act === 'login') { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (x) { if (x.code !== 'auth/popup-closed-by-user' && x.code !== 'auth/cancelled-popup-request') toast(x.code === 'auth/unauthorized-domain' ? 'Dominio non autorizzato: aggiungilo in Firebase > Authentication > Impostazioni.' : 'Accesso non riuscito. Riprova.'); } return; }
     if (act === 'logout') { await signOut(auth); return; }
+    if (act === 'reset') {
+      const em = (($('#a-email') || {}).value || '').trim();
+      if (!em) { toast('Scrivi prima la tua email.'); return; }
+      try { await sendPasswordResetEmail(auth, em); toast('Ti ho inviato un\'email per scegliere una nuova password.'); } catch (x) { authErr(x); }
+      return;
+    }
     if (act === 'tab') { S.tab = b.dataset.tab; S.route = null; render(true); window.scrollTo(0, 0); return; }
     if (act === 'user') { S.route = { t: 'user', id }; render(true); window.scrollTo(0, 0); return; }
     if (act === 'swap') { S.route = { t: 'swap', id }; render(true); window.scrollTo(0, 0); return; }
@@ -279,6 +308,19 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('submit', async e => {
   e.preventDefault();
+  if (e.target.id === 'af') {
+    if (busy) return;
+    const mode = (e.submitter && e.submitter.dataset.mode) || 'signin';
+    const em = $('#a-email').value.trim(), pw = $('#a-pass').value;
+    if (!em) { toast('Scrivi la tua email.'); return; }
+    if (!pw) { toast('Scrivi la password.'); return; }
+    busy = true;
+    try {
+      if (mode === 'signup') await createUserWithEmailAndPassword(auth, em, pw);
+      else await signInWithEmailAndPassword(auth, em, pw);
+    } catch (x) { authErr(x); } finally { busy = false; }
+    return;
+  }
   if (busy || !me) return;
   if (e.target.id === 'cf') {
     const inp = $('#msg'); const t = inp.value.trim(); if (!t || !subKey) return; inp.value = '';

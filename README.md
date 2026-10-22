@@ -9,7 +9,7 @@ Tutto gratuito per un uso piccolo.
 ## 1. Crea il progetto Firebase (10 minuti)
 
 1. Vai su https://console.firebase.google.com e crea un progetto (puoi disattivare Google Analytics).
-2. **Authentication** > Inizia > scheda *Metodo di accesso* > attiva **Google**.
+2. **Authentication** > Inizia > scheda *Metodo di accesso* > attiva **Google** ed **Email/Password**.
 3. **Firestore Database** > Crea database > modalità produzione > scegli una regione europea (per esempio `eur3`).
 4. Nella scheda **Regole** di Firestore cancella tutto, incolla il contenuto di `firestore.rules` e premi **Pubblica**.
 5. **Impostazioni progetto** (ingranaggio) > *Le tue app* > icona web `</>` > registra l'app.
