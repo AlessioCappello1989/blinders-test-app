@@ -14,6 +14,8 @@ const S = { tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb:
 const loaded = { users: false, swaps: false, fb: false, priv: false };
 let app, auth, db, me = null, busy = false, dirty = false, firstRoute = false;
 let dataUnsubs = [], subUnsubs = [], subKey = '', msgs = [], tt;
+const msgWatch = new Map();
+S.lastMsg = new Map();
 
 function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => { t.hidden = true; }, 3600); }
 function toastErr(e) {
@@ -37,6 +39,38 @@ const canTest = (tester, owner) => { const w = wantOf(owner); return !w || w ===
 const compat = (a, b) => canTest(a, b) && canTest(b, a);
 function mine() { const a = []; S.swaps.forEach((s, id) => a.push(Object.assign({ id }, s))); return a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0)); }
 function pairOpen(o) { return mine().find(s => members(s).indexOf(o) > -1 && s.status !== 'declined' && !isDone(s)); }
+/* ---------- Novità non lette (salvate su questo dispositivo) ---------- */
+const seenKey = () => 'blinders-seen-' + me;
+function getSeen() { try { return JSON.parse(localStorage.getItem(seenKey()) || '{}'); } catch (e) { return {}; } }
+function markSeen(id) {
+  if (!S.swaps.get(id)) return;
+  const all = getSeen(); const lm = S.lastMsg.get(id);
+  all[id] = { msg: Math.max(lm ? lm.at : 0, Date.now()), start: true, fb: true, acc: true };
+  try { localStorage.setItem(seenKey(), JSON.stringify(all)); } catch (e) { /* senza memoria locale gli avvisi restano finché non cambia lo stato */ }
+}
+function unreadOf(s) {
+  const seen = getSeen()[s.id] || {}; const o = s.a === me ? s.b : s.a; const out = []; const lm = S.lastMsg.get(s.id);
+  if (lm && lm.from !== me && lm.at > (seen.msg || 0)) out.push('Nuovo messaggio');
+  if (ms(s.start && s.start[o]) && !seen.start) out.push('Ha avviato il test');
+  if (s.fb && s.fb[o] && !seen.fb) out.push('Ha lasciato il feedback');
+  if (s.a === me && s.status === 'active' && !seen.acc) out.push('Ha accettato lo scambio');
+  return out;
+}
+function syncWatch() {
+  S.swaps.forEach((s, id) => {
+    if (s.status !== 'active' || msgWatch.has(id)) return;
+    let first = true;
+    msgWatch.set(id, onSnapshot(query(collection(db, 'swaps', id, 'messages'), orderBy('at', 'desc'), limit(1)), sn => {
+      const d = sn.docs[0] && read(sn.docs[0]);
+      if (d) S.lastMsg.set(id, { at: d.at || 0, from: d.from });
+      const open = S.route && S.route.t === 'swap' && S.route.id === id;
+      if (!first && d && d.from !== me && !open) toast('Nuovo messaggio da ' + nameOf(d.from));
+      first = false;
+      if (open) markSeen(id);
+      render();
+    }, () => { /* senza permesso non c'è nulla da segnalare */ }));
+  });
+}
 function stats(id) { let n = 0, sum = 0; S.fb.forEach(f => { if (f.to === id) { n++; sum += f.stars || 0; } }); return { done: n, n, avg: n ? sum / n : 0 }; }
 function elapsed(s, uid) { const t = ms(s.start && s.start[uid]); return t ? (Date.now() - t) / DAY : null; }
 const dayLabel = el => el === null ? 'Non avviato' : el >= 14 ? '14 giorni completati' : 'Giorno ' + (Math.floor(el) + 1) + ' di 14';
@@ -80,7 +114,8 @@ function swapCard(s) {
   const o = s.a === me ? s.b : s.a; const el = elapsed(s, me);
   const oa = (s.apps && s.apps[o] && s.apps[o].name) || 'la sua app', ma = (s.apps && s.apps[me] && s.apps[me].name) || 'la tua app';
   let h = '<article class="card"><div class="row between"><button class="who" data-act="swap" data-id="' + esc(s.id) + '">' + av(o) + '<span class="n">' + esc(nameOf(o)) + '</span></button>' + statusPill(s) + '</div>'
-    + '<p class="small"><b>Tu testi</b> ' + esc(oa) + ' · <b>lui testa</b> ' + esc(ma) + '</p>';
+    + '<p class="small"><b>Tu testi</b> ' + esc(oa) + ' · <b>lui testa</b> ' + esc(ma) + '</p>'
+    + (unreadOf(s).length ? '<div class="row">' + unreadOf(s).map(l => '<span class="pill warn">' + l + '</span>').join('') + '</div>' : '');
   if (s.status === 'active' && !isDone(s)) h += tracker(el) + '<p class="small muted mono">' + esc(dayLabel(el)) + '</p>';
   if (s.status === 'proposed' && s.b === me) h += '<div class="row"><button class="btn primary" data-act="accept" data-id="' + esc(s.id) + '">Accetta</button><button class="btn ghost" data-act="decline" data-id="' + esc(s.id) + '">Rifiuta</button></div>';
   else h += '<div><button class="btn" data-act="swap" data-id="' + esc(s.id) + '">Apri</button></div>';
@@ -209,7 +244,10 @@ function render(force) {
   if (!me) return gate('Accedi per iniziare', 'Crei il profilo, proponi scambi e chatti con gli altri sviluppatori. Se è la prima volta con email e password, tocca Registrati.', loginForm);
   if (!(loaded.users && loaded.swaps && loaded.fb && loaded.priv)) return;
   if (!firstRoute) { firstRoute = true; if (!S.users.get(me)) S.tab = 'profile'; }
-  const rec = mine().filter(s => s.status === 'proposed' && s.b === me).length;
+  if (S.route && S.route.t === 'swap') markSeen(S.route.id);
+  syncWatch();
+  const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
+  document.title = (rec ? '(' + rec + ') ' : '') + 'Blinders Test App';
   $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['profile', 'Profilo']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '">' + t[1] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</button>').join('');
   $('#nav').hidden = false; $('#out').hidden = false;
   let h = '';
@@ -348,11 +386,24 @@ document.addEventListener('focusout', () => { setTimeout(() => { if (dirty) { co
 function startData() {
   const upd = (key, map) => sn => { S[map] = new Map(sn.docs.map(d => [d.id, read(d)])); loaded[key] = true; render(); };
   dataUnsubs.push(onSnapshot(collection(db, 'users'), upd('users', 'users'), toastErr));
-  dataUnsubs.push(onSnapshot(query(collection(db, 'swaps'), where('members', 'array-contains', me)), upd('swaps', 'swaps'), toastErr));
+  dataUnsubs.push(onSnapshot(query(collection(db, 'swaps'), where('members', 'array-contains', me)), sn => {
+    const next = new Map(sn.docs.map(d => [d.id, read(d)]));
+    if (loaded.swaps) {
+      next.forEach((s, id) => {
+        const old = S.swaps.get(id); const o = s.a === me ? s.b : s.a;
+        if (!old) { if (s.b === me && s.status === 'proposed') toast(nameOf(s.a) + ' ti ha proposto uno scambio'); return; }
+        if (S.route && S.route.t === 'swap' && S.route.id === id) return;
+        if (old.status === 'proposed' && s.status === 'active' && s.a === me) toast(nameOf(o) + ' ha accettato lo scambio');
+        if (!ms(old.start && old.start[o]) && ms(s.start && s.start[o])) toast(nameOf(o) + ' ha avviato il test');
+        if (!(old.fb && old.fb[o]) && s.fb && s.fb[o]) toast(nameOf(o) + ' ha lasciato il feedback');
+      });
+    }
+    S.swaps = next; loaded.swaps = true; render();
+  }, toastErr));
   dataUnsubs.push(onSnapshot(collection(db, 'feedback'), upd('fb', 'fb'), toastErr));
   dataUnsubs.push(onSnapshot(doc(db, 'userPrivate', me), sn => { S.priv = sn.exists() ? sn.data() : { email: '' }; loaded.priv = true; render(); }, toastErr));
 }
-function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; }
+function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; msgWatch.forEach(u => u()); msgWatch.clear(); S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; }
 
 if (!firebaseConfig.apiKey || /INCOLLA/.test(firebaseConfig.apiKey)) {
   gate('Manca la configurazione di Firebase', 'Apri il file firebase-config.js e incolla i valori del tuo progetto Firebase. I passaggi sono nel README.');
