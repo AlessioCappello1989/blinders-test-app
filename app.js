@@ -162,7 +162,7 @@ function profileView(uid, edit) {
     + '<h2 style="margin-top:6px">La tua app</h2>'
     + '<label for="f-app">Nome dell\'app<input id="f-app" maxlength="50" value="' + esc(ap.name || '') + '"><span class="field-note" id="c-f-app">' + (ap.name || '').length + '/50</span></label>'
     + '<div class="grid2"><label for="f-cat">Categoria<select id="f-cat">' + opts + '</select></label>'
-    + '<label for="f-link">Link di adesione al test<input id="f-link" type="url" inputmode="url" value="' + esc(ap.link || '') + '" placeholder="https://play.google.com/apps/testing/..."></label></div>'
+    + '<label for="f-link">Link di adesione al test<input id="f-link" type="url" inputmode="url" value="' + esc(S.priv.link || '') + '" placeholder="https://play.google.com/apps/testing/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te.</span></label></div>'
     + '<label for="f-want">Tester che ti servono<select id="f-want">' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
     + '<label for="f-desc">Cosa deve provare il tester<textarea id="f-desc" maxlength="500" placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc">' + (ap.desc || '').length + '/500</span></label>'
     + '<div><button class="btn primary" type="submit">Salva profilo</button></div></form>'
@@ -176,8 +176,9 @@ function swapView(id) {
   const o = s.a === me ? s.b : s.a;
   const oApp = (s.apps && s.apps[o]) || {}, mApp = (s.apps && s.apps[me]) || {};
   let h = back + '<div class="card"><div class="row between"><button class="who" data-act="user" data-id="' + esc(o) + '">' + av(o) + '<span class="n">' + esc(nameOf(o)) + '</span></button>' + statusPill(s) + '</div>'
-    + '<div class="box"><span class="small muted mono">TU TESTI</span><b>' + esc(oApp.name || 'App') + '</b>' + link(oApp.link) + '</div>'
-    + '<div class="box"><span class="small muted mono">LUI TESTA</span><b>' + esc(mApp.name || 'La tua app') + '</b>' + link(mApp.link) + '</div></div>';
+    + '<div class="box"><span class="small muted mono">TU TESTI</span><b>' + esc(oApp.name || 'App') + '</b>'
+    + (s.status === 'active' ? (S.theirLink ? link(S.theirLink) : '<span class="small muted">Il link di test non è disponibile.</span>') : '<span class="small muted">Il link di test si sblocca quando lo scambio viene accettato.</span>') + '</div>'
+    + '<div class="box"><span class="small muted mono">LUI TESTA</span><b>' + esc(mApp.name || 'La tua app') + '</b></div></div>';
   if (s.status === 'proposed') {
     if (s.b === me) return h + '<div class="card"><p>' + esc(nameOf(o)) + ' propone di testarsi a vicenda.</p><div class="row"><button class="btn primary" data-act="accept" data-id="' + esc(id) + '">Accetta</button><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Rifiuta</button></div></div>';
     return h + '<div class="card"><p>Richiesta inviata. Quando ' + esc(nameOf(o)) + ' accetta si apre la chat.</p></div>';
@@ -208,7 +209,7 @@ function swapView(id) {
   const rf = S.fb.get(id + '_' + o);
   if (rf) step3 += '<div class="fbitem"><b class="small">Feedback di ' + esc(nameOf(o)) + '</b><span class="st">' + stars(rf.stars) + '</span>' + (rf.text ? '<p class="desc">' + esc(rf.text) + '</p>' : '') + '</div>';
   step3 += '</div>';
-  const chat = '<div class="step"><h3>Chat</h3><div class="chat"><div id="msgs"></div><form id="cf" class="send" autocomplete="off"><input id="msg" maxlength="500" placeholder="Scrivi a ' + esc(nameOf(o)) + '" aria-label="Messaggio"><button class="btn primary" type="submit">Invia</button></form></div></div>';
+  const chat = '<div class="step"><h3>Chat</h3><div class="chat"><div id="msgs"></div><form id="cf" class="send" autocomplete="off"><input id="msg" maxlength="200" placeholder="Scrivi a ' + esc(nameOf(o)) + ' (max 200 caratteri)" aria-label="Messaggio, massimo 200 caratteri"><button class="btn primary" type="submit">Invia</button></form></div></div>';
   return h + '<div class="card">' + step1 + step2 + step3 + chat + '</div>';
 }
 
@@ -261,7 +262,7 @@ function render(force) {
 }
 
 /* ---------- Sottoscrizioni dello scambio aperto (chat, email) ---------- */
-function stopSubs() { subUnsubs.forEach(u => u()); subUnsubs = []; subKey = ''; msgs = []; S.myEmail = undefined; S.theirEmail = undefined; }
+function stopSubs() { subUnsubs.forEach(u => u()); subUnsubs = []; subKey = ''; msgs = []; S.myEmail = undefined; S.theirEmail = undefined; S.theirLink = undefined; }
 function syncSubs() {
   let id = null, o = null;
   if (me && S.route && S.route.t === 'swap') {
@@ -272,6 +273,8 @@ function syncSubs() {
   if (subKey === id) return;
   stopSubs(); subKey = id;
   subUnsubs.push(onSnapshot(query(collection(db, 'swaps', id, 'messages'), orderBy('at', 'asc'), limit(200)), sn => { msgs = sn.docs.map(read); drawMsgs(); }, toastErr));
+  // Il link di test dell'altro è leggibile solo a scambio accettato (regola di Firestore).
+  subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'links', o), sn => { S.theirLink = sn.exists() ? sn.data().link : null; render(); }, () => { S.theirLink = null; }));
   let theirUnsub = null;
   subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'emails', me), sn => {
     S.myEmail = sn.exists() ? sn.data().email : null;
@@ -317,13 +320,19 @@ document.addEventListener('click', async e => {
       if (pairOpen(id)) { toast('Avete già uno scambio aperto.'); return; }
       if (!countryOf(me)) { toast('Scegli prima il tuo paese nel profilo.'); return; }
       if (!compat(me, id)) { toast('Scambio non compatibile con i paesi richiesti.'); return; }
-      const apps = {}; apps[me] = { name: meU.app.name, link: meU.app.link || '' }; apps[id] = { name: them.app.name, link: them.app.link || '' };
+      if (!S.priv.link) { toast('Aggiungi nel profilo il link di adesione al test della tua app.'); return; }
+      const apps = {}; apps[me] = { name: meU.app.name }; apps[id] = { name: them.app.name };
       const ref = await addDoc(collection(db, 'swaps'), { a: me, b: id, members: [me, id], apps, status: 'proposed', createdAt: Date.now(), start: {}, fb: {} });
+      await setDoc(doc(db, 'swaps', ref.id, 'links', me), { link: S.priv.link });
       toast('Richiesta inviata'); S.tab = 'swaps'; S.route = { t: 'swap', id: ref.id };
     } else if (act === 'accept') {
       const oo = s.a === me ? s.b : s.a;
       if (!compat(me, oo)) { toast('Scambio non compatibile con i paesi richiesti.'); return; }
-      await updateDoc(doc(db, 'swaps', id), { status: 'active', acceptedAt: Date.now() }); toast('Scambio accettato');
+      if (!S.priv.link) { toast('Aggiungi nel profilo il link di adesione al test della tua app, poi accetta.'); return; }
+      const ab = writeBatch(db);
+      ab.set(doc(db, 'swaps', id, 'links', me), { link: S.priv.link });
+      ab.update(doc(db, 'swaps', id), { status: 'active', acceptedAt: Date.now() });
+      await ab.commit(); toast('Scambio accettato');
     } else if (act === 'decline') { await updateDoc(doc(db, 'swaps', id), { status: 'declined' }); S.route = null; toast('Richiesta rifiutata'); }
     else if (act === 'shareEmail') {
       if (!S.priv.email) { toast('Aggiungi la tua email nel profilo.'); return; }
@@ -362,7 +371,7 @@ document.addEventListener('submit', async e => {
   if (busy || !me) return;
   if (e.target.id === 'cf') {
     const inp = $('#msg'); const t = inp.value.trim(); if (!t || !subKey) return; inp.value = '';
-    try { await addDoc(collection(db, 'swaps', subKey, 'messages'), { from: me, text: t.slice(0, 500), at: Date.now() }); } catch (err) { inp.value = t; toastErr(err); }
+    try { await addDoc(collection(db, 'swaps', subKey, 'messages'), { from: me, text: t.slice(0, 200), at: Date.now() }); } catch (err) { inp.value = t; toastErr(err); }
     return;
   }
   if (e.target.id === 'pf') {
@@ -374,8 +383,8 @@ document.addEventListener('submit', async e => {
     busy = true;
     try {
       const old = S.users.get(me) || {};
-      await setDoc(doc(db, 'users', me), { nick, country, bio: $('#f-bio').value.trim().slice(0, 200), app: { name: ap, want: $('#f-want').value, cat: $('#f-cat').value, link: lk, desc: $('#f-desc').value.trim().slice(0, 500) }, createdAt: old.createdAt || Date.now(), updatedAt: Date.now() });
-      await setDoc(doc(db, 'userPrivate', me), { email });
+      await setDoc(doc(db, 'users', me), { nick, country, bio: $('#f-bio').value.trim().slice(0, 200), app: { name: ap, want: $('#f-want').value, cat: $('#f-cat').value, desc: $('#f-desc').value.trim().slice(0, 500) }, createdAt: old.createdAt || Date.now(), updatedAt: Date.now() });
+      await setDoc(doc(db, 'userPrivate', me), { email, link: lk });
       toast(ap ? 'Profilo salvato' : 'Profilo salvato. Aggiungi la tua app per comparire in Esplora.');
     } catch (err) { toastErr(err); } finally { busy = false; render(true); }
   }
