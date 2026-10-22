@@ -71,7 +71,15 @@ function syncWatch() {
     }, () => { /* senza permesso non c'è nulla da segnalare */ }));
   });
 }
-function stats(id) { let n = 0, sum = 0; S.fb.forEach(f => { if (f.to === id) { n++; sum += f.stars || 0; } }); return { done: n, n, avg: n ? sum / n : 0 }; }
+/* Scambi ancora aperti: richieste in attesa e scambi accettati non ancora completati da entrambi. */
+const openSwaps = () => mine().filter(s => s.status !== 'declined' && !isDone(s));
+/* done = tester dell'app attuale (i feedback senza app indicata contano); n e avg = tutti i feedback ricevuti. */
+function stats(id) {
+  const u = S.users.get(id); const cur = (u && u.app && u.app.name) || '';
+  let n = 0, sum = 0, done = 0;
+  S.fb.forEach(f => { if (f.to === id) { n++; sum += f.stars || 0; if (!f.app || f.app === cur) done++; } });
+  return { done, n, avg: n ? sum / n : 0 };
+}
 function elapsed(s, uid) { const t = ms(s.start && s.start[uid]); return t ? (Date.now() - t) / DAY : null; }
 const dayLabel = el => el === null ? 'Non avviato' : el >= 14 ? '14 giorni completati' : 'Giorno ' + (Math.floor(el) + 1) + ' di 14';
 function tracker(el) { let h = '<div class="tracker" role="img" aria-label="' + esc(dayLabel(el)) + '">'; for (let i = 0; i < 14; i++) { let c = ''; if (el !== null) c = i < Math.floor(el) ? 'on' : (i === Math.floor(el) ? 'now' : ''); h += '<i class="' + c + '"></i>'; } return h + '</div>'; }
@@ -152,6 +160,10 @@ function profileView(uid, edit) {
   }
   const copts = (u.country ? '' : '<option value="">Scegli il tuo paese</option>') + COUNTRIES.map(c => '<option value="' + c + '"' + (u.country === c ? ' selected' : '') + '>' + c + '</option>').join('');
   const wopts = '<option value="">Qualsiasi paese</option>' + COUNTRIES.map(c => '<option value="' + c + '"' + (ap.want === c ? ' selected' : '') + '>Solo ' + c + '</option>').join('');
+  const nOpen = openSwaps().length;
+  const lock = nOpen > 0 && !!ap.name;
+  const dis = lock ? ' disabled' : '';
+  const lockNote = lock ? '<div class="banner">App bloccata: hai ' + nOpen + (nOpen === 1 ? ' scambio aperto' : ' scambi aperti') + '. Puoi cambiare app quando tutti gli scambi sono completati, rifiutati o chiusi. Li trovi in <b>Scambi</b>.</div>' : '';
   const opts = CATS.map(c => '<option' + ((ap.cat || 'Altro') === c ? ' selected' : '') + '>' + c + '</option>').join('');
   return (!S.users.get(me) ? '<div class="banner">Completa il profilo e pubblica la tua app per poter proporre scambi.</div>' : '')
     + '<form id="pf" class="card" autocomplete="off"><h2>Il tuo profilo</h2>'
@@ -159,12 +171,12 @@ function profileView(uid, edit) {
     + '<label for="f-bio">Chi sei<textarea id="f-bio" maxlength="200" placeholder="Una riga su di te">' + esc(u.bio || '') + '</textarea><span class="field-note" id="c-f-bio">' + (u.bio || '').length + '/200</span></label>'
     + '<label for="f-email">Email dell\'account Google per i test<input id="f-email" type="email" inputmode="email" value="' + esc(S.priv.email || '') + '" placeholder="nome@gmail.com"><span class="field-note">Resta privata. Viene condivisa solo dentro uno scambio e solo se condividi anche tu.</span></label>'
     + '<label for="f-country">Il tuo paese<select id="f-country">' + copts + '</select><span class="field-note">Serve per far combaciare le richieste di tester. Lo scrivi tu, non viene verificato.</span></label>'
-    + '<h2 style="margin-top:6px">La tua app</h2>'
-    + '<label for="f-app">Nome dell\'app<input id="f-app" maxlength="50" value="' + esc(ap.name || '') + '"><span class="field-note" id="c-f-app">' + (ap.name || '').length + '/50</span></label>'
-    + '<div class="grid2"><label for="f-cat">Categoria<select id="f-cat">' + opts + '</select></label>'
-    + '<label for="f-link">Link di adesione al test<input id="f-link" type="url" inputmode="url" value="' + esc(S.priv.link || '') + '" placeholder="https://play.google.com/apps/testing/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te.</span></label></div>'
-    + '<label for="f-want">Tester che ti servono<select id="f-want">' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
-    + '<label for="f-desc">Cosa deve provare il tester<textarea id="f-desc" maxlength="500" placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc">' + (ap.desc || '').length + '/500</span></label>'
+    + '<h2 style="margin-top:6px">La tua app</h2>' + lockNote
+    + '<label for="f-app">Nome dell\'app<input id="f-app" maxlength="50"' + dis + ' value="' + esc(ap.name || '') + '"><span class="field-note" id="c-f-app">' + (ap.name || '').length + '/50</span></label>'
+    + '<div class="grid2"><label for="f-cat">Categoria<select id="f-cat"' + dis + '>' + opts + '</select></label>'
+    + '<label for="f-link">Link di adesione al test<input id="f-link" type="url" inputmode="url"' + dis + ' value="' + esc(S.priv.link || '') + '" placeholder="https://play.google.com/apps/testing/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te.</span></label></div>'
+    + '<label for="f-want">Tester che ti servono<select id="f-want"' + dis + '>' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
+    + '<label for="f-desc">Cosa deve provare il tester<textarea id="f-desc" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc">' + (ap.desc || '').length + '/500</span></label>'
     + '<div><button class="btn primary" type="submit">Salva profilo</button></div></form>'
     + statBlock(uid) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>';
 }
@@ -181,7 +193,7 @@ function swapView(id) {
     + '<div class="box"><span class="small muted mono">LUI TESTA</span><b>' + esc(mApp.name || 'La tua app') + '</b></div></div>';
   if (s.status === 'proposed') {
     if (s.b === me) return h + '<div class="card"><p>' + esc(nameOf(o)) + ' propone di testarsi a vicenda.</p><div class="row"><button class="btn primary" data-act="accept" data-id="' + esc(id) + '">Accetta</button><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Rifiuta</button></div></div>';
-    return h + '<div class="card"><p>Richiesta inviata. Quando ' + esc(nameOf(o)) + ' accetta si apre la chat.</p></div>';
+    return h + '<div class="card"><p>Richiesta inviata. Quando ' + esc(nameOf(o)) + ' accetta si apre la chat.</p><div><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Annulla richiesta</button></div></div>';
   }
   const done = isDone(s);
   const mineE = S.myEmail, theirE = S.theirEmail;
@@ -212,7 +224,11 @@ function swapView(id) {
   if (rf) step3 += '<div class="fbitem"><b class="small">Feedback di ' + esc(nameOf(o)) + '</b><span class="st">' + stars(rf.stars) + '</span>' + (rf.text ? '<p class="desc">' + esc(rf.text) + '</p>' : '') + '</div>';
   step3 += '</div>';
   const chat = '<div class="step"><h3>Chat</h3><div class="chat"><div id="msgs"></div><form id="cf" class="send" autocomplete="off"><input id="msg" maxlength="200" placeholder="Scrivi a ' + esc(nameOf(o)) + ' (max 200 caratteri)" aria-label="Messaggio, massimo 200 caratteri"><button class="btn primary" type="submit">Invia</button></form></div></div>';
-  return h + '<div class="card">' + step1 + step2 + step3 + chat + '</div>';
+  const closeBox = done ? '' : '<div class="card"><p class="small muted">Se l\'altro non risponde più puoi chiudere lo scambio. La tua app si libera e potrai cambiarla.</p>'
+    + (S.confirm === id
+      ? '<div class="row"><button class="btn primary" data-act="decline" data-id="' + esc(id) + '">Conferma: chiudi scambio</button><button class="btn ghost" data-act="noClose">Non chiudere</button></div>'
+      : '<div><button class="btn ghost" data-act="askClose" data-id="' + esc(id) + '">Chiudi scambio</button></div>') + '</div>';
+  return h + '<div class="card">' + step1 + step2 + step3 + chat + '</div>' + closeBox;
 }
 
 function authErr(x) {
@@ -310,7 +326,9 @@ document.addEventListener('click', async e => {
     if (act === 'tab') { S.tab = b.dataset.tab; S.route = null; render(true); window.scrollTo(0, 0); return; }
     if (act === 'user') { S.route = { t: 'user', id }; render(true); window.scrollTo(0, 0); return; }
     if (act === 'swap') { S.route = { t: 'swap', id }; render(true); window.scrollTo(0, 0); return; }
-    if (act === 'back') { S.route = null; render(true); return; }
+    if (act === 'back') { S.route = null; S.confirm = null; render(true); return; }
+    if (act === 'askClose') { S.confirm = id; render(true); return; }
+    if (act === 'noClose') { S.confirm = null; render(true); return; }
     if (act === 'star') { S.star[id] = +b.dataset.n; view.querySelectorAll('.star').forEach((x, i) => x.classList.toggle('on', i < S.star[id])); return; }
     if (act === 'copy') { try { await navigator.clipboard.writeText(b.dataset.text); toast('Email copiata'); } catch (x) { toast('Copia non disponibile: seleziona il testo a mano'); } return; }
     busy = true; b.disabled = true;
@@ -335,7 +353,7 @@ document.addEventListener('click', async e => {
       ab.set(doc(db, 'swaps', id, 'links', me), { link: S.priv.link });
       ab.update(doc(db, 'swaps', id), { status: 'active', acceptedAt: Date.now() });
       await ab.commit(); toast('Scambio accettato');
-    } else if (act === 'decline') { await updateDoc(doc(db, 'swaps', id), { status: 'declined' }); S.route = null; toast('Richiesta rifiutata'); }
+    } else if (act === 'decline') { await updateDoc(doc(db, 'swaps', id), { status: 'declined' }); S.route = null; S.confirm = null; toast(s.status === 'active' ? 'Scambio chiuso' : (s.a === me ? 'Richiesta annullata' : 'Richiesta rifiutata')); }
     else if (act === 'shareEmail') {
       if (!S.priv.email) { toast('Aggiungi la tua email nel profilo.'); return; }
       await setDoc(doc(db, 'swaps', id, 'emails', me), { email: S.priv.email, at: Date.now() }); toast('Email condivisa');
@@ -346,7 +364,7 @@ document.addEventListener('click', async e => {
       const n = S.star[id] || 0; if (!n) { toast('Scegli da 1 a 5 stelle.'); return; }
       const o = s.a === me ? s.b : s.a; const tx = (($('#fbtext') || {}).value || '').trim().slice(0, 600);
       const batch = writeBatch(db);
-      batch.set(doc(db, 'feedback', id + '_' + me), { swapId: id, from: me, to: o, stars: n, text: tx, at: Date.now() });
+      batch.set(doc(db, 'feedback', id + '_' + me), { swapId: id, from: me, to: o, stars: n, text: tx, app: (s.apps && s.apps[o] && s.apps[o].name) || '', at: Date.now() });
       batch.update(doc(db, 'swaps', id), { ['fb.' + me]: true });
       await batch.commit(); toast('Feedback inviato');
     }
@@ -387,8 +405,11 @@ document.addEventListener('submit', async e => {
     busy = true;
     try {
       const old = S.users.get(me) || {};
-      await setDoc(doc(db, 'users', me), { nick, country, bio: $('#f-bio').value.trim().slice(0, 200), app: { name: ap, want: $('#f-want').value, cat: $('#f-cat').value, desc: $('#f-desc').value.trim().slice(0, 500) }, createdAt: old.createdAt || Date.now(), updatedAt: Date.now() });
-      await setDoc(doc(db, 'userPrivate', me), { email, link: lk });
+      // Con scambi aperti l'app non si cambia: si riscrive quella già salvata.
+      const locked = openSwaps().length > 0 && !!(old.app && old.app.name);
+      const keep = Object.assign({}, old.app || {}); delete keep.link;
+      await setDoc(doc(db, 'users', me), { nick, country, bio: $('#f-bio').value.trim().slice(0, 200), app: locked ? keep : { name: ap, want: $('#f-want').value, cat: $('#f-cat').value, desc: $('#f-desc').value.trim().slice(0, 500) }, createdAt: old.createdAt || Date.now(), updatedAt: Date.now() });
+      await setDoc(doc(db, 'userPrivate', me), { email, link: locked ? (S.priv.link || '') : lk });
       toast(ap ? 'Profilo salvato' : 'Profilo salvato. Aggiungi la tua app per comparire in Esplora.');
     } catch (err) { toastErr(err); } finally { busy = false; render(true); }
   }
