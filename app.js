@@ -1,7 +1,7 @@
 import { firebaseConfig, TEST_DAYS } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { getFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -357,7 +357,9 @@ function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; stopSubs();
 if (!firebaseConfig.apiKey || /INCOLLA/.test(firebaseConfig.apiKey)) {
   gate('Manca la configurazione di Firebase', 'Apri il file firebase-config.js e incolla i valori del tuo progetto Firebase. I passaggi sono nel README.');
 } else {
-  app = initializeApp(firebaseConfig); auth = getAuth(app); db = getFirestore(app);
+  app = initializeApp(firebaseConfig); auth = getAuth(app); /* Su molte reti mobili la connessione in tempo reale resta bloccata e gli aggiornamenti non arrivano.
+     Con il rilevamento automatico Firestore passa da solo a una connessione più compatibile. */
+  db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
   onAuthStateChanged(auth, u => {
     stopData(); me = u ? u.uid : null;
     if (me) startData();
