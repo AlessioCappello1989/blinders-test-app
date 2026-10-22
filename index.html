@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Blinders Test App</title>
+<meta name="theme-color" content="#0B1A4A">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
@@ -105,15 +109,21 @@ html{color-scheme:light}
 [hidden]{display:none!important}
 img{max-width:100%}
 .login{align-items:flex-start}
+.headl{flex-wrap:nowrap;min-width:0}
+.logo{width:48px;height:48px;border-radius:12px;object-fit:cover;flex:none;background:#0B1A4A}
+.logo-big{width:112px;height:112px;border-radius:24px;object-fit:cover;background:#0B1A4A}
 .setup code{font:500 13px var(--f-mono);overflow-wrap:anywhere}
 </style>
 </head>
 <body>
 <div class="app">
   <header class="row between">
-    <div class="brand">
-      <h1>Blinders Test App</h1>
-      <span class="tag">1 a 1 · 14 giorni · 12 tester</span>
+    <div class="row headl">
+      <img class="logo" src="logo.png" width="48" height="48" alt="">
+      <div class="brand">
+        <h1>Blinders Test App</h1>
+        <span class="tag">1 a 1 · 14 giorni · 12 tester</span>
+      </div>
     </div>
     <button id="out" class="btn ghost sm" data-act="logout" hidden>Esci</button>
   </header>

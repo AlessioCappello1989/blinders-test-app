@@ -247,7 +247,7 @@ function authErr(x) {
   toast(m[x && x.code] || 'Accesso non riuscito. Riprova.');
   console.error(x);
 }
-const loginForm = '<div class="stack" style="width:100%"><div><button class="btn primary" data-act="login">Accedi con Google</button></div>'
+const loginForm = '<div class="stack" style="width:100%"><img class="logo-big" src="logo.png" width="112" height="112" alt="Blinders Test App"><div><button class="btn primary" data-act="login">Accedi con Google</button></div>'
   + '<p class="small muted">oppure con email e password</p>'
   + '<form id="af" class="stack" autocomplete="on" novalidate>'
   + '<label for="a-email">Email<input id="a-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="nome@esempio.it"></label>'

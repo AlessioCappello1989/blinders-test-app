@@ -23,16 +23,19 @@ service cloud.firestore {
         && request.resource.data.country is string && request.resource.data.country.size() > 0
         && request.resource.data.get('bio', '').size() <= 200
         && request.resource.data.app.name.size() <= 50
+        && !('link' in request.resource.data.app)
         && request.resource.data.app.get('desc', '').size() <= 500
         && request.resource.data.app.get('want', '').size() <= 40;
       allow delete: if false;
     }
 
-    // Email personale: leggibile e scrivibile solo da te.
+    // Email personale e link di test: leggibili e scrivibili solo da te.
     match /userPrivate/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow write: if signedIn() && request.auth.uid == uid
-        && request.resource.data.email is string && request.resource.data.email.size() <= 100;
+        && request.resource.data.keys().hasOnly(['email', 'link'])
+        && request.resource.data.email is string && request.resource.data.email.size() <= 100
+        && request.resource.data.get('link', '').size() <= 300;
     }
 
     // Scambi: visibili solo ai due partecipanti.
@@ -58,15 +61,26 @@ service cloud.firestore {
 
       allow update: if signedIn() && request.auth.uid in resource.data.members
         && changed().hasOnly(['status', 'acceptedAt', 'start', 'fb'])
-        // Solo chi riceve la richiesta può accettare o rifiutare.
+        // Accetta solo chi riceve la richiesta. Annullare o chiudere può farlo uno qualsiasi dei due,
+        // ma uno scambio già completato da entrambi non si chiude più.
         && (!('status' in changed()) || (
-              resource.data.status == 'proposed'
-              && request.auth.uid == resource.data.b
-              && request.resource.data.status in ['active', 'declined']))
+              (resource.data.status == 'proposed'
+                && request.resource.data.status == 'active'
+                && request.auth.uid == resource.data.b)
+              || (resource.data.status == 'proposed'
+                && request.resource.data.status == 'declined')
+              || (resource.data.status == 'active'
+                && request.resource.data.status == 'declined'
+                && !(resource.data.fb.get(resource.data.a, false) && resource.data.fb.get(resource.data.b, false)))))
         && (!('acceptedAt' in changed()) || request.auth.uid == resource.data.b)
         // L'avvio del test usa l'orario del server e si imposta una sola volta, solo per sé.
         && (!('start' in changed()) || (
               resource.data.status == 'active'
+              // Si può avviare il test solo se l'altro ha messo a disposizione il link dell'app.
+              && ((resource.data.a == request.auth.uid
+                    && exists(/databases/$(database)/documents/swaps/$(id)/links/$(resource.data.b)))
+                  || (resource.data.b == request.auth.uid
+                    && exists(/databases/$(database)/documents/swaps/$(id)/links/$(resource.data.a))))
               && ownKeyOnly('start')
               && !(request.auth.uid in resource.data.start)
               && request.resource.data.start[request.auth.uid] == request.time))
@@ -82,7 +96,16 @@ service cloud.firestore {
         && swapDoc(id).status == 'active'
         && request.resource.data.from == request.auth.uid
         && request.resource.data.text is string
-        && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500;
+        && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 200;
+    }
+
+    // Link di test: quello dell'altro si legge solo quando lo scambio è stato accettato.
+    match /swaps/{id}/links/{uid} {
+      allow read: if isMember(id)
+        && (uid == request.auth.uid || swapDoc(id).status == 'active');
+      allow create, update: if isMember(id)
+        && uid == request.auth.uid
+        && request.resource.data.link is string && request.resource.data.link.size() <= 300;
     }
 
     // Email dello scambio: la sua si legge solo dopo aver condiviso la tua.

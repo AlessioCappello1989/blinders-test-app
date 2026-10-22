@@ -42,6 +42,8 @@ Avvia il test dallo scambio, aspetta un minuto e il modulo del feedback compare.
 - Le email personali sono leggibili solo dal proprietario.
 - Dentro uno scambio vedi l'email dell'altro solo dopo aver condiviso la tua.
 - Gli scambi e le chat sono visibili solo ai due partecipanti.
+- Il link di test dell'altro si sblocca solo quando lo scambio è accettato.
+- Una sola app per utente: finché ha scambi aperti, l'app nel profilo è bloccata. Questo controllo è nell'app, non nelle regole del database.
 - Si può proporre uno scambio solo se i paesi richiesti da entrambi combaciano.
 - Il feedback si può inviare solo dopo 14 giorni dall'avvio del tuo test, con l'orario del server.
 - Nome, categoria, descrizione e testi hanno limiti di lunghezza anche lato server.
@@ -50,5 +52,5 @@ Avvia il test dallo scambio, aspetta un minuto e il modulo del feedback compare.
 
 - Il paese è dichiarato dall'utente e non viene verificato.
 - Il conteggio dei tester si basa sui feedback ricevuti. Funziona bene fino a qualche centinaio di utenti; oltre servirebbe un contatore aggregato.
-- Il link di test dell'app è nel profilo pubblico, visibile a chi ha fatto il login.
+- Il link di test dell'app è privato: lo legge solo l'altro partecipante, e solo quando lo scambio è stato accettato.
 - Le regole non sono state provate con l'emulatore Firebase. Provale con due account prima di condividere il sito.
