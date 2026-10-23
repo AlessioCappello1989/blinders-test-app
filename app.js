@@ -1,7 +1,7 @@
 import { firebaseConfig, TEST_DAYS } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -178,9 +178,58 @@ function profileView(uid, edit) {
     + '<label for="f-want">Tester che ti servono<select id="f-want"' + dis + '>' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
     + '<label for="f-desc">Cosa deve provare il tester<textarea id="f-desc" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc">' + (ap.desc || '').length + '/500</span></label>'
     + '<div><button class="btn primary" type="submit">Salva profilo</button></div></form>'
-    + statBlock(uid) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>';
+    + statBlock(uid) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + deleteBox();
 }
 
+const SUPPORT = 'Blinders.NL8993@gmail.com';
+function deleteBox() {
+  const user = auth && auth.currentUser;
+  const hasPw = !!(user && user.providerData.some(p => p.providerId === 'password'));
+  const head = '<section class="card"><h3>Account e privacy</h3><p class="small muted">Per informazioni o per segnalare un problema scrivi a <a href="mailto:' + SUPPORT + '">' + SUPPORT + '</a>. Puoi eliminare il tuo account e i tuoi dati in qualsiasi momento.</p>';
+  if (!S.delOpen) return head + '<div><button class="btn ghost" data-act="delOpen">Elimina il mio account</button></div></section>';
+  return head + '<div class="box"><b>Cosa succede</b>'
+    + '<p class="small"><b>Vengono eliminati:</b> profilo, nome dell\'app, email e link di test, messaggi che hai inviato e testo dei feedback che hai scritto.</p>'
+    + '<p class="small"><b>Vengono chiusi:</b> gli scambi in corso e le richieste in attesa.</p>'
+    + '<p class="small"><b>Restano, in forma anonima:</b> le stelle che hai dato e gli scambi già completati, perché contano per l\'altro sviluppatore. I feedback ricevuti non sono più collegati a nessun profilo.</p>'
+    + '<p class="small">L\'operazione non si può annullare.</p></div>'
+    + '<label for="del-word">Scrivi ELIMINA per confermare<input id="del-word" autocomplete="off" autocapitalize="characters" placeholder="ELIMINA"></label>'
+    + (hasPw ? '<label for="del-pass">La tua password<input id="del-pass" type="password" autocomplete="current-password"></label>' : '<p class="small muted">Ti verrà chiesto di accedere di nuovo con Google per confermare.</p>')
+    + '<div class="row"><button class="btn primary" data-act="delGo">Elimina definitivamente</button><button class="btn ghost" data-act="delClose">Annulla</button></div></section>';
+}
+async function deleteAccount() {
+  const user = auth.currentUser; if (!user) return;
+  if ((($('#del-word') || {}).value || '').trim().toUpperCase() !== 'ELIMINA') { toast('Scrivi ELIMINA per confermare.'); return; }
+  const hasPw = user.providerData.some(p => p.providerId === 'password');
+  const pw = (($('#del-pass') || {}).value || '');
+  if (hasPw && !pw) { toast('Scrivi la tua password per confermare.'); return; }
+  busy = true;
+  try {
+    // 1. Conferma di nuovo chi sei, richiesto da Firebase per eliminare un account.
+    if (hasPw) await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, pw));
+    else await reauthenticateWithPopup(user, new GoogleAuthProvider());
+    // 2. Chiude gli scambi aperti e toglie i tuoi dati dagli scambi.
+    const swaps = []; S.swaps.forEach((sw, sid) => swaps.push([sid, sw]));
+    for (const [sid, sw] of swaps) {
+      if (sw.status !== 'declined' && !isDone(sw)) await updateDoc(doc(db, 'swaps', sid), { status: 'declined' });
+      await deleteDoc(doc(db, 'swaps', sid, 'links', me));
+      await deleteDoc(doc(db, 'swaps', sid, 'emails', me));
+      const mine_ = await getDocs(query(collection(db, 'swaps', sid, 'messages'), where('from', '==', me)));
+      for (const d of mine_.docs) await deleteDoc(d.ref);
+    }
+    // 3. Rende anonimi i feedback che hai scritto: restano le stelle, sparisce il testo e il tuo nome.
+    const fbs = await getDocs(query(collection(db, 'feedback'), where('from', '==', me)));
+    for (const d of fbs.docs) await updateDoc(d.ref, { text: '', from: 'deleted' });
+    // 4. Elimina profilo, dati privati e account.
+    await deleteDoc(doc(db, 'userPrivate', me));
+    await deleteDoc(doc(db, 'users', me));
+    try { localStorage.removeItem(seenKey()); } catch (e) { /* nessuna memoria locale */ }
+    await deleteUser(user);
+    toast('Account eliminato.');
+  } catch (e) {
+    if (e && e.code && String(e.code).indexOf('auth/') === 0) { if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') authErr(e); }
+    else toastErr(e);
+  } finally { busy = false; if (me) render(true); }
+}
 function swapView(id) {
   const s = S.swaps.get(id) && Object.assign({ id }, S.swaps.get(id));
   const back = '<button class="btn ghost sm back" data-act="back">← Indietro</button>';
@@ -317,6 +366,9 @@ document.addEventListener('click', async e => {
   try {
     if (act === 'login') { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (x) { if (x.code !== 'auth/popup-closed-by-user' && x.code !== 'auth/cancelled-popup-request') toast(x.code === 'auth/unauthorized-domain' ? 'Dominio non autorizzato: aggiungilo in Firebase > Authentication > Impostazioni.' : 'Accesso non riuscito. Riprova.'); } return; }
     if (act === 'logout') { await signOut(auth); return; }
+    if (act === 'delOpen') { S.delOpen = true; render(true); return; }
+    if (act === 'delClose') { S.delOpen = false; render(true); return; }
+    if (act === 'delGo') { await deleteAccount(); return; }
     if (act === 'reset') {
       const em = (($('#a-email') || {}).value || '').trim();
       if (!em) { toast('Scrivi prima la tua email.'); return; }
@@ -437,7 +489,7 @@ function startData() {
   dataUnsubs.push(onSnapshot(collection(db, 'feedback'), upd('fb', 'fb'), toastErr));
   dataUnsubs.push(onSnapshot(doc(db, 'userPrivate', me), sn => { S.priv = sn.exists() ? sn.data() : { email: '' }; loaded.priv = true; render(); }, toastErr));
 }
-function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; msgWatch.forEach(u => u()); msgWatch.clear(); S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; }
+function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; msgWatch.forEach(u => u()); msgWatch.clear(); S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; S.delOpen = false; }
 
 if (!firebaseConfig.apiKey || /INCOLLA/.test(firebaseConfig.apiKey)) {
   gate('Manca la configurazione di Firebase', 'Apri il file firebase-config.js e incolla i valori del tuo progetto Firebase. I passaggi sono nel README.');

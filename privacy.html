@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Privacy e dati - Blinders Test App</title>
+<meta name="theme-color" content="#0B1A4A">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+:root{--bg:#0A1128;--surface:#111B3A;--ink:#E8EDFB;--muted:#93A0C8;--line:#243263;--accent:#7C95FF;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Segoe UI",system-ui,sans-serif;
+  padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{font-size:26px;line-height:1.2;margin:0}
+h2{font-size:18px;margin:0 0 6px}
+p,ul{margin:0}
+ul{padding-left:20px}
+li{margin:3px 0}
+section{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+a{color:var(--accent);overflow-wrap:anywhere}
+.muted{color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+<p><a href="./">← Torna all'app</a></p>
+<h1>Privacy e dati</h1>
+<p class="muted">Blinders Test App · ultimo aggiornamento: 22 ottobre 2026</p>
+
+<section>
+<h2>Chi siamo e come contattarci</h2>
+<p>Blinders Test App mette in contatto sviluppatori Android che cercano tester per i test chiusi di Google Play. Per domande, segnalazioni o richieste sui tuoi dati scrivi a <a href="mailto:Blinders.NL8993@gmail.com">Blinders.NL8993@gmail.com</a>.</p>
+</section>
+
+<section>
+<h2>Quali dati raccogliamo</h2>
+<ul>
+<li>Account: email e password (gestite da Firebase Authentication) oppure account Google.</li>
+<li>Profilo: nome visibile, paese, presentazione, nome, categoria e descrizione della tua app.</li>
+<li>Dati privati: email dell'account Google per i test e link di adesione al test della tua app.</li>
+<li>Attività: richieste di scambio, messaggi di chat, date di avvio del test, feedback e stelle.</li>
+</ul>
+</section>
+
+<section>
+<h2>Chi vede cosa</h2>
+<ul>
+<li>Tutti gli utenti registrati vedono il tuo profilo pubblico: nome visibile, paese, presentazione, app e feedback ricevuti.</li>
+<li>L'altro partecipante di uno scambio vede il link di test solo dopo che lo scambio è accettato, e la tua email solo se la condividi anche tu.</li>
+<li>Chat e dettagli dello scambio sono visibili solo ai due partecipanti.</li>
+</ul>
+</section>
+
+<section>
+<h2>Dove sono i dati</h2>
+<p>I dati sono conservati con i servizi Firebase di Google (Authentication e Firestore). Non vendiamo i dati e non li usiamo per pubblicità.</p>
+</section>
+
+<section>
+<h2>Per quanto tempo</h2>
+<p>Finché non elimini il tuo account.</p>
+</section>
+
+<section id="elimina">
+<h2>Come eliminare il tuo account e i tuoi dati</h2>
+<p>Nell'app apri <b>Profilo</b>, scorri in fondo a <b>Account e privacy</b> e tocca <b>Elimina il mio account</b>. Scrivi ELIMINA e conferma.</p>
+<ul>
+<li>Vengono eliminati: profilo, nome dell'app, email e link di test, messaggi inviati, testo dei feedback scritti e account di accesso.</li>
+<li>Gli scambi in corso e le richieste in attesa vengono chiusi.</li>
+<li>Restano, in forma anonima, le stelle che hai dato e gli scambi già completati, perché fanno parte dello storico dell'altro sviluppatore.</li>
+</ul>
+<p style="margin-top:8px">Se non riesci ad accedere all'app, scrivi a <a href="mailto:Blinders.NL8993@gmail.com">Blinders.NL8993@gmail.com</a> dall'indirizzo con cui ti sei registrato e cancelleremo i tuoi dati.</p>
+</section>
+
+<section>
+<h2>I tuoi diritti</h2>
+<p>Puoi chiedere accesso, correzione, cancellazione e copia dei tuoi dati scrivendo all'indirizzo qui sopra. Puoi anche rivolgerti al Garante per la protezione dei dati personali.</p>
+</section>
+</main>
+</body>
+</html>

@@ -26,13 +26,15 @@ service cloud.firestore {
         && !('link' in request.resource.data.app)
         && request.resource.data.app.get('desc', '').size() <= 500
         && request.resource.data.app.get('want', '').size() <= 40;
-      allow delete: if false;
+      // Ognuno può eliminare il proprio profilo (eliminazione account).
+      allow delete: if signedIn() && request.auth.uid == uid;
     }
 
     // Email personale e link di test: leggibili e scrivibili solo da te.
     match /userPrivate/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
-      allow write: if signedIn() && request.auth.uid == uid
+      allow delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['email', 'link'])
         && request.resource.data.email is string && request.resource.data.email.size() <= 100
         && request.resource.data.get('link', '').size() <= 300;
@@ -97,6 +99,8 @@ service cloud.firestore {
         && request.resource.data.from == request.auth.uid
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 200;
+      // Puoi eliminare solo i messaggi che hai scritto tu (eliminazione account).
+      allow delete: if isMember(id) && resource.data.from == request.auth.uid;
     }
 
     // Link di test: quello dell'altro si legge solo quando lo scambio è stato accettato.
@@ -106,6 +110,7 @@ service cloud.firestore {
       allow create, update: if isMember(id)
         && uid == request.auth.uid
         && request.resource.data.link is string && request.resource.data.link.size() <= 300;
+      allow delete: if isMember(id) && uid == request.auth.uid;
     }
 
     // Email dello scambio: la sua si legge solo dopo aver condiviso la tua.
@@ -117,6 +122,7 @@ service cloud.firestore {
         && uid == request.auth.uid
         && swapDoc(id).status == 'active'
         && request.resource.data.email is string && request.resource.data.email.size() <= 100;
+      allow delete: if isMember(id) && uid == request.auth.uid;
     }
 
     // Feedback: visibili a tutti gli utenti loggati, creabili solo dopo 14 giorni di test.
@@ -133,7 +139,12 @@ service cloud.firestore {
         && request.resource.data.get('text', '').size() <= 600
         && request.auth.uid in swapDoc(request.resource.data.swapId).start
         && swapDoc(request.resource.data.swapId).start[request.auth.uid] + testDuration() <= request.time;
-      allow update, delete: if false;
+      allow delete: if false;
+      // Eliminazione account: il tuo feedback resta con le stelle ma senza testo e senza il tuo nome.
+      allow update: if signedIn() && resource.data.from == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'from'])
+        && request.resource.data.text == ''
+        && request.resource.data.from == 'deleted';
     }
   }
 }

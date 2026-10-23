@@ -48,6 +48,12 @@ Avvia il test dallo scambio, aspetta un minuto e il modulo del feedback compare.
 - Il feedback si può inviare solo dopo 14 giorni dall'avvio del tuo test, con l'orario del server.
 - Nome, categoria, descrizione e testi hanno limiti di lunghezza anche lato server.
 
+## Eliminazione account e contatti
+
+- In **Profilo > Account e privacy** l'utente può eliminare il proprio account e i dati: serve scrivere ELIMINA e confermare di nuovo la password o l'accesso con Google.
+- `privacy.html` è una pagina di informativa di base, da rileggere e adattare a come usi davvero i dati. Non è una consulenza legale. Il suo indirizzo, `https://TUO-UTENTE.github.io/blinders-test-app/privacy.html`, è quello da indicare in Play Console come informativa sulla privacy e come pagina per l'eliminazione dei dati.
+- L'email di contatto è nel piè di pagina dell'app, nel Profilo e in `privacy.html`.
+
 ## Limiti noti
 
 - Il paese è dichiarato dall'utente e non viene verificato.
