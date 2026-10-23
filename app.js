@@ -48,21 +48,23 @@ function markSeen(id) {
   all[id] = { msg: Math.max(lm ? lm.at : 0, Date.now()), start: true, fb: true, acc: true };
   try { localStorage.setItem(seenKey(), JSON.stringify(all)); } catch (e) { /* senza memoria locale gli avvisi restano finché non cambia lo stato */ }
 }
-function unreadOf(s) {
+function unreadInfo(s) {
   const seen = getSeen()[s.id] || {}; const o = s.a === me ? s.b : s.a; const out = []; const lm = S.lastMsg.get(s.id);
-  if (lm && lm.from !== me && lm.at > (seen.msg || 0)) out.push('Nuovo messaggio');
+  const nMsg = lm ? lm.list.filter(m => m.from !== me && m.at > (seen.msg || 0)).length : 0;
+  if (nMsg) out.push(nMsg === 1 ? 'Nuovo messaggio' : nMsg + ' nuovi messaggi');
   if (ms(s.start && s.start[o]) && !seen.start) out.push('Ha avviato il test');
   if (s.fb && s.fb[o] && !seen.fb) out.push('Ha lasciato il feedback');
   if (s.a === me && s.status === 'active' && !seen.acc) out.push('Ha accettato lo scambio');
-  return out;
+  return { labels: out, n: out.length + Math.max(0, nMsg - 1) };
 }
+const unreadOf = s => unreadInfo(s).labels;
 function syncWatch() {
   S.swaps.forEach((s, id) => {
     if (s.status !== 'active' || msgWatch.has(id)) return;
     let first = true;
-    msgWatch.set(id, onSnapshot(query(collection(db, 'swaps', id, 'messages'), orderBy('at', 'desc'), limit(1)), sn => {
-      const d = sn.docs[0] && read(sn.docs[0]);
-      if (d) S.lastMsg.set(id, { at: d.at || 0, from: d.from });
+    msgWatch.set(id, onSnapshot(query(collection(db, 'swaps', id, 'messages'), orderBy('at', 'desc'), limit(30)), sn => {
+      const list = sn.docs.map(read); const d = list[0];
+      if (d) S.lastMsg.set(id, { at: d.at || 0, from: d.from, list: list.map(m => ({ at: m.at || 0, from: m.from })) });
       const open = S.route && S.route.t === 'swap' && S.route.id === id;
       if (!first && d && d.from !== me && !open) toast('Nuovo messaggio da ' + nameOf(d.from));
       first = false;
@@ -121,7 +123,7 @@ const exploreView = () => '<label for="q">Cerca un\'app<input id="q" type="searc
 function swapCard(s) {
   const o = s.a === me ? s.b : s.a; const el = elapsed(s, me);
   const oa = (s.apps && s.apps[o] && s.apps[o].name) || 'la sua app', ma = (s.apps && s.apps[me] && s.apps[me].name) || 'la tua app';
-  let h = '<article class="card"><div class="row between"><button class="who" data-act="swap" data-id="' + esc(s.id) + '">' + av(o) + '<span class="n">' + esc(nameOf(o)) + '</span></button>' + statusPill(s) + '</div>'
+  let h = '<article class="card"><div class="row between"><button class="who" data-act="swap" data-id="' + esc(s.id) + '">' + av(o) + '<span class="n">' + esc(nameOf(o)) + '</span>' + (unreadInfo(s).n ? '<span class="dot" role="status" aria-label="' + unreadInfo(s).n + ' novità">' + (unreadInfo(s).n > 9 ? '9+' : unreadInfo(s).n) + '</span>' : '') + '</button>' + statusPill(s) + '</div>'
     + '<p class="small"><b>Tu testi</b> ' + esc(oa) + ' · <b>lui testa</b> ' + esc(ma) + '</p>'
     + (unreadOf(s).length ? '<div class="row">' + unreadOf(s).map(l => '<span class="pill warn">' + l + '</span>').join('') + '</div>' : '');
   if (s.status === 'active' && !isDone(s)) h += tracker(el) + '<p class="small muted mono">' + esc(dayLabel(el)) + '</p>';
