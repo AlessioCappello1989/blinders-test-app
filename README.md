@@ -43,7 +43,8 @@ Avvia il test dallo scambio, aspetta un minuto e il modulo del feedback compare.
 - Dentro uno scambio vedi l'email dell'altro solo dopo aver condiviso la tua.
 - Gli scambi e le chat sono visibili solo ai due partecipanti.
 - Il link di test dell'altro si sblocca solo quando lo scambio è accettato.
-- Una sola app per utente: finché ha scambi aperti, l'app nel profilo è bloccata. Questo controllo è nell'app, non nelle regole del database.
+- Ogni app ha il suo blocco: finché ha scambi aperti, quell'app nel profilo non si cambia. Questo controllo è nell'app, non nelle regole del database.
+- Invita un amico: ogni amico che si registra con il tuo link (`?invito=`) e pubblica la sua app sblocca un'app extra da far testare, fino a 3, anche se la principale è in test. Il limite di 3 e il conteggio sono nell'app, non nelle regole.
 - Si può proporre uno scambio solo se i paesi richiesti da entrambi combaciano.
 - Il feedback si può inviare solo dopo 14 giorni dall'avvio del tuo test, con l'orario del server.
 - Nome, categoria, descrizione e testi hanno limiti di lunghezza anche lato server.
@@ -56,6 +57,8 @@ Avvia il test dallo scambio, aspetta un minuto e il modulo del feedback compare.
 
 ## Limiti noti
 
+- Gli inviti non si possono verificare del tutto: chi crea account finti può sbloccare app extra. Un invito conta solo se l'amico ha un profilo nuovo (meno di 7 giorni) e ha pubblicato un'app.
+- Dopo l'aggiornamento pubblica insieme `app.js` e `firestore.rules`: la creazione di uno scambio ora richiede `appIds`. Gli scambi già esistenti restano validi e valgono per l'app principale.
 - Il paese è dichiarato dall'utente e non viene verificato.
 - Il conteggio dei tester si basa sui feedback ricevuti. Funziona bene fino a qualche centinaio di utenti; oltre servirebbe un contatore aggregato.
 - Il link di test dell'app è privato: lo legge solo l'altro partecipante, e solo quando lo scambio è stato accettato.

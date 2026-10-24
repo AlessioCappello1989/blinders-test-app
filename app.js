@@ -10,7 +10,18 @@ const CATS = ['Giochi', 'Produttività', 'Social', 'Strumenti', 'Salute e fitnes
 const COUNTRIES = ['Italia', 'Albania', 'Argentina', 'Australia', 'Austria', 'Belgio', 'Brasile', 'Canada', 'Cina', 'Croazia', 'Danimarca', 'Egitto', 'Filippine', 'Finlandia', 'Francia', 'Germania', 'Giappone', 'Grecia', 'India', 'Indonesia', 'Irlanda', 'Messico', 'Paesi Bassi', 'Polonia', 'Portogallo', 'Regno Unito', 'Romania', 'Spagna', 'Stati Uniti', 'Svezia', 'Svizzera', 'Turchia', 'Ucraina', 'Altro'];
 
 const view = $('#view');
-const S = { tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), priv: { email: '' }, q: '', star: {}, myEmail: undefined, theirEmail: undefined };
+const S = { tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, q: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined };
+/* Invito di un amico: il link ?invito=ID viene ricordato su questo dispositivo fino alla registrazione. */
+const INVITE_KEY = 'blinders-invite';
+let pendingInvite = null;
+try {
+  const ip = new URLSearchParams(location.search).get('invito');
+  const iok = ip && /^[A-Za-z0-9_-]{6,128}$/.test(ip) ? ip : null;
+  if (iok) { try { localStorage.setItem(INVITE_KEY, iok); } catch (e) { /* vale solo per questa visita */ } }
+  if (ip !== null) history.replaceState(null, '', location.pathname + location.hash);
+  pendingInvite = iok || localStorage.getItem(INVITE_KEY);
+} catch (e) { /* senza memoria locale l'invito vale solo per questa visita */ }
+function clearInvite() { pendingInvite = null; try { localStorage.removeItem(INVITE_KEY); } catch (e) { /* nessuna memoria locale */ } }
 const loaded = { users: false, swaps: false, fb: false, priv: false };
 let app, auth, db, me = null, busy = false, dirty = false, firstRoute = false;
 let dataUnsubs = [], subUnsubs = [], subKey = '', msgs = [], tt;
@@ -34,11 +45,40 @@ const av = id => '<span class="av ph">' + esc(nameOf(id)[0] || '?') + '</span>';
 const members = s => s.members || [s.a, s.b];
 const isDone = s => !!(s.fb && s.fb[s.a] && s.fb[s.b]);
 const countryOf = id => (S.users.get(id) && S.users.get(id).country) || '';
-const wantOf = id => (S.users.get(id) && S.users.get(id).app && S.users.get(id).app.want) || '';
-const canTest = (tester, owner) => { const w = wantOf(owner); return !w || w === countryOf(tester); };
-const compat = (a, b) => canTest(a, b) && canTest(b, a);
+/* App di uno sviluppatore: quella principale ('main') più le app extra sbloccate con gli inviti ('x1'..'x3'). */
+const SLOTS = ['x1', 'x2', 'x3'];
+const MAX_EXTRA = 3;
+const appsOf = id => {
+  const u = S.users.get(id); const l = [];
+  if (u && u.app && u.app.name) l.push(Object.assign({ id: 'main' }, u.app));
+  if (u && u.extra) SLOTS.forEach(k => { if (u.extra[k] && u.extra[k].name) l.push(Object.assign({ id: k }, u.extra[k])); });
+  return l;
+};
+const appOf = (uid, aid) => appsOf(uid).find(x => x.id === (aid || 'main'));
+const wantOf = (uid, aid) => { const a = appOf(uid, aid); return (a && a.want) || ''; };
+const canTest = (tester, owner, oAid) => { const w = wantOf(owner, oAid); return !w || w === countryOf(tester); };
+const compat = (a, aA, b, bA) => canTest(a, b, bA) && canTest(b, a, aA);
+const aidOf = (s, uid) => (s.appIds && s.appIds[uid]) || 'main';
 function mine() { const a = []; S.swaps.forEach((s, id) => a.push(Object.assign({ id }, s))); return a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0)); }
-function pairOpen(o) { return mine().find(s => members(s).indexOf(o) > -1 && s.status !== 'declined' && !isDone(s)); }
+const isOpenSwap = s => s.status !== 'declined' && !isDone(s);
+function pairOpen(o, mA, oA) { return mine().find(s => members(s).indexOf(o) > -1 && aidOf(s, me) === mA && aidOf(s, o) === oA && isOpenSwap(s)); }
+/* Scambio ancora aperto con quell'app dell'altro, qualunque sia la mia. */
+const swapForCard = (o, oA) => mine().find(s => members(s).indexOf(o) > -1 && aidOf(s, o) === oA && isOpenSwap(s));
+const openCount = aid => mine().filter(s => isOpenSwap(s) && aidOf(s, me) === aid).length;
+const linkFor = aid => aid === 'main' ? (S.priv.link || '') : ((S.priv.extraLinks || {})[aid] || '');
+/* Inviti: un amico conta quando si è registrato con il tuo link, ha il profilo e ha pubblicato la sua app. Massimo 3 extra. */
+function validInvites() {
+  const out = []; S.refs.forEach((r, inv) => { const u = S.users.get(inv); if (u && u.app && u.app.name) out.push(inv); });
+  return out.slice(0, MAX_EXTRA);
+}
+const inviteLink = () => location.origin + location.pathname + '?invito=' + encodeURIComponent(me);
+const slotsShown = u => { const b = validInvites().length; return SLOTS.filter((k, i) => i < b || !!(u && u.extra && u.extra[k] && u.extra[k].name)); };
+async function recordInvite(old, hasApp) {
+  if (!pendingInvite || !hasApp) return false;
+  if (S.myRef || pendingInvite === me || !S.users.get(pendingInvite)) { clearInvite(); return false; }
+  if (old.createdAt && Date.now() - old.createdAt > 7 * DAY) { clearInvite(); return false; }
+  try { await setDoc(doc(db, 'refs', me), { by: pendingInvite, at: Date.now() }); clearInvite(); return true; } catch (e) { console.error(e); return false; }
+}
 /* ---------- Novità non lette (salvate su questo dispositivo) ---------- */
 const seenKey = () => 'blinders-seen-' + me;
 function getSeen() { try { return JSON.parse(localStorage.getItem(seenKey()) || '{}'); } catch (e) { return {}; } }
@@ -75,11 +115,11 @@ function syncWatch() {
 }
 /* Scambi ancora aperti: richieste in attesa e scambi accettati non ancora completati da entrambi. */
 const openSwaps = () => mine().filter(s => s.status !== 'declined' && !isDone(s));
-/* done = tester dell'app attuale (i feedback senza app indicata contano); n e avg = tutti i feedback ricevuti. */
-function stats(id) {
-  const u = S.users.get(id); const cur = (u && u.app && u.app.name) || '';
+/* done = tester di quell'app (per la principale contano anche i feedback senza app indicata); n e avg = tutti i feedback ricevuti. */
+function stats(id, a) {
+  const cur = a || appsOf(id)[0] || { id: 'main', name: '' };
   let n = 0, sum = 0, done = 0;
-  S.fb.forEach(f => { if (f.to === id) { n++; sum += f.stars || 0; if (!f.app || f.app === cur) done++; } });
+  S.fb.forEach(f => { if (f.to === id) { n++; sum += f.stars || 0; if (f.app ? f.app === cur.name : cur.id === 'main') done++; } });
   return { done, n, avg: n ? sum / n : 0 };
 }
 function elapsed(s, uid) { const t = ms(s.start && s.start[uid]); return t ? (Date.now() - t) / DAY : null; }
@@ -94,31 +134,54 @@ function statusPill(s) { if (isDone(s)) return '<span class="pill ok">Completato
 const stars = n => '★'.repeat(n || 0) + '☆'.repeat(5 - (n || 0));
 
 /* ---------- Viste ---------- */
+function inviteBox(short) {
+  if (!S.users.get(me)) return '';
+  const n = validInvites().length;
+  const prog = '<span class="pill ' + (n ? 'ok' : '') + '">' + n + '/' + MAX_EXTRA + ' amici</span>';
+  if (short) return '<div class="card"><div class="row between"><b>Vuoi far testare un\'altra app?</b>' + prog + '</div><p class="small muted">Invita un amico: quando si registra e pubblica la sua app sblocchi un\'app extra, anche se la precedente è in fase di test.</p><div><button class="btn" data-act="invite">Invita un amico</button></div></div>';
+  return '<div class="card"><div class="row between"><h2>Invita un amico</h2>' + prog + '</div>'
+    + '<p class="small muted">Ogni amico che si registra con il tuo link e pubblica la sua app ti sblocca uno spazio per un\'app extra da far testare, anche se la precedente è in fase di test. Massimo ' + MAX_EXTRA + ' app extra.</p>'
+    + '<div class="box"><code class="small" style="overflow-wrap:anywhere">' + esc(inviteLink()) + '</code></div>'
+    + '<div class="row"><button class="btn primary" data-act="invite">Invita un amico</button><button class="btn" data-act="copy" data-text="' + esc(inviteLink()) + '" data-msg="Link copiato">Copia link</button></div>'
+    + '<p class="small muted">Spazi sbloccati: ' + n + '. Gli amici contano quando hanno pubblicato la loro app.</p></div>';
+}
 function exploreItems() {
   const q = S.q.trim().toLowerCase();
-  const meU = S.users.get(me); const myApp = meU && meU.app && meU.app.name;
+  const mineApps = appsOf(me);
   const arr = []; let hidden = 0;
   S.users.forEach((u, id) => {
-    if (id === me || !u.app || !u.app.name) return;
-    if (q && (u.app.name + ' ' + (u.nick || '') + ' ' + (u.app.cat || '')).toLowerCase().indexOf(q) < 0) return;
-    if (!compat(me, id) && !pairOpen(id)) { hidden++; return; }
-    arr.push({ id, u, st: stats(id) });
+    if (id === me) return;
+    appsOf(id).forEach(a => {
+      if (q && (a.name + ' ' + (u.nick || '') + ' ' + (a.cat || '')).toLowerCase().indexOf(q) < 0) return;
+      const ex = swapForCard(id, a.id);
+      const ok = canTest(me, id, a.id) && (!mineApps.length || mineApps.some(m => canTest(id, me, m.id)));
+      if (!ex && !ok) { hidden++; return; }
+      arr.push({ id, u, a, ex, st: stats(id, a) });
+    });
   });
-  arr.sort((a, b) => b.st.done - a.st.done || (b.u.createdAt || 0) - (a.u.createdAt || 0));
+  arr.sort((x, y) => y.st.done - x.st.done || (y.u.createdAt || 0) - (x.u.createdAt || 0));
   const note = hidden ? '<p class="small muted">' + hidden + (hidden === 1 ? ' app nascosta perché non è' : ' app nascoste perché non sono') + ' compatibili con i paesi richiesti da te o da loro.</p>' : '';
   if (!arr.length) return '<div class="empty"><h3>Nessuna app da testare per ora</h3><p class="muted">' + (q ? 'Prova con un altro nome o categoria.' : 'Pubblica la tua app dal profilo e invita altri sviluppatori.') + '</p></div>' + note;
   return arr.map(x => {
-    const ex = pairOpen(x.id); let act;
-    if (!myApp || !countryOf(me)) act = '<button class="btn ghost" data-act="tab" data-tab="profile">Completa prima il tuo profilo</button>';
-    else if (ex) act = '<button class="btn" data-act="swap" data-id="' + esc(ex.id) + '">Apri scambio</button>';
-    else act = '<button class="btn primary" data-act="propose" data-id="' + esc(x.id) + '">Proponi scambio 1 a 1</button>';
+    let act, pickH = '';
+    if (!mineApps.length || !countryOf(me)) act = '<button class="btn ghost" data-act="tab" data-tab="profile">Completa prima il tuo profilo</button>';
+    else if (x.ex) act = '<button class="btn" data-act="swap" data-id="' + esc(x.ex.id) + '">Apri scambio</button>';
+    else {
+      const elig = mineApps.filter(m => canTest(x.id, me, m.id) && canTest(me, x.id, x.a.id) && !pairOpen(x.id, m.id, x.a.id));
+      if (!elig.length) act = '<p class="small muted">Nessuna delle tue app è compatibile o libera per questo scambio.</p>';
+      else {
+        const key = x.id + '-' + x.a.id; const cur = elig.find(m => m.id === S.pick[key]) || elig[0];
+        if (elig.length > 1) pickH = '<label for="pick-' + esc(key) + '">Con quale tua app?<select class="pick" id="pick-' + esc(key) + '" data-key="' + esc(key) + '">' + elig.map(m => '<option value="' + esc(m.id) + '"' + (m.id === cur.id ? ' selected' : '') + '>' + esc(m.name) + '</option>').join('') + '</select></label>';
+        act = '<button class="btn primary" data-act="propose" data-id="' + esc(x.id) + '" data-oa="' + esc(x.a.id) + '" data-ma="' + esc(cur.id) + '">Proponi scambio 1 a 1</button>';
+      }
+    }
     return '<article class="card"><div class="row between"><button class="who" data-act="user" data-id="' + esc(x.id) + '">' + av(x.id) + '<span class="n">' + esc(nameOf(x.id)) + '</span></button>' + rate(x.st) + '</div>'
-      + '<div><h3 class="appname">' + esc(x.u.app.name) + '</h3><div class="row" style="margin-top:4px"><span class="chip">' + esc(x.u.app.cat || 'Altro') + '</span><span class="chip">' + esc(x.u.country || 'Paese n.d.') + '</span><span class="chip">Cerca: ' + esc(x.u.app.want || 'tutti i paesi') + '</span><span class="small muted">' + x.st.done + ' tester completati</span></div></div>'
-      + (x.u.app.desc ? '<p class="desc">' + esc(x.u.app.desc) + '</p>' : '')
-      + '<div>' + act + '</div></article>';
+      + '<div><h3 class="appname">' + esc(x.a.name) + '</h3><div class="row" style="margin-top:4px"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="chip">' + esc(x.u.country || 'Paese n.d.') + '</span><span class="chip">Cerca: ' + esc(x.a.want || 'tutti i paesi') + '</span><span class="small muted">' + x.st.done + ' tester completati</span></div></div>'
+      + (x.a.desc ? '<p class="desc">' + esc(x.a.desc) + '</p>' : '')
+      + pickH + '<div>' + act + '</div></article>';
   }).join('') + note;
 }
-const exploreView = () => '<label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label><div id="list" class="stack">' + exploreItems() + '</div>';
+const exploreView = () => '<label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
 
 function swapCard(s) {
   const o = s.a === me ? s.b : s.a; const el = elapsed(s, me);
@@ -146,41 +209,49 @@ function fbList(uid) {
   if (!a.length) return '<p class="muted small">Nessun feedback ricevuto.</p>';
   return a.map(f => '<div class="fbitem"><div class="row between"><b>' + esc(nameOf(f.from)) + '</b><span class="small muted mono">' + fmtD(f.at || Date.now()) + '</span></div><span class="st" aria-label="' + f.stars + ' stelle su 5">' + stars(f.stars) + '</span>' + (f.text ? '<p class="desc">' + esc(f.text) + '</p>' : '') + '</div>').join('');
 }
-function statBlock(uid) {
-  const st = stats(uid);
-  return '<div class="card"><div class="row between"><h3>Tester completati</h3><span class="mono">' + Math.min(st.done, 12) + '/12</span></div>' + meter(Math.min(st.done, 12))
+function statBlock(uid, a, multi) {
+  const st = stats(uid, a);
+  return '<div class="card"><div class="row between"><h3>Tester completati' + (multi && a ? ' · ' + esc(a.name) : '') + '</h3><span class="mono">' + Math.min(st.done, 12) + '/12</span></div>' + meter(Math.min(st.done, 12))
     + '<p class="small muted">Google Play chiede 12 tester per 14 giorni consecutivi. Conta ogni persona che ha testato la tua app per 14 giorni e ha lasciato il feedback.</p>'
     + '<div class="row between"><span class="small muted">Valutazione media</span>' + rate(st) + '</div></div>';
+}
+function appFields(k, ap, title, bonus) {
+  const n = openCount(k), lock = n > 0 && !!ap.name, dis = lock ? ' disabled' : '';
+  const wopts = '<option value="">Qualsiasi paese</option>' + COUNTRIES.map(c => '<option value="' + c + '"' + (ap.want === c ? ' selected' : '') + '>Solo ' + c + '</option>').join('');
+  const opts = CATS.map(c => '<option' + ((ap.cat || 'Altro') === c ? ' selected' : '') + '>' + c + '</option>').join('');
+  const note = lock ? '<div class="banner">App bloccata: hai ' + n + (n === 1 ? ' scambio aperto' : ' scambi aperti') + '. Puoi cambiarla quando tutti gli scambi di questa app sono completati, rifiutati o chiusi. Li trovi in <b>Scambi</b>.' + (k === 'main' && bonus < MAX_EXTRA ? ' Vuoi far testare un\'altra app subito? Invita un amico qui sopra.' : '') + '</div>'
+    : (k !== 'main' && !ap.name ? '<p class="small muted">Spazio sbloccato da un invito. Lascialo vuoto se non ti serve.</p>' : '');
+  const lk = linkFor(k);
+  return '<h2 style="margin-top:6px">' + title + '</h2>' + note
+    + '<label for="f-app-' + k + '">Nome dell\'app<input id="f-app-' + k + '" maxlength="50"' + dis + ' value="' + esc(ap.name || '') + '"><span class="field-note" id="c-f-app-' + k + '">' + (ap.name || '').length + '/50</span></label>'
+    + '<div class="grid2"><label for="f-cat-' + k + '">Categoria<select id="f-cat-' + k + '"' + dis + '>' + opts + '</select></label>'
+    + '<label for="f-link-' + k + '">Link di adesione al test<input id="f-link-' + k + '" type="url" inputmode="url"' + dis + ' value="' + esc(lk) + '" placeholder="https://play.google.com/apps/testing/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te.</span></label></div>'
+    + '<label for="f-want-' + k + '">Tester che ti servono<select id="f-want-' + k + '"' + dis + '>' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
+    + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>';
 }
 function profileView(uid, edit) {
   const u = S.users.get(uid) || {}; const ap = u.app || {};
   if (!edit) {
+    const list = appsOf(uid);
     return '<button class="btn ghost sm back" data-act="back">← Indietro</button>'
       + '<div class="card"><div class="row">' + av(uid) + '<div><h2>' + esc(nameOf(uid)) + '</h2><span class="chip">' + esc(u.country || 'Paese n.d.') + '</span></div></div>' + (u.bio ? '<p class="desc">' + esc(u.bio) + '</p>' : '') + '</div>'
-      + (ap.name ? '<div class="card"><span class="small muted mono">APP DA TESTARE</span><h3 class="appname">' + esc(ap.name) + '</h3><div class="row"><span class="chip">' + esc(ap.cat || 'Altro') + '</span><span class="chip">Cerca: ' + esc(ap.want || 'tutti i paesi') + '</span></div>' + (ap.desc ? '<p class="desc">' + esc(ap.desc) + '</p>' : '') + '</div>' : '')
-      + statBlock(uid) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>';
+      + list.map(a => '<div class="card"><span class="small muted mono">APP DA TESTARE</span><h3 class="appname">' + esc(a.name) + '</h3><div class="row"><span class="chip">' + esc(a.cat || 'Altro') + '</span><span class="chip">Cerca: ' + esc(a.want || 'tutti i paesi') + '</span></div>' + (a.desc ? '<p class="desc">' + esc(a.desc) + '</p>' : '') + '</div>').join('')
+      + (list.length ? list.map(a => statBlock(uid, a, list.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>';
   }
   const copts = (u.country ? '' : '<option value="">Scegli il tuo paese</option>') + COUNTRIES.map(c => '<option value="' + c + '"' + (u.country === c ? ' selected' : '') + '>' + c + '</option>').join('');
-  const wopts = '<option value="">Qualsiasi paese</option>' + COUNTRIES.map(c => '<option value="' + c + '"' + (ap.want === c ? ' selected' : '') + '>Solo ' + c + '</option>').join('');
-  const nOpen = openSwaps().length;
-  const lock = nOpen > 0 && !!ap.name;
-  const dis = lock ? ' disabled' : '';
-  const lockNote = lock ? '<div class="banner">App bloccata: hai ' + nOpen + (nOpen === 1 ? ' scambio aperto' : ' scambi aperti') + '. Puoi cambiare app quando tutti gli scambi sono completati, rifiutati o chiusi. Li trovi in <b>Scambi</b>.</div>' : '';
-  const opts = CATS.map(c => '<option' + ((ap.cat || 'Altro') === c ? ' selected' : '') + '>' + c + '</option>').join('');
+  const bonus = validInvites().length; const shown = slotsShown(u);
+  const mineList = appsOf(uid);
   return (!S.users.get(me) ? '<div class="banner">Completa il profilo e pubblica la tua app per poter proporre scambi.</div>' : '')
+    + inviteBox(false)
     + '<form id="pf" class="card" autocomplete="off"><h2>Il tuo profilo</h2>'
     + '<label for="f-nick">Nome visibile<input id="f-nick" maxlength="30" value="' + esc(u.nick || '') + '" placeholder="Come ti chiamano gli altri"></label>'
     + '<label for="f-bio">Chi sei<textarea id="f-bio" maxlength="200" placeholder="Una riga su di te">' + esc(u.bio || '') + '</textarea><span class="field-note" id="c-f-bio">' + (u.bio || '').length + '/200</span></label>'
     + '<label for="f-email">Email dell\'account Google per i test<input id="f-email" type="email" inputmode="email" value="' + esc(S.priv.email || '') + '" placeholder="nome@gmail.com"><span class="field-note">Resta privata. Viene condivisa solo dentro uno scambio e solo se condividi anche tu.</span></label>'
     + '<label for="f-country">Il tuo paese<select id="f-country">' + copts + '</select><span class="field-note">Serve per far combaciare le richieste di tester. Lo scrivi tu, non viene verificato.</span></label>'
-    + '<h2 style="margin-top:6px">La tua app</h2>' + lockNote
-    + '<label for="f-app">Nome dell\'app<input id="f-app" maxlength="50"' + dis + ' value="' + esc(ap.name || '') + '"><span class="field-note" id="c-f-app">' + (ap.name || '').length + '/50</span></label>'
-    + '<div class="grid2"><label for="f-cat">Categoria<select id="f-cat"' + dis + '>' + opts + '</select></label>'
-    + '<label for="f-link">Link di adesione al test<input id="f-link" type="url" inputmode="url"' + dis + ' value="' + esc(S.priv.link || '') + '" placeholder="https://play.google.com/apps/testing/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te.</span></label></div>'
-    + '<label for="f-want">Tester che ti servono<select id="f-want"' + dis + '>' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
-    + '<label for="f-desc">Cosa deve provare il tester<textarea id="f-desc" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc">' + (ap.desc || '').length + '/500</span></label>'
+    + appFields('main', ap, 'La tua app', bonus)
+    + shown.map((k, i) => appFields(k, (u.extra && u.extra[k]) || {}, 'App extra ' + (i + 1), bonus)).join('')
     + '<div><button class="btn primary" type="submit">Salva profilo</button></div></form>'
-    + statBlock(uid) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + deleteBox();
+    + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + deleteBox();
 }
 
 const SUPPORT = 'Blinders.NL8993@gmail.com';
@@ -222,6 +293,7 @@ async function deleteAccount() {
     const fbs = await getDocs(query(collection(db, 'feedback'), where('from', '==', me)));
     for (const d of fbs.docs) await updateDoc(d.ref, { text: '', from: 'deleted' });
     // 4. Elimina profilo, dati privati e account.
+    try { await deleteDoc(doc(db, 'refs', me)); } catch (e) { /* nessun invito da togliere */ }
     await deleteDoc(doc(db, 'userPrivate', me));
     await deleteDoc(doc(db, 'users', me));
     try { localStorage.removeItem(seenKey()); } catch (e) { /* nessuna memoria locale */ }
@@ -311,7 +383,7 @@ function gate(t, p, extra) { view.innerHTML = '<div class="empty login"><h3>' + 
 function render(force) {
   if (!force) { const a = document.activeElement; if (a && view.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) { dirty = true; return; } }
   dirty = false;
-  if (!me) return gate('Accedi per iniziare', 'Crei il profilo, proponi scambi e chatti con gli altri sviluppatori. Se è la prima volta con email e password, tocca Registrati.', loginForm);
+  if (!me) return gate('Accedi per iniziare', (pendingInvite ? 'Sei stato invitato da un amico: registrati e pubblica la tua app per sbloccargli un\'app extra. ' : '') + 'Crei il profilo, proponi scambi e chatti con gli altri sviluppatori. Se è la prima volta con email e password, tocca Registrati.', loginForm);
   if (!(loaded.users && loaded.swaps && loaded.fb && loaded.priv)) return;
   if (!firstRoute) { firstRoute = true; if (!S.users.get(me)) S.tab = 'profile'; }
   if (S.route && S.route.t === 'swap') markSeen(S.route.id);
@@ -384,27 +456,39 @@ document.addEventListener('click', async e => {
     if (act === 'askClose') { S.confirm = id; render(true); return; }
     if (act === 'noClose') { S.confirm = null; render(true); return; }
     if (act === 'star') { S.star[id] = +b.dataset.n; view.querySelectorAll('.star').forEach((x, i) => x.classList.toggle('on', i < S.star[id])); return; }
-    if (act === 'copy') { try { await navigator.clipboard.writeText(b.dataset.text); toast('Email copiata'); } catch (x) { toast('Copia non disponibile: seleziona il testo a mano'); } return; }
+    if (act === 'invite') {
+      const url = inviteLink(), text = 'Ti invito su Blinders Test App: ci scambiamo i test di 14 giorni per le nostre app Android.';
+      if (navigator.share) { try { await navigator.share({ title: 'Blinders Test App', text, url }); } catch (x) { /* condivisione annullata */ } return; }
+      try { await navigator.clipboard.writeText(text + ' ' + url); toast('Link di invito copiato'); } catch (x) { toast('Copia non disponibile: ' + url); }
+      return;
+    }
+    if (act === 'copy') { try { await navigator.clipboard.writeText(b.dataset.text); toast(b.dataset.msg || 'Email copiata'); } catch (x) { toast('Copia non disponibile: seleziona il testo a mano'); } return; }
     busy = true; b.disabled = true;
     const s = S.swaps.get(id);
     if (act === 'propose') {
-      const meU = S.users.get(me), them = S.users.get(id);
-      if (!meU || !meU.app || !meU.app.name) { toast('Pubblica prima la tua app nel profilo.'); return; }
-      if (!them || !them.app || !them.app.name) return;
-      if (pairOpen(id)) { toast('Avete già uno scambio aperto.'); return; }
+      const oA = b.dataset.oa || 'main'; const them = appOf(id, oA);
+      const sel = document.getElementById('pick-' + id + '-' + oA);
+      const mA = (sel && sel.value) || b.dataset.ma || 'main'; const mineA = appOf(me, mA);
+      if (!mineA) { toast('Pubblica prima la tua app nel profilo.'); return; }
+      if (!them) return;
+      if (pairOpen(id, mA, oA)) { toast('Avete già uno scambio aperto con queste app.'); return; }
       if (!countryOf(me)) { toast('Scegli prima il tuo paese nel profilo.'); return; }
-      if (!compat(me, id)) { toast('Scambio non compatibile con i paesi richiesti.'); return; }
-      if (!S.priv.link) { toast('Aggiungi nel profilo il link di adesione al test della tua app.'); return; }
-      const apps = {}; apps[me] = { name: meU.app.name }; apps[id] = { name: them.app.name };
-      const ref = await addDoc(collection(db, 'swaps'), { a: me, b: id, members: [me, id], apps, status: 'proposed', createdAt: Date.now(), start: {}, fb: {} });
-      await setDoc(doc(db, 'swaps', ref.id, 'links', me), { link: S.priv.link });
+      if (!compat(me, mA, id, oA)) { toast('Scambio non compatibile con i paesi richiesti.'); return; }
+      const lk = linkFor(mA);
+      if (!lk) { toast('Aggiungi nel profilo il link di adesione al test di ' + mineA.name + '.'); return; }
+      const apps = {}; apps[me] = { name: mineA.name }; apps[id] = { name: them.name };
+      const appIds = {}; appIds[me] = mA; appIds[id] = oA;
+      const ref = await addDoc(collection(db, 'swaps'), { a: me, b: id, members: [me, id], apps, appIds, status: 'proposed', createdAt: Date.now(), start: {}, fb: {} });
+      await setDoc(doc(db, 'swaps', ref.id, 'links', me), { link: lk });
       toast('Richiesta inviata'); S.tab = 'swaps'; S.route = { t: 'swap', id: ref.id };
     } else if (act === 'accept') {
-      const oo = s.a === me ? s.b : s.a;
-      if (!compat(me, oo)) { toast('Scambio non compatibile con i paesi richiesti.'); return; }
-      if (!S.priv.link) { toast('Aggiungi nel profilo il link di adesione al test della tua app, poi accetta.'); return; }
+      const oo = s.a === me ? s.b : s.a; const mA = aidOf(s, me), oA = aidOf(s, oo);
+      if (!appOf(me, mA)) { toast('L\'app di questo scambio non è più nel tuo profilo.'); return; }
+      if (!compat(me, mA, oo, oA)) { toast('Scambio non compatibile con i paesi richiesti.'); return; }
+      const lk = linkFor(mA);
+      if (!lk) { toast('Aggiungi nel profilo il link di adesione al test della tua app, poi accetta.'); return; }
       const ab = writeBatch(db);
-      ab.set(doc(db, 'swaps', id, 'links', me), { link: S.priv.link });
+      ab.set(doc(db, 'swaps', id, 'links', me), { link: lk });
       ab.update(doc(db, 'swaps', id), { status: 'active', acceptedAt: Date.now() });
       await ab.commit(); toast('Scambio accettato');
     } else if (act === 'decline') { await updateDoc(doc(db, 'swaps', id), { status: 'declined' }); S.route = null; S.confirm = null; toast(s.status === 'active' ? 'Scambio chiuso' : (s.a === me ? 'Richiesta annullata' : 'Richiesta rifiutata')); }
@@ -429,6 +513,7 @@ document.addEventListener('input', e => {
   if (e.target.id === 'q') { S.q = e.target.value; const l = $('#list'); if (l) l.innerHTML = exploreItems(); }
   const c = e.target.id && $('#c-' + e.target.id); if (c) c.textContent = e.target.value.length + '/' + e.target.maxLength;
 });
+document.addEventListener('change', e => { const t = e.target; if (t && t.classList && t.classList.contains('pick')) S.pick[t.dataset.key] = t.value; });
 document.addEventListener('submit', async e => {
   e.preventDefault();
   if (e.target.id === 'af') {
@@ -451,20 +536,31 @@ document.addEventListener('submit', async e => {
     return;
   }
   if (e.target.id === 'pf') {
-    const nick = $('#f-nick').value.trim(), email = $('#f-email').value.trim(), ap = $('#f-app').value.trim().slice(0, 50), lk = $('#f-link').value.trim();
+    const nick = $('#f-nick').value.trim(), email = $('#f-email').value.trim();
     if (!nick) { toast('Scrivi il nome visibile.'); return; }
     const country = $('#f-country').value; if (!country) { toast('Scegli il tuo paese.'); return; }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Controlla l\'email.'); return; }
-    if (lk && !/^https:\/\//i.test(lk)) { toast('Il link deve iniziare con https://'); return; }
+    const old = S.users.get(me) || {};
+    const ks = ['main'].concat(slotsShown(old));
+    for (const k of ks) { const l = ($('#f-link-' + k).value || '').trim(); if (l && !/^https:\/\//i.test(l)) { toast('Il link deve iniziare con https://'); return; } }
     busy = true;
     try {
-      const old = S.users.get(me) || {};
-      // Con scambi aperti l'app non si cambia: si riscrive quella già salvata.
-      const locked = openSwaps().length > 0 && !!(old.app && old.app.name);
-      const keep = Object.assign({}, old.app || {}); delete keep.link;
-      await setDoc(doc(db, 'users', me), { nick, country, bio: $('#f-bio').value.trim().slice(0, 200), app: locked ? keep : { name: ap, want: $('#f-want').value, cat: $('#f-cat').value, desc: $('#f-desc').value.trim().slice(0, 500) }, createdAt: old.createdAt || Date.now(), updatedAt: Date.now() });
-      await setDoc(doc(db, 'userPrivate', me), { email, link: locked ? (S.priv.link || '') : lk });
-      toast(ap ? 'Profilo salvato' : 'Profilo salvato. Aggiungi la tua app per comparire in Esplora.');
+      const extra = {}, extraLinks = {}; let mainApp = null, mainLink = '';
+      for (const k of ks) {
+        const prev = Object.assign({}, k === 'main' ? (old.app || {}) : ((old.extra || {})[k] || {})); delete prev.link;
+        // Con scambi aperti su quell'app non si cambia: si riscrive quella già salvata.
+        const locked = openCount(k) > 0 && !!prev.name;
+        const app = locked ? prev : { name: $('#f-app-' + k).value.trim().slice(0, 50), want: $('#f-want-' + k).value, cat: $('#f-cat-' + k).value, desc: $('#f-desc-' + k).value.trim().slice(0, 500) };
+        const lk = locked ? linkFor(k) : $('#f-link-' + k).value.trim();
+        if (k === 'main') { mainApp = app; mainLink = lk; } else if (app.name) { extra[k] = app; extraLinks[k] = lk; }
+      }
+      const data = { nick, country, bio: $('#f-bio').value.trim().slice(0, 200), app: mainApp, createdAt: old.createdAt || Date.now(), updatedAt: Date.now() };
+      if (Object.keys(extra).length) data.extra = extra;
+      await setDoc(doc(db, 'users', me), data);
+      const priv = { email, link: mainLink }; if (Object.keys(extraLinks).length) priv.extraLinks = extraLinks;
+      await setDoc(doc(db, 'userPrivate', me), priv);
+      const counted = await recordInvite(old, !!mainApp.name);
+      toast(counted ? 'Profilo salvato. Il tuo invito è stato registrato: grazie!' : (mainApp.name ? 'Profilo salvato' : 'Profilo salvato. Aggiungi la tua app per comparire in Esplora.'));
     } catch (err) { toastErr(err); } finally { busy = false; render(true); }
   }
 });
@@ -489,9 +585,11 @@ function startData() {
     S.swaps = next; loaded.swaps = true; render();
   }, toastErr));
   dataUnsubs.push(onSnapshot(collection(db, 'feedback'), upd('fb', 'fb'), toastErr));
+  dataUnsubs.push(onSnapshot(doc(db, 'refs', me), sn => { S.myRef = sn.exists() ? sn.data() : null; }, () => { S.myRef = null; }));
+  dataUnsubs.push(onSnapshot(query(collection(db, 'refs'), where('by', '==', me)), sn => { S.refs = new Map(sn.docs.map(d => [d.id, read(d)])); render(); }, () => { /* senza inviti non c'è nulla da mostrare */ }));
   dataUnsubs.push(onSnapshot(doc(db, 'userPrivate', me), sn => { S.priv = sn.exists() ? sn.data() : { email: '' }; loaded.priv = true; render(); }, toastErr));
 }
-function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; msgWatch.forEach(u => u()); msgWatch.clear(); S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; S.delOpen = false; }
+function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; msgWatch.forEach(u => u()); msgWatch.clear(); S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; S.refs = new Map(); S.myRef = undefined; Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; S.delOpen = false; }
 
 if (!firebaseConfig.apiKey || /INCOLLA/.test(firebaseConfig.apiKey)) {
   gate('Manca la configurazione di Firebase', 'Apri il file firebase-config.js e incolla i valori del tuo progetto Firebase. I passaggi sono nel README.');
