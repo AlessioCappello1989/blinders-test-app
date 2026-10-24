@@ -141,8 +141,7 @@ function inviteBox(short) {
   if (short) return '<div class="card"><div class="row between"><b>Vuoi far testare un\'altra app?</b>' + prog + '</div><p class="small muted">Invita un amico: quando si registra e pubblica la sua app sblocchi un\'app extra, anche se la precedente è in fase di test.</p><div><button class="btn" data-act="invite">Invita un amico</button></div></div>';
   return '<div class="card"><div class="row between"><h2>Invita un amico</h2>' + prog + '</div>'
     + '<p class="small muted">Ogni amico che si registra con il tuo link e pubblica la sua app ti sblocca uno spazio per un\'app extra da far testare, anche se la precedente è in fase di test. Massimo ' + MAX_EXTRA + ' app extra.</p>'
-    + '<div class="box"><code class="small" style="overflow-wrap:anywhere">' + esc(inviteLink()) + '</code></div>'
-    + '<div class="row"><button class="btn primary" data-act="invite">Invita un amico</button><button class="btn" data-act="copy" data-text="' + esc(inviteLink()) + '" data-msg="Link copiato">Copia link</button></div>'
+    + '<div class="row"><button class="btn primary" data-act="invite">Invita un amico</button><button class="btn" data-act="copy" data-text="' + esc(inviteLink()) + '" data-msg="Link copiato!">Copia link</button></div>'
     + '<p class="small muted">Spazi sbloccati: ' + n + '. Gli amici contano quando hanno pubblicato la loro app.</p></div>';
 }
 function exploreItems() {
@@ -459,7 +458,7 @@ document.addEventListener('click', async e => {
     if (act === 'invite') {
       const url = inviteLink(), text = 'Ti invito su Blinders Test App: ci scambiamo i test di 14 giorni per le nostre app Android.';
       if (navigator.share) { try { await navigator.share({ title: 'Blinders Test App', text, url }); } catch (x) { /* condivisione annullata */ } return; }
-      try { await navigator.clipboard.writeText(text + ' ' + url); toast('Link di invito copiato'); } catch (x) { toast('Copia non disponibile: ' + url); }
+      try { await navigator.clipboard.writeText(text + ' ' + url); toast('Link copiato!'); } catch (x) { toast('Copia non disponibile: ' + url); }
       return;
     }
     if (act === 'copy') { try { await navigator.clipboard.writeText(b.dataset.text); toast(b.dataset.msg || 'Email copiata'); } catch (x) { toast('Copia non disponibile: seleziona il testo a mano'); } return; }
