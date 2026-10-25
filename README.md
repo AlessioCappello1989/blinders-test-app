@@ -20,11 +20,11 @@ Tutto gratuito per un uso piccolo.
 
 1. Crea un repository su GitHub (per esempio `blinders-test-app`) e carica tutti i file di questa cartella nella radice.
 2. Repository > **Settings** > **Pages** > *Build and deployment* > Source: **Deploy from a branch** > branch `main`, cartella `/ (root)` > Save.
-3. Dopo un minuto il sito è su `https://TUO-UTENTE.github.io/blinders-test-app/`.
+3. Dopo un minuto il sito è su `https://TUO-UTENTE.github.io/blinders-test-app/` (oppure sul tuo dominio, per esempio `https://ironblind.it/`).
 
 ## 3. Autorizza il dominio per il login
 
-Firebase > **Authentication** > **Impostazioni** > **Domini autorizzati** > Aggiungi `TUO-UTENTE.github.io`.
+Firebase > **Authentication** > **Impostazioni** > **Domini autorizzati** > Aggiungi `TUO-UTENTE.github.io` e, se usi un dominio tuo, anche quello (per esempio `ironblind.it`).
 Senza questo passaggio il pulsante "Accedi con Google" dà errore.
 
 ## Provare con due account senza aspettare 14 giorni
