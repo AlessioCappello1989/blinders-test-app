@@ -48,6 +48,9 @@ const countryOf = id => (S.users.get(id) && S.users.get(id).country) || '';
 /* App di uno sviluppatore: quella principale ('main') più le app extra sbloccate con gli inviti ('x1'..'x3'). */
 const SLOTS = ['x1', 'x2', 'x3'];
 const MAX_EXTRA = 3;
+/* Offerta libera: scrivi qui il tuo nome PayPal.me (per esempio 'mariorossi' da paypal.me/mariorossi). Se è vuoto i pulsanti non compaiono. */
+const PAYPAL_ME = 'AlessioCappello89';
+const tipUrl = () => 'https://www.paypal.me/' + encodeURIComponent(PAYPAL_ME);
 const appsOf = id => {
   const u = S.users.get(id); const l = [];
   if (u && u.app && u.app.name) l.push(Object.assign({ id: 'main' }, u.app));
@@ -279,7 +282,8 @@ function isInstalled() {
 }
 const ICON_INFO = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
 function aboutBox() {
-  return '<section class="card"><button type="button" class="menuitem" data-act="aboutOpen"><span class="row">' + ICON_INFO + '<b>Chi siamo &amp; Guida App</b></span><span aria-hidden="true">›</span></button></section>';
+  return '<section class="card"><button type="button" class="menuitem" data-act="aboutOpen"><span class="row">' + ICON_INFO + '<b>Chi siamo &amp; Guida App</b></span><span aria-hidden="true">›</span></button>'
+    + (PAYPAL_ME ? '<a class="menuitem" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(tipUrl()) + '"><span class="row"><span aria-hidden="true">☕</span><b>Offrimi un caffè</b></span><span aria-hidden="true">›</span></a>' : '') + '</section>';
 }
 let aboutFocus = null;
 function closeAbout() {
@@ -297,7 +301,9 @@ function openAbout() {
     + '<li><b>iPhone/iPad (Safari):</b> Tasto Condividi (quadrato con freccia in alto) ➔ "Aggiungi alla schermata Home".</li></ul></div>';
   const bg = document.createElement('div'); bg.id = 'about'; bg.className = 'modal-bg';
   bg.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="about-t"><div class="row between"><h2 id="about-t">Chi siamo &amp; Guida App</h2><button type="button" class="btn ghost sm" data-act="aboutClose" aria-label="Chiudi">✕</button></div>'
-    + '<div class="stack"><div><h3>🚀 Chi siamo</h3><p style="margin-top:6px">IronBlind (ironblind.it) nasce per aiutare gli sviluppatori indipendenti a superare il requisito di 12 tester per 14 giorni imposto da Google Play Console. La nostra community permette agli sviluppatori di fare squadra, testare reciprocamente le app e scambiare feedback costruttivi.</p></div>' + guide + '</div></div>';
+    + '<div class="stack"><div><h3>🚀 Chi siamo</h3><p style="margin-top:6px">IronBlind (ironblind.it) nasce per aiutare gli sviluppatori indipendenti a superare il requisito di 12 tester per 14 giorni imposto da Google Play Console. La nostra community permette agli sviluppatori di fare squadra, testare reciprocamente le app e scambiare feedback costruttivi.</p></div>' + guide
+    + (PAYPAL_ME ? '<div class="step"><h3>☕ Sostieni IronBlind</h3><p>IronBlind è gratuita. Se ti è utile puoi offrirmi un caffè con PayPal, con l\'importo che preferisci. Non sblocca nulla: è solo un grazie.</p><a class="btn primary" style="text-align:center;text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(tipUrl()) + '">Offrimi un caffè con PayPal</a></div>' : '')
+    + '</div></div>';
   bg.addEventListener('click', e => { if (e.target === bg) closeAbout(); });
   document.body.appendChild(bg); document.addEventListener('keydown', aboutKey);
   const cb = bg.querySelector('[data-act="aboutClose"]'); if (cb) cb.focus();
