@@ -239,12 +239,14 @@ function appFields(k, ap, title, bonus) {
       ? '<div class="box"><p class="small"><b>Concludere questa app?</b> Viene tolta dal profilo e lo slot si azzera. Per usarlo di nuovo dovrai invitare un altro amico. Gli scambi già completati restano.</p><div class="row"><button type="button" class="btn primary sm" data-act="concludeApp" data-k="' + k + '">Sì, concludi</button><button type="button" class="btn ghost sm" data-act="noConclude">Annulla</button></div></div>'
       : '<div><button type="button" class="btn ghost sm" data-act="askConclude" data-k="' + k + '">Concludi app e libera lo slot</button></div>';
   }
-  return '<h2 style="margin-top:6px">' + title + '</h2>' + note
+  const pill = k === 'main' ? (lock ? '<span class="pill warn">Bloccata</span>' : '<span class="pill ok">Principale</span>')
+    : (lock ? '<span class="pill warn">Bloccata</span>' : ap.name ? '<span class="pill ok">In uso</span>' : '<span class="pill ok">Sbloccato · libero</span>');
+  return '<div class="slot' + (k === 'main' ? ' main' : '') + '"><div class="row between"><h3>' + title + '</h3>' + pill + '</div>' + note
     + '<label for="f-app-' + k + '">Nome dell\'app<input id="f-app-' + k + '" maxlength="50"' + dis + ' value="' + esc(ap.name || '') + '"><span class="field-note" id="c-f-app-' + k + '">' + (ap.name || '').length + '/50</span></label>'
     + '<div class="grid2"><label for="f-cat-' + k + '">Categoria<select id="f-cat-' + k + '"' + dis + '>' + opts + '</select></label>'
     + '<label for="f-link-' + k + '">Link di adesione al test<input id="f-link-' + k + '" type="url" inputmode="url"' + dis + ' value="' + esc(lk) + '" placeholder="https://play.google.com/apps/testing/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te.</span></label></div>'
     + '<label for="f-want-' + k + '">Tester che ti servono<select id="f-want-' + k + '"' + dis + '>' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
-    + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>' + conclude;
+    + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>' + conclude + '</div>';
 }
 function profileView(uid, edit) {
   const u = S.users.get(uid) || {}; const ap = u.app || {};
@@ -265,8 +267,8 @@ function profileView(uid, edit) {
     + '<label for="f-bio">Chi sei<textarea id="f-bio" maxlength="200" placeholder="Una riga su di te">' + esc(u.bio || '') + '</textarea><span class="field-note" id="c-f-bio">' + (u.bio || '').length + '/200</span></label>'
     + '<label for="f-email">Email dell\'account Google per i test<input id="f-email" type="email" inputmode="email" value="' + esc(S.priv.email || '') + '" placeholder="nome@gmail.com"><span class="field-note">Resta privata. Viene condivisa solo dentro uno scambio e solo se condividi anche tu.</span></label>'
     + '<label for="f-country">Il tuo paese<select id="f-country">' + copts + '</select><span class="field-note">Serve per far combaciare le richieste di tester. Lo scrivi tu, non viene verificato.</span></label>'
-    + appFields('main', ap, 'La tua app', bonus)
-    + shown.map((k, i) => appFields(k, (u.extra && u.extra[k]) || {}, 'App extra ' + (i + 1), bonus)).join('')
+    + appFields('main', ap, '📱 La tua app', bonus)
+    + shown.map((k, i) => appFields(k, (u.extra && u.extra[k]) || {}, '🧩 Slot App Extra #' + (i + 1), bonus)).join('')
     + '<div><button class="btn primary" type="submit">Salva profilo</button></div></form>'
     + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + aboutBox() + deleteBox();
 }
