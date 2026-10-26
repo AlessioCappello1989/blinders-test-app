@@ -10,7 +10,7 @@ const CATS = ['Giochi', 'Produttività', 'Social', 'Strumenti', 'Salute e fitnes
 const COUNTRIES = ['Italia', 'Albania', 'Argentina', 'Australia', 'Austria', 'Belgio', 'Brasile', 'Canada', 'Cina', 'Croazia', 'Danimarca', 'Egitto', 'Filippine', 'Finlandia', 'Francia', 'Germania', 'Giappone', 'Grecia', 'India', 'Indonesia', 'Irlanda', 'Messico', 'Paesi Bassi', 'Polonia', 'Portogallo', 'Regno Unito', 'Romania', 'Spagna', 'Stati Uniti', 'Svezia', 'Svizzera', 'Turchia', 'Ucraina', 'Altro'];
 
 const view = $('#view');
-const S = { tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, q: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined };
+const S = { tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined };
 /* Invito di un amico: il link ?invito=ID viene ricordato su questo dispositivo fino alla registrazione. */
 const INVITE_KEY = 'blinders-invite';
 let pendingInvite = null;
@@ -150,6 +150,7 @@ function exploreItems() {
   const arr = []; let hidden = 0;
   S.users.forEach((u, id) => {
     if (id === me) return;
+    if (S.fc && u.country !== S.fc) return;
     appsOf(id).forEach(a => {
       if (q && (a.name + ' ' + (u.nick || '') + ' ' + (a.cat || '')).toLowerCase().indexOf(q) < 0) return;
       const ex = swapForCard(id, a.id);
@@ -160,7 +161,7 @@ function exploreItems() {
   });
   arr.sort((x, y) => y.st.done - x.st.done || (y.u.createdAt || 0) - (x.u.createdAt || 0));
   const note = hidden ? '<p class="small muted">' + hidden + (hidden === 1 ? ' app nascosta perché non è' : ' app nascoste perché non sono') + ' compatibili con i paesi richiesti da te o da loro.</p>' : '';
-  if (!arr.length) return '<div class="empty"><h3>Nessuna app da testare per ora</h3><p class="muted">' + (q ? 'Prova con un altro nome o categoria.' : 'Pubblica la tua app dal profilo e invita altri sviluppatori.') + '</p></div>' + note;
+  if (!arr.length) return '<div class="empty"><h3>Nessuna app da testare per ora</h3><p class="muted">' + (q || S.fc ? 'Prova con un altro nome, categoria o paese.' : 'Pubblica la tua app dal profilo e invita altri sviluppatori.') + '</p></div>' + note;
   return arr.map(x => {
     let act, pickH = '';
     if (!mineApps.length || !countryOf(me)) act = '<button class="btn ghost" data-act="tab" data-tab="profile">Completa prima il tuo profilo</button>';
@@ -180,7 +181,12 @@ function exploreItems() {
       + pickH + '<div>' + act + '</div></article>';
   }).join('') + note;
 }
-const exploreView = () => '<label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
+function countryFilter() {
+  const have = new Set(); S.users.forEach((u, id) => { if (id !== me && u.country && appsOf(id).length) have.add(u.country); });
+  const list = COUNTRIES.filter(c => have.has(c) || c === S.fc);
+  return '<label for="fc">Paese dello sviluppatore<select id="fc"><option value="">Tutti i paesi</option>' + list.map(c => '<option' + (c === S.fc ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>';
+}
+const exploreView = () => '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
 
 function swapCard(s) {
   const o = s.a === me ? s.b : s.a; const el = elapsed(s, me);
@@ -512,7 +518,7 @@ document.addEventListener('input', e => {
   if (e.target.id === 'q') { S.q = e.target.value; const l = $('#list'); if (l) l.innerHTML = exploreItems(); }
   const c = e.target.id && $('#c-' + e.target.id); if (c) c.textContent = e.target.value.length + '/' + e.target.maxLength;
 });
-document.addEventListener('change', e => { const t = e.target; if (t && t.classList && t.classList.contains('pick')) S.pick[t.dataset.key] = t.value; });
+document.addEventListener('change', e => { const t = e.target; if (t && t.id === 'fc') { S.fc = t.value; const l = $('#list'); if (l) l.innerHTML = exploreItems(); } if (t && t.classList && t.classList.contains('pick')) S.pick[t.dataset.key] = t.value; });
 document.addEventListener('submit', async e => {
   e.preventDefault();
   if (e.target.id === 'af') {
