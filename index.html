@@ -134,6 +134,11 @@ img{max-width:100%}
   #msgs{max-height:420px}
 }
 @media (hover:hover){.card{transition:border-color .15s}.card:hover{border-color:var(--accent)}}
+.menuitem{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:none;border:0;padding:4px 0;font:inherit;color:inherit;cursor:pointer;text-align:left;min-height:40px}
+.menuitem:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.modal-bg{position:fixed;inset:0;z-index:20;background:rgba(11,26,74,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:16px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.guide{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
 </style>
 </head>
 <body>
@@ -153,6 +158,6 @@ img{max-width:100%}
 </div>
 <nav class="nav" id="nav" hidden><div class="nav-in" id="navin"></div></nav>
 <div id="toast" hidden role="status"></div>
-<script type="module" src="./app.js"></script>
+<script type="module" src="./app.js?v=20261026b"></script>
 </body>
 </html>

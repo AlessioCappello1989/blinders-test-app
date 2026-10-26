@@ -256,9 +256,43 @@ function profileView(uid, edit) {
     + appFields('main', ap, 'La tua app', bonus)
     + shown.map((k, i) => appFields(k, (u.extra && u.extra[k]) || {}, 'App extra ' + (i + 1), bonus)).join('')
     + '<div><button class="btn primary" type="submit">Salva profilo</button></div></form>'
-    + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + deleteBox();
+    + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + aboutBox() + deleteBox();
 }
 
+/* ---------- Chi siamo & guida ---------- */
+/* Vero se l'app è aperta come PWA installata (schermata Home) o come app Android, falso nel browser. */
+function isInstalled() {
+  try {
+    const mm = q => !!(window.matchMedia && window.matchMedia(q).matches);
+    return mm('(display-mode: standalone)') || mm('(display-mode: fullscreen)') || mm('(display-mode: minimal-ui)')
+      || navigator.standalone === true || (document.referrer || '').indexOf('android-app://') === 0;
+  } catch (e) { return false; }
+}
+const ICON_INFO = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+function aboutBox() {
+  return '<section class="card"><button type="button" class="menuitem" data-act="aboutOpen"><span class="row">' + ICON_INFO + '<b>Chi siamo &amp; Guida App</b></span><span aria-hidden="true">›</span></button></section>';
+}
+let aboutFocus = null;
+function closeAbout() {
+  const m = $('#about'); if (m) m.remove();
+  document.removeEventListener('keydown', aboutKey);
+  if (aboutFocus && document.contains(aboutFocus)) aboutFocus.focus(); aboutFocus = null;
+}
+function aboutKey(e) { if (e.key === 'Escape') closeAbout(); }
+function openAbout() {
+  if ($('#about')) return;
+  aboutFocus = document.activeElement;
+  const guide = isInstalled() ? '' : '<div class="step"><h3>📱 Come installare Blinders sul telefono (PWA)</h3>'
+    + '<p>Blinders è una Progressive Web App (PWA). Puoi aggiungerla alla schermata Home del telefono per usarla come un\'app nativa:</p>'
+    + '<ul class="guide"><li><b>Android (Chrome):</b> Menu ⋮ in alto a destra ➔ "Aggiungi a schermata Home" o "Installa app".</li>'
+    + '<li><b>iPhone/iPad (Safari):</b> Tasto Condividi (quadrato con freccia in alto) ➔ "Aggiungi alla schermata Home".</li></ul></div>';
+  const bg = document.createElement('div'); bg.id = 'about'; bg.className = 'modal-bg';
+  bg.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="about-t"><div class="row between"><h2 id="about-t">Chi siamo &amp; Guida App</h2><button type="button" class="btn ghost sm" data-act="aboutClose" aria-label="Chiudi">✕</button></div>'
+    + '<div class="stack"><div><h3>🚀 Chi siamo</h3><p style="margin-top:6px">Blinders (ironblind.it) nasce per aiutare gli sviluppatori indipendenti a superare il requisito di 12 tester per 14 giorni imposto da Google Play Console. La nostra community permette agli sviluppatori di fare squadra, testare reciprocamente le app e scambiare feedback costruttivi.</p></div>' + guide + '</div></div>';
+  bg.addEventListener('click', e => { if (e.target === bg) closeAbout(); });
+  document.body.appendChild(bg); document.addEventListener('keydown', aboutKey);
+  const cb = bg.querySelector('[data-act="aboutClose"]'); if (cb) cb.focus();
+}
 const SUPPORT = 'Blinders.NL8993@gmail.com';
 function deleteBox() {
   const user = auth && auth.currentUser;
@@ -444,6 +478,8 @@ document.addEventListener('click', async e => {
   const act = b.dataset.act, id = b.dataset.id;
   try {
     if (act === 'login') { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (x) { if (x.code !== 'auth/popup-closed-by-user' && x.code !== 'auth/cancelled-popup-request') toast(x.code === 'auth/unauthorized-domain' ? 'Dominio non autorizzato: aggiungilo in Firebase > Authentication > Impostazioni.' : 'Accesso non riuscito. Riprova.'); } return; }
+    if (act === 'aboutOpen') { openAbout(); return; }
+    if (act === 'aboutClose') { closeAbout(); return; }
     if (act === 'logout') { await signOut(auth); return; }
     if (act === 'delOpen') { S.delOpen = true; render(true); return; }
     if (act === 'delClose') { S.delOpen = false; render(true); return; }
