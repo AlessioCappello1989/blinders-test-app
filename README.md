@@ -44,7 +44,7 @@ Avvia il test dallo scambio, aspetta un minuto e il modulo del feedback compare.
 - Gli scambi e le chat sono visibili solo ai due partecipanti.
 - Il link di test dell'altro si sblocca solo quando lo scambio è accettato.
 - Ogni app ha il suo blocco: finché ha scambi aperti, quell'app nel profilo non si cambia. Questo controllo è nell'app, non nelle regole del database.
-- Invita un amico: ogni amico che si registra con il tuo link (`?invito=`) e pubblica la sua app sblocca un'app extra da far testare, fino a 3, anche se la principale è in test. Il limite di 3 e il conteggio sono nell'app, non nelle regole.
+- Invita un amico: ogni amico che si registra con il tuo link (`?invito=`) e pubblica la sua app sblocca un'app extra da far testare, fino a 3, anche se la principale è in test. Con **Concludi app e libera lo slot** (solo se l'app non ha scambi aperti) l'app extra esce dal profilo e consuma l'invito: per riavere lo slot serve invitare un altro amico. Il limite di 3 e il conteggio sono nell'app, non nelle regole.
 - Si può proporre uno scambio solo se i paesi richiesti da entrambi combaciano.
 - Il feedback si può inviare solo dopo 14 giorni dall'avvio del tuo test, con l'orario del server.
 - Nome, categoria, descrizione e testi hanno limiti di lunghezza anche lato server.

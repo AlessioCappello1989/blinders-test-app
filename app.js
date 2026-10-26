@@ -68,11 +68,14 @@ const openCount = aid => mine().filter(s => isOpenSwap(s) && aidOf(s, me) === ai
 const linkFor = aid => aid === 'main' ? (S.priv.link || '') : ((S.priv.extraLinks || {})[aid] || '');
 /* Inviti: un amico conta quando si è registrato con il tuo link, ha il profilo e ha pubblicato la sua app. Massimo 3 extra. */
 function validInvites() {
-  const out = []; S.refs.forEach((r, inv) => { const u = S.users.get(inv); if (u && u.app && u.app.name) out.push(inv); });
-  return out.slice(0, MAX_EXTRA);
+  const u = S.users.get(me); const spent = (u && u.spent) || [];
+  const out = []; S.refs.forEach((r, inv) => { const f = S.users.get(inv); if (f && f.app && f.app.name && spent.indexOf(inv) < 0) out.push([inv, (r && r.at) || 0]); });
+  return out.sort((x, y) => x[1] - y[1]).map(x => x[0]).slice(0, MAX_EXTRA);
 }
 const inviteLink = () => location.origin + location.pathname + '?invito=' + encodeURIComponent(me);
-const slotsShown = u => { const b = validInvites().length; return SLOTS.filter((k, i) => i < b || !!(u && u.extra && u.extra[k] && u.extra[k].name)); };
+const hasExtra = (u, k) => !!(u && u.extra && u.extra[k] && u.extra[k].name);
+const freeSlots = u => Math.max(0, validInvites().length - SLOTS.filter(k => hasExtra(u, k)).length);
+const slotsShown = u => { let free = freeSlots(u); return SLOTS.filter(k => { if (hasExtra(u, k)) return true; if (free > 0) { free--; return true; } return false; }); };
 async function recordInvite(old, hasApp) {
   if (!pendingInvite || !hasApp) return false;
   if (S.myRef || pendingInvite === me || !S.users.get(pendingInvite)) { clearInvite(); return false; }
@@ -142,7 +145,7 @@ function inviteBox(short) {
   return '<div class="card"><div class="row between"><h2>Invita un amico</h2>' + prog + '</div>'
     + '<p class="small muted">Ogni amico che si registra con il tuo link e pubblica la sua app ti sblocca uno spazio per un\'app extra da far testare, anche se la precedente è in fase di test. Massimo ' + MAX_EXTRA + ' app extra.</p>'
     + '<div class="row"><button class="btn primary" data-act="invite">Invita un amico</button><button class="btn" data-act="copy" data-text="' + esc(inviteLink()) + '" data-msg="Link copiato!">Copia link</button></div>'
-    + '<p class="small muted">Spazi sbloccati: ' + n + '. Gli amici contano quando hanno pubblicato la loro app.</p></div>';
+    + '<p class="small muted">Inviti disponibili: ' + n + '. Gli amici contano quando hanno pubblicato la loro app. Quando concludi un\'app extra lo slot si azzera e per riaverlo serve invitare un altro amico.</p></div>';
 }
 function exploreItems() {
   const q = S.q.trim().toLowerCase();
@@ -227,12 +230,18 @@ function appFields(k, ap, title, bonus) {
   const note = lock ? '<div class="banner">App bloccata: hai ' + n + (n === 1 ? ' scambio aperto' : ' scambi aperti') + '. Puoi cambiarla quando tutti gli scambi di questa app sono completati, rifiutati o chiusi. Li trovi in <b>Scambi</b>.' + (k === 'main' && bonus < MAX_EXTRA ? ' Vuoi far testare un\'altra app subito? Invita un amico qui sopra.' : '') + '</div>'
     : (k !== 'main' && !ap.name ? '<p class="small muted">Spazio sbloccato da un invito. Lascialo vuoto se non ti serve.</p>' : '');
   const lk = linkFor(k);
+  let conclude = '';
+  if (k !== 'main' && ap.name && !lock) {
+    conclude = S.confirmK === k
+      ? '<div class="box"><p class="small"><b>Concludere questa app?</b> Viene tolta dal profilo e lo slot si azzera. Per usarlo di nuovo dovrai invitare un altro amico. Gli scambi già completati restano.</p><div class="row"><button type="button" class="btn primary sm" data-act="concludeApp" data-k="' + k + '">Sì, concludi</button><button type="button" class="btn ghost sm" data-act="noConclude">Annulla</button></div></div>'
+      : '<div><button type="button" class="btn ghost sm" data-act="askConclude" data-k="' + k + '">Concludi app e libera lo slot</button></div>';
+  }
   return '<h2 style="margin-top:6px">' + title + '</h2>' + note
     + '<label for="f-app-' + k + '">Nome dell\'app<input id="f-app-' + k + '" maxlength="50"' + dis + ' value="' + esc(ap.name || '') + '"><span class="field-note" id="c-f-app-' + k + '">' + (ap.name || '').length + '/50</span></label>'
     + '<div class="grid2"><label for="f-cat-' + k + '">Categoria<select id="f-cat-' + k + '"' + dis + '>' + opts + '</select></label>'
     + '<label for="f-link-' + k + '">Link di adesione al test<input id="f-link-' + k + '" type="url" inputmode="url"' + dis + ' value="' + esc(lk) + '" placeholder="https://play.google.com/apps/testing/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te.</span></label></div>'
     + '<label for="f-want-' + k + '">Tester che ti servono<select id="f-want-' + k + '"' + dis + '>' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
-    + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>';
+    + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>' + conclude;
 }
 function profileView(uid, edit) {
   const u = S.users.get(uid) || {}; const ap = u.app || {};
@@ -478,6 +487,8 @@ document.addEventListener('click', async e => {
   const act = b.dataset.act, id = b.dataset.id;
   try {
     if (act === 'login') { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (x) { if (x.code !== 'auth/popup-closed-by-user' && x.code !== 'auth/cancelled-popup-request') toast(x.code === 'auth/unauthorized-domain' ? 'Dominio non autorizzato: aggiungilo in Firebase > Authentication > Impostazioni.' : 'Accesso non riuscito. Riprova.'); } return; }
+    if (act === 'askConclude') { S.confirmK = b.dataset.k; render(true); return; }
+    if (act === 'noConclude') { S.confirmK = null; render(true); return; }
     if (act === 'aboutOpen') { openAbout(); return; }
     if (act === 'aboutClose') { closeAbout(); return; }
     if (act === 'logout') { await signOut(auth); return; }
@@ -506,7 +517,20 @@ document.addEventListener('click', async e => {
     if (act === 'copy') { try { await navigator.clipboard.writeText(b.dataset.text); toast(b.dataset.msg || 'Email copiata'); } catch (x) { toast('Copia non disponibile: seleziona il testo a mano'); } return; }
     busy = true; b.disabled = true;
     const s = S.swaps.get(id);
-    if (act === 'propose') {
+    if (act === 'concludeApp') {
+      const k = b.dataset.k, u = S.users.get(me);
+      if (!u || !hasExtra(u, k)) { S.confirmK = null; return; }
+      if (openCount(k) > 0) { toast('Questa app ha ancora scambi aperti.'); return; }
+      const nu = Object.assign({}, u); nu.extra = Object.assign({}, u.extra); delete nu.extra[k];
+      if (!Object.keys(nu.extra).length) delete nu.extra;
+      const inv = validInvites()[0]; if (inv) nu.spent = (u.spent || []).concat(inv);
+      nu.updatedAt = Date.now();
+      await setDoc(doc(db, 'users', me), nu);
+      const pv = { email: S.priv.email || '', link: S.priv.link || '' }; const el = Object.assign({}, S.priv.extraLinks || {}); delete el[k];
+      if (Object.keys(el).length) pv.extraLinks = el;
+      await setDoc(doc(db, 'userPrivate', me), pv);
+      S.confirmK = null; toast('App conclusa. Lo slot si è azzerato: invita un altro amico per riaverlo.');
+    } else if (act === 'propose') {
       const oA = b.dataset.oa || 'main'; const them = appOf(id, oA);
       const sel = document.getElementById('pick-' + id + '-' + oA);
       const mA = (sel && sel.value) || b.dataset.ma || 'main'; const mineA = appOf(me, mA);
@@ -597,6 +621,7 @@ document.addEventListener('submit', async e => {
       }
       const data = { nick, country, bio: $('#f-bio').value.trim().slice(0, 200), app: mainApp, createdAt: old.createdAt || Date.now(), updatedAt: Date.now() };
       if (Object.keys(extra).length) data.extra = extra;
+      if (old.spent && old.spent.length) data.spent = old.spent;
       await setDoc(doc(db, 'users', me), data);
       const priv = { email, link: mainLink }; if (Object.keys(extraLinks).length) priv.extraLinks = extraLinks;
       await setDoc(doc(db, 'userPrivate', me), priv);
