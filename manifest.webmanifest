@@ -1,6 +1,6 @@
 {
-  "name": "Blinders Test App",
-  "short_name": "Blinders",
+  "name": "IronBlind Test App",
+  "short_name": "IronBlind",
   "description": "Trova tester per la tua app Android con scambi 1 a 1.",
   "start_url": "./",
   "scope": "./",

@@ -291,13 +291,13 @@ function aboutKey(e) { if (e.key === 'Escape') closeAbout(); }
 function openAbout() {
   if ($('#about')) return;
   aboutFocus = document.activeElement;
-  const guide = isInstalled() ? '' : '<div class="step"><h3>📱 Come installare Blinders sul telefono (PWA)</h3>'
-    + '<p>Blinders è una Progressive Web App (PWA). Puoi aggiungerla alla schermata Home del telefono per usarla come un\'app nativa:</p>'
+  const guide = isInstalled() ? '' : '<div class="step"><h3>📱 Come installare IronBlind sul telefono (PWA)</h3>'
+    + '<p>IronBlind è una Progressive Web App (PWA). Puoi aggiungerla alla schermata Home del telefono per usarla come un\'app nativa:</p>'
     + '<ul class="guide"><li><b>Android (Chrome):</b> Menu ⋮ in alto a destra ➔ "Aggiungi a schermata Home" o "Installa app".</li>'
     + '<li><b>iPhone/iPad (Safari):</b> Tasto Condividi (quadrato con freccia in alto) ➔ "Aggiungi alla schermata Home".</li></ul></div>';
   const bg = document.createElement('div'); bg.id = 'about'; bg.className = 'modal-bg';
   bg.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="about-t"><div class="row between"><h2 id="about-t">Chi siamo &amp; Guida App</h2><button type="button" class="btn ghost sm" data-act="aboutClose" aria-label="Chiudi">✕</button></div>'
-    + '<div class="stack"><div><h3>🚀 Chi siamo</h3><p style="margin-top:6px">Blinders (ironblind.it) nasce per aiutare gli sviluppatori indipendenti a superare il requisito di 12 tester per 14 giorni imposto da Google Play Console. La nostra community permette agli sviluppatori di fare squadra, testare reciprocamente le app e scambiare feedback costruttivi.</p></div>' + guide + '</div></div>';
+    + '<div class="stack"><div><h3>🚀 Chi siamo</h3><p style="margin-top:6px">IronBlind (ironblind.it) nasce per aiutare gli sviluppatori indipendenti a superare il requisito di 12 tester per 14 giorni imposto da Google Play Console. La nostra community permette agli sviluppatori di fare squadra, testare reciprocamente le app e scambiare feedback costruttivi.</p></div>' + guide + '</div></div>';
   bg.addEventListener('click', e => { if (e.target === bg) closeAbout(); });
   document.body.appendChild(bg); document.addEventListener('keydown', aboutKey);
   const cb = bg.querySelector('[data-act="aboutClose"]'); if (cb) cb.focus();
@@ -418,7 +418,7 @@ function authErr(x) {
   toast(m[x && x.code] || 'Accesso non riuscito. Riprova.');
   console.error(x);
 }
-const loginForm = '<div class="stack" style="width:100%"><img class="logo-big" src="logo.png" width="112" height="112" alt="Blinders Test App"><div><button class="btn primary" data-act="login">Accedi con Google</button></div>'
+const loginForm = '<div class="stack" style="width:100%"><img class="logo-big" src="logo.png" width="112" height="112" alt="IronBlind Test App"><div><button class="btn primary" data-act="login">Accedi con Google</button></div>'
   + '<p class="small muted">oppure con email e password</p>'
   + '<form id="af" class="stack" autocomplete="on" novalidate>'
   + '<label for="a-email">Email<input id="a-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="nome@esempio.it"></label>'
@@ -437,7 +437,7 @@ function render(force) {
   if (S.route && S.route.t === 'swap') markSeen(S.route.id);
   syncWatch();
   const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
-  document.title = (rec ? '(' + rec + ') ' : '') + 'Blinders Test App';
+  document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App';
   $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['profile', 'Profilo']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '">' + t[1] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</button>').join('');
   $('#nav').hidden = false; $('#out').hidden = false;
   let h = '';
@@ -509,8 +509,8 @@ document.addEventListener('click', async e => {
     if (act === 'noClose') { S.confirm = null; render(true); return; }
     if (act === 'star') { S.star[id] = +b.dataset.n; view.querySelectorAll('.star').forEach((x, i) => x.classList.toggle('on', i < S.star[id])); return; }
     if (act === 'invite') {
-      const url = inviteLink(), text = 'Ti invito su Blinders Test App: ci scambiamo i test di 14 giorni per le nostre app Android.';
-      if (navigator.share) { try { await navigator.share({ title: 'Blinders Test App', text, url }); } catch (x) { /* condivisione annullata */ } return; }
+      const url = inviteLink(), text = 'Ti invito su IronBlind Test App: ci scambiamo i test di 14 giorni per le nostre app Android.';
+      if (navigator.share) { try { await navigator.share({ title: 'IronBlind Test App', text, url }); } catch (x) { /* condivisione annullata */ } return; }
       try { await navigator.clipboard.writeText(text + ' ' + url); toast('Link copiato!'); } catch (x) { toast('Copia non disponibile: ' + url); }
       return;
     }

@@ -1,4 +1,4 @@
-# Blinders Test App
+# IronBlind Test App
 
 Web app per trovare tester per le app Android e superare i test chiusi di 14 giorni di Google Play.
 Scambio 1 a 1: tu testi la sua app, lui testa la tua, poi feedback reciproco.
