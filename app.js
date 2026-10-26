@@ -1,7 +1,7 @@
 import { firebaseConfig, TEST_DAYS } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -10,7 +10,7 @@ const CATS = ['Giochi', 'Produttività', 'Social', 'Strumenti', 'Salute e fitnes
 const COUNTRIES = ['Italia', 'Albania', 'Argentina', 'Australia', 'Austria', 'Belgio', 'Brasile', 'Canada', 'Cina', 'Croazia', 'Danimarca', 'Egitto', 'Filippine', 'Finlandia', 'Francia', 'Germania', 'Giappone', 'Grecia', 'India', 'Indonesia', 'Irlanda', 'Messico', 'Paesi Bassi', 'Polonia', 'Portogallo', 'Regno Unito', 'Romania', 'Spagna', 'Stati Uniti', 'Svezia', 'Svizzera', 'Turchia', 'Ucraina', 'Altro'];
 
 const view = $('#view');
-const S = { tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined };
+const S = { tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined };
 /* Invito di un amico: il link ?invito=ID viene ricordato su questo dispositivo fino alla registrazione. */
 const INVITE_KEY = 'blinders-invite';
 let pendingInvite = null;
@@ -50,6 +50,10 @@ const SLOTS = ['x1', 'x2', 'x3'];
 const MAX_EXTRA = 3;
 /* Offerta libera: scrivi qui il tuo nome PayPal.me (per esempio 'mariorossi' da paypal.me/mariorossi). Se è vuoto i pulsanti non compaiono. */
 const PAYPAL_ME = 'AlessioCappello89';
+const ADMIN_EMAIL = 'alessiocappello1989@gmail.com';
+const SLOT_PRICE = '1,99 €';
+const MOON_COST = 20;
+const payUrl = () => 'https://www.paypal.me/' + encodeURIComponent(PAYPAL_ME) + '/1.99EUR';
 const tipUrl = () => 'https://www.paypal.me/' + encodeURIComponent(PAYPAL_ME);
 const appsOf = id => {
   const u = S.users.get(id); const l = [];
@@ -81,7 +85,30 @@ function validInvites() {
 }
 const inviteLink = () => location.origin + location.pathname + '?invito=' + encodeURIComponent(me);
 const hasExtra = (u, k) => !!(u && u.extra && u.extra[k] && u.extra[k].name);
-const freeSlots = u => Math.max(0, validInvites().length - SLOTS.filter(k => hasExtra(u, k)).length);
+const paidSlots = () => Math.max(0, Math.min(MAX_EXTRA, Math.floor(+S.paid || 0)));
+const extraCount = u => SLOTS.filter(k => hasExtra(u, k)).length;
+/* Lune: +1 per ogni giorno di test completato (massimo 14 per scambio). Il valore più alto raggiunto si salva nel profilo. */
+function moonsEarned() {
+  let n = 0;
+  mine().forEach(sw => { if (sw.status === 'declined') return; const el = elapsed(sw, me); if (el !== null) n += Math.min(14, Math.floor(el)); });
+  return n;
+}
+const moonTotal = u => Math.max((u && u.moons) || 0, moonsEarned());
+const moonBalance = u => Math.max(0, moonTotal(u) - ((u && u.moonsSpent) || 0));
+const moonSlots = u => Math.floor(((u && u.moonsSpent) || 0) / MOON_COST);
+const markers = u => ((u && u.spent) || []).filter(x => x === '#').length;
+/* Slot extra = inviti non usati + slot ottenuti con le Lune o pagati, meno quelli già consumati (massimo 3 app extra). */
+const otherCredits = u => Math.max(0, moonSlots(u) + paidSlots() - markers(u));
+const creditsTotal = u => Math.min(MAX_EXTRA, validInvites().length + otherCredits(u));
+const freeSlots = u => Math.max(0, creditsTotal(u) - extraCount(u));
+const moonLabel = n => '🌕 ' + n + (n === 1 ? ' Luna' : ' Lune');
+let moonWrite = false;
+function syncMoons() {
+  const u = S.users.get(me); if (!u || moonWrite || busy) return;
+  const t = moonsEarned(); if (t <= (u.moons || 0)) return;
+  moonWrite = true;
+  updateDoc(doc(db, 'users', me), { moons: t }).catch(e => console.error(e)).finally(() => { moonWrite = false; });
+}
 const slotsShown = u => { let free = freeSlots(u); return SLOTS.filter(k => { if (hasExtra(u, k)) return true; if (free > 0) { free--; return true; } return false; }); };
 async function recordInvite(old, hasApp) {
   if (!pendingInvite || !hasApp) return false;
@@ -235,8 +262,8 @@ function appFields(k, ap, title, bonus) {
   const n = openCount(k), lock = n > 0 && !!ap.name, dis = lock ? ' disabled' : '';
   const wopts = '<option value="">Qualsiasi paese</option>' + COUNTRIES.map(c => '<option value="' + c + '"' + (ap.want === c ? ' selected' : '') + '>Solo ' + c + '</option>').join('');
   const opts = CATS.map(c => '<option' + ((ap.cat || 'Altro') === c ? ' selected' : '') + '>' + c + '</option>').join('');
-  const note = lock ? '<div class="banner">App bloccata: hai ' + n + (n === 1 ? ' scambio aperto' : ' scambi aperti') + '. Puoi cambiarla quando tutti gli scambi di questa app sono completati, rifiutati o chiusi. Li trovi in <b>Scambi</b>.' + (k === 'main' && bonus < MAX_EXTRA ? ' Vuoi far testare un\'altra app subito? Invita un amico qui sopra.' : '') + '</div>'
-    : (k !== 'main' && !ap.name ? '<p class="small muted">Spazio sbloccato da un invito. Lascialo vuoto se non ti serve.</p>' : '');
+  const note = lock ? '<div class="banner">App bloccata: hai ' + n + (n === 1 ? ' scambio aperto' : ' scambi aperti') + '. Puoi cambiarla quando tutti gli scambi di questa app sono completati, rifiutati o chiusi. Li trovi in <b>Scambi</b>.' + (k === 'main' && bonus < MAX_EXTRA ? ' Vuoi far testare un\'altra app subito? Usa le Lune o invita un amico qui sopra.' : '') + '</div>'
+    : (k !== 'main' && !ap.name ? '<p class="small muted">Spazio sbloccato. Lascialo vuoto se non ti serve.</p>' : '');
   const lk = linkFor(k);
   let conclude = '';
   if (k !== 'main' && ap.name && !lock) {
@@ -263,9 +290,10 @@ function profileView(uid, edit) {
       + (list.length ? list.map(a => statBlock(uid, a, list.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>';
   }
   const copts = (u.country ? '' : '<option value="">Scegli il tuo paese</option>') + COUNTRIES.map(c => '<option value="' + c + '"' + (u.country === c ? ' selected' : '') + '>' + c + '</option>').join('');
-  const bonus = validInvites().length; const shown = slotsShown(u);
+  const bonus = creditsTotal(u); const shown = slotsShown(u);
   const mineList = appsOf(uid);
   return (!S.users.get(me) ? '<div class="banner">Completa il profilo e pubblica la tua app per poter proporre scambi.</div>' : '')
+    + moonCard(u)
     + inviteBox(false)
     + '<form id="pf" class="card" autocomplete="off"><h2>Il tuo profilo</h2>'
     + '<label for="f-nick">Nome visibile<input id="f-nick" maxlength="30" value="' + esc(u.nick || '') + '" placeholder="Come ti chiamano gli altri"></label>'
@@ -274,8 +302,10 @@ function profileView(uid, edit) {
     + '<label for="f-country">Il tuo paese<select id="f-country">' + copts + '</select><span class="field-note">Serve per far combaciare le richieste di tester. Lo scrivi tu, non viene verificato.</span></label>'
     + appFields('main', ap, '📱 La tua app', bonus)
     + shown.map((k, i) => appFields(k, (u.extra && u.extra[k]) || {}, '🧩 Slot App Extra #' + (i + 1), bonus)).join('')
+    + (S.users.get(me) && ap.name && freeSlots(u) === 0 && extraCount(u) < MAX_EXTRA
+      ? '<div class="box"><b>Vuoi far testare un\'altra app?</b><p class="small muted">Hai usato lo slot gratuito. Sblocca uno slot con le Lune, invitando un amico o subito per ' + SLOT_PRICE + '.</p>' + (S.slotReq ? '<p class="small"><b>Pagamento in verifica:</b> lo slot si sblocca appena confermato.</p>' : '') + '<div><button type="button" class="btn" data-act="slotOpen">+ Aggiungi un\'altra app</button></div></div>' : '')
     + '<div><button class="btn primary" type="submit">Salva profilo</button></div></form>'
-    + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + aboutBox() + deleteBox();
+    + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + adminBox() + aboutBox() + deleteBox();
 }
 
 /* ---------- Chi siamo & guida ---------- */
@@ -314,6 +344,47 @@ function openAbout() {
   bg.addEventListener('click', e => { if (e.target === bg) closeAbout(); });
   document.body.appendChild(bg); document.addEventListener('keydown', aboutKey);
   const cb = bg.querySelector('[data-act="aboutClose"]'); if (cb) cb.focus();
+}
+function moonCard(u) {
+  if (!S.users.get(me)) return '';
+  const bal = moonBalance(u), pct = Math.min(100, Math.round(bal / MOON_COST * 100));
+  const can = bal >= MOON_COST && creditsTotal(u) < MAX_EXTRA;
+  return '<div class="card"><div class="row between"><h2>Le tue Lune</h2><span class="pill ok" aria-label="' + bal + ' Lune">' + moonLabel(bal) + '</span></div>'
+    + '<div class="bar" role="img" aria-label="' + bal + ' su ' + MOON_COST + ' Lune"><i style="width:' + pct + '%"></i></div>'
+    + '<p class="small muted">Ogni giorno di test completato ti dà +1 Luna (massimo 14 per scambio). Con ' + MOON_COST + ' Lune sblocchi uno slot extra. Ne hai ' + Math.min(bal, MOON_COST) + '/' + MOON_COST + '.</p>'
+    + (can ? '<div><button type="button" class="btn primary" data-act="moonRedeem">Usa ' + MOON_COST + ' Lune per sbloccare uno Slot Extra</button></div>'
+      : (bal >= MOON_COST ? '<p class="small muted">Hai già il massimo di slot extra.</p>' : '')) + '</div>';
+}
+/* ---------- Slot extra: Lune, inviti o pagamento ---------- */
+function closeSlot() { const m = $('#slotm'); if (m) m.remove(); document.removeEventListener('keydown', slotKey); }
+function slotKey(e) { if (e.key === 'Escape') closeSlot(); }
+function openSlot() {
+  closeSlot();
+  const u = S.users.get(me) || {}; const bal = moonBalance(u); const code = esc(me);
+  const optA = '<div class="step"><h3>🌕 Con le Lune (gratis)</h3><p class="small muted">Ogni giorno di test completato = +1 Luna. Hai ' + moonLabel(bal) + ': servono ' + MOON_COST + '.</p>'
+    + (bal >= MOON_COST ? '<div><button type="button" class="btn primary" data-act="moonRedeem">Usa ' + MOON_COST + ' Lune per sbloccare uno Slot Extra</button></div>'
+      : '<div class="bar"><i style="width:' + Math.round(bal / MOON_COST * 100) + '%"></i></div><p class="small muted">Te ne mancano ' + (MOON_COST - bal) + '.</p>') + '</div>';
+  const optI = '<div class="step"><h3>👥 Invita un amico (gratis)</h3><p class="small muted">Quando si registra con il tuo link e pubblica la sua app, ottieni uno slot extra.</p><div><button type="button" class="btn" data-act="invite">Invita un amico</button></div></div>';
+  const optB = !PAYPAL_ME ? '' : '<div class="step"><h3>⚡ Subito: ' + SLOT_PRICE + '</h3>'
+    + '<p class="small muted">Paga con PayPal e scrivi nella nota il tuo codice. Dopo la verifica, di solito entro 24 ore, lo slot si sblocca da solo.</p>'
+    + '<div class="box"><span class="small muted">Il tuo codice</span><code class="small" style="overflow-wrap:anywhere">' + code + '</code><div><button type="button" class="btn sm" data-act="copy" data-text="' + code + '" data-msg="Codice copiato">Copia codice</button></div></div>'
+    + '<a class="btn primary" style="text-align:center;text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(payUrl()) + '">Paga ' + SLOT_PRICE + ' con PayPal</a>'
+    + (S.slotReq ? '<p class="small"><b>Richiesta già inviata:</b> stiamo verificando il pagamento.</p>' : '')
+    + '<label for="slot-payer">Nome o email usati su PayPal<input id="slot-payer" maxlength="100" placeholder="Facoltativo, aiuta a trovare il pagamento"></label>'
+    + '<div><button type="button" class="btn" data-act="slotPaid">Ho pagato, avvisa</button></div></div>';
+  const bg = document.createElement('div'); bg.id = 'slotm'; bg.className = 'modal-bg';
+  bg.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="slot-t"><div class="row between"><h2 id="slot-t">Slot app extra</h2><button type="button" class="btn ghost sm" data-act="slotClose" aria-label="Chiudi">✕</button></div>'
+    + '<p>Hai usato lo slot gratuito. Per far testare un\'altra app scegli una strada:</p>' + optA + optI + optB + '</div>';
+  bg.addEventListener('click', e => { if (e.target === bg) closeSlot(); });
+  document.body.appendChild(bg); document.addEventListener('keydown', slotKey);
+  const cb = bg.querySelector('[data-act="slotClose"]'); if (cb) cb.focus();
+}
+const isAdminUser = () => !!(auth && auth.currentUser && auth.currentUser.email === ADMIN_EMAIL && auth.currentUser.emailVerified);
+function adminBox() {
+  if (!isAdminUser()) return '';
+  const l = []; S.reqs.forEach((r, uid) => l.push([uid, r]));
+  l.sort((a, b) => (a[1].at || 0) - (b[1].at || 0));
+  return '<section class="card"><h3>Richieste slot (solo tu)</h3>' + (l.length ? l.map(x => '<div class="box"><div class="row between"><b>' + esc(nameOf(x[0])) + '</b><span class="small muted">' + fmtD(x[1].at || Date.now()) + '</span></div><p class="small">PayPal: ' + esc(x[1].payer || 'non indicato') + '</p><code class="small" style="overflow-wrap:anywhere">' + esc(x[0]) + '</code><div class="row"><button type="button" class="btn primary sm" data-act="adminGrant" data-id="' + esc(x[0]) + '">Sblocca +1 slot</button><button type="button" class="btn ghost sm" data-act="adminDrop" data-id="' + esc(x[0]) + '">Elimina richiesta</button></div></div>').join('') : '<p class="small muted">Nessuna richiesta in attesa.</p>') + '</section>';
 }
 const SUPPORT = 'Blinders.NL8993@gmail.com';
 function deleteBox() {
@@ -354,6 +425,7 @@ async function deleteAccount() {
     const fbs = await getDocs(query(collection(db, 'feedback'), where('from', '==', me)));
     for (const d of fbs.docs) await updateDoc(d.ref, { text: '', from: 'deleted' });
     // 4. Elimina profilo, dati privati e account.
+    try { await deleteDoc(doc(db, 'slotRequests', me)); await deleteDoc(doc(db, 'paid', me)); } catch (e) { /* nessuna richiesta da togliere */ }
     try { await deleteDoc(doc(db, 'refs', me)); } catch (e) { /* nessun invito da togliere */ }
     await deleteDoc(doc(db, 'userPrivate', me));
     await deleteDoc(doc(db, 'users', me));
@@ -448,7 +520,7 @@ function render(force) {
   if (!(loaded.users && loaded.swaps && loaded.fb && loaded.priv)) return;
   if (!firstRoute) { firstRoute = true; if (!S.users.get(me)) S.tab = 'profile'; }
   if (S.route && S.route.t === 'swap') markSeen(S.route.id);
-  syncWatch();
+  syncWatch(); syncMoons();
   const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
   document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App';
   $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['profile', 'Profilo']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '">' + t[1] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</button>').join('');
@@ -500,6 +572,8 @@ document.addEventListener('click', async e => {
   const act = b.dataset.act, id = b.dataset.id;
   try {
     if (act === 'login') { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (x) { if (x.code !== 'auth/popup-closed-by-user' && x.code !== 'auth/cancelled-popup-request') toast(x.code === 'auth/unauthorized-domain' ? 'Dominio non autorizzato: aggiungilo in Firebase > Authentication > Impostazioni.' : 'Accesso non riuscito. Riprova.'); } return; }
+    if (act === 'slotOpen') { openSlot(); return; }
+    if (act === 'slotClose') { closeSlot(); return; }
     if (act === 'askConclude') { S.confirmK = b.dataset.k; render(true); return; }
     if (act === 'noConclude') { S.confirmK = null; render(true); return; }
     if (act === 'aboutOpen') { openAbout(); return; }
@@ -530,13 +604,31 @@ document.addEventListener('click', async e => {
     if (act === 'copy') { try { await navigator.clipboard.writeText(b.dataset.text); toast(b.dataset.msg || 'Email copiata'); } catch (x) { toast('Copia non disponibile: seleziona il testo a mano'); } return; }
     busy = true; b.disabled = true;
     const s = S.swaps.get(id);
-    if (act === 'concludeApp') {
+    if (act === 'moonRedeem') {
+      const u = S.users.get(me);
+      if (!u || moonBalance(u) < MOON_COST) { toast('Non hai abbastanza Lune.'); return; }
+      if (creditsTotal(u) >= MAX_EXTRA) { toast('Hai già il massimo di slot extra.'); return; }
+      await updateDoc(doc(db, 'users', me), { moonsSpent: (u.moonsSpent || 0) + MOON_COST, moons: moonTotal(u) });
+      closeSlot(); toast('Slot extra sbloccato con ' + MOON_COST + ' Lune! Aggiungi la nuova app dal Profilo.');
+    } else if (act === 'slotPaid') {
+      const payer = (($('#slot-payer') || {}).value || '').trim().slice(0, 100);
+      await setDoc(doc(db, 'slotRequests', me), { at: Date.now(), payer });
+      toast('Richiesta inviata. Sblocchiamo lo slot dopo aver verificato il pagamento.'); closeSlot();
+    } else if (act === 'adminGrant') {
+      if (!isAdminUser()) return;
+      const cur = await getDoc(doc(db, 'paid', id)); const n = Math.min(MAX_EXTRA, ((cur.exists() && cur.data().slots) || 0) + 1);
+      await setDoc(doc(db, 'paid', id), { slots: n }); await deleteDoc(doc(db, 'slotRequests', id)); toast('Slot sbloccato per ' + nameOf(id));
+    } else if (act === 'adminDrop') {
+      if (!isAdminUser()) return;
+      await deleteDoc(doc(db, 'slotRequests', id)); toast('Richiesta eliminata');
+    } else if (act === 'concludeApp') {
       const k = b.dataset.k, u = S.users.get(me);
       if (!u || !hasExtra(u, k)) { S.confirmK = null; return; }
       if (openCount(k) > 0) { toast('Questa app ha ancora scambi aperti.'); return; }
       const nu = Object.assign({}, u); nu.extra = Object.assign({}, u.extra); delete nu.extra[k];
       if (!Object.keys(nu.extra).length) delete nu.extra;
-      const inv = validInvites()[0]; if (inv) nu.spent = (u.spent || []).concat(inv);
+      const inv = validInvites()[0];
+      if (inv) nu.spent = (u.spent || []).concat(inv); else if (otherCredits(u) > 0) nu.spent = (u.spent || []).concat('#');
       nu.updatedAt = Date.now();
       await setDoc(doc(db, 'users', me), nu);
       const pv = { email: S.priv.email || '', link: S.priv.link || '' }; const el = Object.assign({}, S.priv.extraLinks || {}); delete el[k];
@@ -635,6 +727,8 @@ document.addEventListener('submit', async e => {
       const data = { nick, country, bio: $('#f-bio').value.trim().slice(0, 200), app: mainApp, createdAt: old.createdAt || Date.now(), updatedAt: Date.now() };
       if (Object.keys(extra).length) data.extra = extra;
       if (old.spent && old.spent.length) data.spent = old.spent;
+      if (old.moons) data.moons = old.moons;
+      if (old.moonsSpent) data.moonsSpent = old.moonsSpent;
       await setDoc(doc(db, 'users', me), data);
       const priv = { email, link: mainLink }; if (Object.keys(extraLinks).length) priv.extraLinks = extraLinks;
       await setDoc(doc(db, 'userPrivate', me), priv);
@@ -664,11 +758,19 @@ function startData() {
     S.swaps = next; loaded.swaps = true; render();
   }, toastErr));
   dataUnsubs.push(onSnapshot(collection(db, 'feedback'), upd('fb', 'fb'), toastErr));
+  let paidFirst = true;
+  dataUnsubs.push(onSnapshot(doc(db, 'paid', me), sn => {
+    const n = sn.exists() ? Math.max(0, Math.floor(+sn.data().slots || 0)) : 0;
+    if (!paidFirst && n > paidSlots()) toast('Pagamento confermato! Slot extra sbloccato: aggiungi la nuova app dal Profilo.');
+    paidFirst = false; S.paid = n; render();
+  }, () => { S.paid = 0; }));
+  dataUnsubs.push(onSnapshot(doc(db, 'slotRequests', me), sn => { S.slotReq = sn.exists() ? sn.data() : null; render(); }, () => { S.slotReq = null; }));
+  if (isAdminUser()) dataUnsubs.push(onSnapshot(collection(db, 'slotRequests'), sn => { S.reqs = new Map(sn.docs.map(d => [d.id, read(d)])); render(); }, () => { S.reqs = new Map(); }));
   dataUnsubs.push(onSnapshot(doc(db, 'refs', me), sn => { S.myRef = sn.exists() ? sn.data() : null; }, () => { S.myRef = null; }));
   dataUnsubs.push(onSnapshot(query(collection(db, 'refs'), where('by', '==', me)), sn => { S.refs = new Map(sn.docs.map(d => [d.id, read(d)])); render(); }, () => { /* senza inviti non c'è nulla da mostrare */ }));
   dataUnsubs.push(onSnapshot(doc(db, 'userPrivate', me), sn => { S.priv = sn.exists() ? sn.data() : { email: '' }; loaded.priv = true; render(); }, toastErr));
 }
-function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; msgWatch.forEach(u => u()); msgWatch.clear(); S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; S.refs = new Map(); S.myRef = undefined; Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; S.delOpen = false; }
+function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; msgWatch.forEach(u => u()); msgWatch.clear(); S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; S.refs = new Map(); S.myRef = undefined; S.paid = 0; S.slotReq = undefined; S.reqs = new Map(); closeSlot(); Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; S.delOpen = false; }
 
 if (!firebaseConfig.apiKey || /INCOLLA/.test(firebaseConfig.apiKey)) {
   gate('Manca la configurazione di Firebase', 'Apri il file firebase-config.js e incolla i valori del tuo progetto Firebase. I passaggi sono nel README.');

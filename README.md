@@ -55,7 +55,15 @@ Avvia il test dallo scambio, aspetta un minuto e il modulo del feedback compare.
 - `privacy.html` è una pagina di informativa di base, da rileggere e adattare a come usi davvero i dati. Non è una consulenza legale. Il suo indirizzo, `https://TUO-UTENTE.github.io/blinders-test-app/privacy.html`, è quello da indicare in Play Console come informativa sulla privacy e come pagina per l'eliminazione dei dati.
 - L'email di contatto è nel piè di pagina dell'app, nel Profilo e in `privacy.html`.
 
+## Lune e slot extra
+
+- **Lune:** ogni giorno di test completato dà +1 Luna (massimo 14 per scambio; gli scambi chiusi dall'altro non contano). Il saldo è nel Profilo come "🌕 12 Lune". Con 20 Lune compare **Usa 20 Lune per sbloccare uno Slot Extra**.
+- **Tre strade per uno slot extra:** Lune (gratis), invito a un amico (gratis) o pagamento di 1,99 € con PayPal ("Subito"). Si sommano, fino a 3 app extra in tutto. Quando concludi un'app extra, lo slot si consuma.
+- **Pagamento:** l'utente paga su PayPal.me (`PAYPAL_ME` in `app.js`), scrive nella nota il suo codice e tocca **Ho pagato, avvisa**. Tu, entrando con l'account `alessiocappello1989@gmail.com`, vedi nel Profilo la sezione **Richieste slot (solo tu)** con il pulsante **Sblocca +1 slot**. Non devi toccare il database. Per cambiare l'email dell'amministratore modifica `ADMIN_EMAIL` in `app.js` e `isAdmin()` in `firestore.rules`.
+
 ## Limiti noti
+
+- Le Lune si calcolano nell'app e il saldo è salvato nel profilo dell'utente: chi sa usare gli strumenti del browser può alterarlo, e chi crea più account può farmare Lune scambiandosi i test. Le regole garantiscono solo che i numeri non diminuiscano.
 
 - Gli inviti non si possono verificare del tutto: chi crea account finti può sbloccare app extra. Un invito conta solo se l'amico ha un profilo nuovo (meno di 7 giorni) e ha pubblicato un'app.
 - Dopo l'aggiornamento pubblica insieme `app.js` e `firestore.rules`: la creazione di uno scambio ora richiede `appIds`. Gli scambi già esistenti restano validi e valgono per l'app principale.
