@@ -61,6 +61,10 @@ const appOf = (uid, aid) => appsOf(uid).find(x => x.id === (aid || 'main'));
 const wantOf = (uid, aid) => { const a = appOf(uid, aid); return (a && a.want) || ''; };
 const canTest = (tester, owner, oAid) => { const w = wantOf(owner, oAid); return !w || w === countryOf(tester); };
 const compat = (a, aA, b, bA) => canTest(a, b, bA) && canTest(b, a, aA);
+/* Etichetta e classe che distinguono le app extra dalla principale. */
+const isExtra = aid => !!aid && aid !== 'main';
+const xcls = aid => isExtra(aid) ? ' extra' : '';
+const xtag = aid => isExtra(aid) ? '<span class="pill ok">🧩 App extra</span>' : '';
 const aidOf = (s, uid) => (s.appIds && s.appIds[uid]) || 'main';
 function mine() { const a = []; S.swaps.forEach((s, id) => a.push(Object.assign({ id }, s))); return a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0)); }
 const isOpenSwap = s => s.status !== 'declined' && !isDone(s);
@@ -181,8 +185,8 @@ function exploreItems() {
         act = '<button class="btn primary" data-act="propose" data-id="' + esc(x.id) + '" data-oa="' + esc(x.a.id) + '" data-ma="' + esc(cur.id) + '">Proponi scambio 1 a 1</button>';
       }
     }
-    return '<article class="card"><div class="row between"><button class="who" data-act="user" data-id="' + esc(x.id) + '">' + av(x.id) + '<span class="n">' + esc(nameOf(x.id)) + '</span></button>' + rate(x.st) + '</div>'
-      + '<div><h3 class="appname">' + esc(x.a.name) + '</h3><div class="row" style="margin-top:4px"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="chip">' + esc(x.u.country || 'Paese n.d.') + '</span><span class="chip">Cerca: ' + esc(x.a.want || 'tutti i paesi') + '</span><span class="small muted">' + x.st.done + ' tester completati</span></div></div>'
+    return '<article class="card app' + xcls(x.a.id) + '"><div class="row between"><button class="who" data-act="user" data-id="' + esc(x.id) + '">' + av(x.id) + '<span class="n">' + esc(nameOf(x.id)) + '</span></button>' + rate(x.st) + '</div>'
+      + '<div><div class="row" style="margin-bottom:4px"><span class="small muted mono">' + (isExtra(x.a.id) ? '' : '📱 ') + 'APP DA TESTARE</span>' + xtag(x.a.id) + '</div><h3 class="appname">' + esc(x.a.name) + '</h3><div class="row" style="margin-top:4px"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="chip">' + esc(x.u.country || 'Paese n.d.') + '</span><span class="chip">Cerca: ' + esc(x.a.want || 'tutti i paesi') + '</span><span class="small muted">' + x.st.done + ' tester completati</span></div></div>'
       + (x.a.desc ? '<p class="desc">' + esc(x.a.desc) + '</p>' : '')
       + pickH + '<div>' + act + '</div></article>';
   }).join('') + note;
@@ -198,7 +202,8 @@ function swapCard(s) {
   const o = s.a === me ? s.b : s.a; const el = elapsed(s, me);
   const oa = (s.apps && s.apps[o] && s.apps[o].name) || 'la sua app', ma = (s.apps && s.apps[me] && s.apps[me].name) || 'la tua app';
   let h = '<article class="card"><div class="row between"><button class="who" data-act="swap" data-id="' + esc(s.id) + '">' + av(o) + '<span class="n">' + esc(nameOf(o)) + '</span>' + (unreadInfo(s).n ? '<span class="dot" role="status" aria-label="' + unreadInfo(s).n + ' novità">' + (unreadInfo(s).n > 9 ? '9+' : unreadInfo(s).n) + '</span>' : '') + '</button>' + statusPill(s) + '</div>'
-    + '<p class="small"><b>Tu testi</b> ' + esc(oa) + ' · <b>lui testa</b> ' + esc(ma) + '</p>'
+    + '<div class="mini' + xcls(aidOf(s, o)) + '"><span class="small muted mono">TU TESTI</span><div class="row between"><b>' + esc(oa) + '</b>' + xtag(aidOf(s, o)) + '</div></div>'
+    + '<div class="mini' + xcls(aidOf(s, me)) + '"><span class="small muted mono">LUI TESTA</span><div class="row between"><b>' + esc(ma) + '</b>' + xtag(aidOf(s, me)) + '</div></div>'
     + (unreadOf(s).length ? '<div class="row">' + unreadOf(s).map(l => '<span class="pill warn">' + l + '</span>').join('') + '</div>' : '');
   if (s.status === 'active' && !isDone(s)) h += tracker(el) + '<p class="small muted mono">' + esc(dayLabel(el)) + '</p>';
   if (s.status === 'proposed' && s.b === me) h += '<div class="row"><button class="btn primary" data-act="accept" data-id="' + esc(s.id) + '">Accetta</button><button class="btn ghost" data-act="decline" data-id="' + esc(s.id) + '">Rifiuta</button></div>';
@@ -367,9 +372,9 @@ function swapView(id) {
   const o = s.a === me ? s.b : s.a;
   const oApp = (s.apps && s.apps[o]) || {}, mApp = (s.apps && s.apps[me]) || {};
   let h = back + '<div class="card"><div class="row between"><button class="who" data-act="user" data-id="' + esc(o) + '">' + av(o) + '<span class="n">' + esc(nameOf(o)) + '</span></button>' + statusPill(s) + '</div>'
-    + '<div class="box"><span class="small muted mono">TU TESTI</span><b>' + esc(oApp.name || 'App') + '</b>'
+    + '<div class="box mini' + xcls(aidOf(s, o)) + '"><div class="row between"><span class="small muted mono">TU TESTI</span>' + xtag(aidOf(s, o)) + '</div><b>' + esc(oApp.name || 'App') + '</b>'
     + (s.status === 'active' ? (S.theirLink ? link(S.theirLink) : '<span class="small muted">Il link di test non è disponibile.</span>') : '<span class="small muted">Il link di test si sblocca quando lo scambio viene accettato.</span>') + '</div>'
-    + '<div class="box"><span class="small muted mono">LUI TESTA</span><b>' + esc(mApp.name || 'La tua app') + '</b></div></div>';
+    + '<div class="box mini' + xcls(aidOf(s, me)) + '"><div class="row between"><span class="small muted mono">LUI TESTA</span>' + xtag(aidOf(s, me)) + '</div><b>' + esc(mApp.name || 'La tua app') + '</b></div></div>';
   if (s.status === 'proposed') {
     if (s.b === me) return h + '<div class="card"><p>' + esc(nameOf(o)) + ' propone di testarsi a vicenda.</p><div class="row"><button class="btn primary" data-act="accept" data-id="' + esc(id) + '">Accetta</button><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Rifiuta</button></div></div>';
     return h + '<div class="card"><p>Richiesta inviata. Quando ' + esc(nameOf(o)) + ' accetta si apre la chat.</p><div><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Annulla richiesta</button></div></div>';
