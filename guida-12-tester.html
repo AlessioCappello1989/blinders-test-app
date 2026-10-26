@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Come trovare 12 tester per il test chiuso di Google Play | IronBlind</title>
+<meta name="description" content="Guida pratica ai 12 tester per 14 giorni richiesti da Google Play: cosa serve, come organizzare il test chiuso e dove trovare tester affidabili.">
+<link rel="canonical" href="https://ironblind.it/guida-12-tester.html">
+<meta name="theme-color" content="#0B1A4A">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="IronBlind Test App">
+<meta property="og:title" content="Come trovare 12 tester per il test chiuso di Google Play | IronBlind">
+<meta property="og:description" content="Guida pratica ai 12 tester per 14 giorni richiesti da Google Play: cosa serve, come organizzare il test chiuso e dove trovare tester affidabili.">
+<meta property="og:url" content="https://ironblind.it/guida-12-tester.html">
+<meta property="og:image" content="https://ironblind.it/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+:root{--bg:#EDF1EE;--surface:#FFFFFF;--ink:#13201A;--muted:#5A6A61;--line:#D3DCD6;--accent:#2748D8;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 "Segoe UI",system-ui,sans-serif;
+  padding-block:0 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{margin:0 -16px 20px;padding:12px 16px;background:#0B1A4A;color:#fff}
+header.top .in{max-width:720px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header.top a{color:#fff;text-decoration:none;font-weight:600}
+header.top nav{display:flex;gap:16px;font-size:14px}
+main{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{font-size:28px;line-height:1.2;margin:0}
+h2{font-size:20px;margin:0 0 8px}
+h3{font-size:17px;margin:14px 0 4px}
+p,ul,ol{margin:0}
+ul,ol{padding-left:22px}
+li{margin:4px 0}
+section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+section p+p,section p+ul,section p+ol,section ul+p,section ol+p{margin-top:10px}
+a{color:var(--accent);overflow-wrap:anywhere}
+.muted{color:var(--muted);font-size:14px}
+.lead{font-size:18px}
+.cta{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:600;padding:11px 18px;border-radius:8px}
+.cta-box{background:#0B1A4A;color:#fff;border:0}
+.cta-box a:not(.cta){color:#fff}
+.cta-box .cta{background:#fff;color:#0B1A4A;margin-top:12px}
+details{border-top:1px solid var(--line);padding:10px 0}
+details:first-of-type{border-top:0}
+summary{cursor:pointer;font-weight:600}
+details p{margin-top:8px}
+footer{max-width:720px;margin:24px auto 0;font-size:14px;color:var(--muted)}
+</style>
+
+</head>
+<body>
+<header class="top"><div class="in"><a href="./">IronBlind Test App</a><nav><a href="guida-12-tester.html">Guida ai 12 tester</a><a href="faq.html">FAQ</a><a href="./">Apri l'app</a></nav></div></header>
+<main>
+<h1>Come superare i 12 tester per 14 giorni di Google Play</h1>
+<p class="lead">Se hai un account sviluppatore Google Play personale creato dopo il 13 novembre 2023, prima di pubblicare la tua app devi fare un test chiuso con almeno 12 tester per 14 giorni consecutivi. Questa guida spiega cosa serve e come organizzarsi.</p>
+<section><h2>Cosa chiede Google</h2>
+<ul><li>Un <b>test chiuso</b> attivo con almeno <b>12 tester</b> iscritti.</li>
+<li>I tester devono restare iscritti <b>per almeno 14 giorni consecutivi</b>. Chi esce prima non conta, e chi esce e rientra deve rifare i 14 giorni di seguito.</li>
+<li>Passati i 14 giorni puoi fare richiesta di accesso alla produzione dalla Dashboard di Play Console, con la richiesta di accesso alla produzione ("Apply for production" nella versione inglese).</li></ul>
+<p class="muted">Fonte: <a href="https://support.google.com/googleplay/android-developer/answer/14151465?hl=it" rel="noopener">Guida di Google Play Console</a>. Le regole possono cambiare: controlla sempre la pagina ufficiale.</p></section>
+<section><h2>Come si organizza un test chiuso</h2>
+<ol><li>In Play Console apri la tua app, vai su <b>Test e rilascio</b> e crea un rilascio nel <b>test chiuso</b>.</li>
+<li>Carica il pacchetto (AAB) della tua app e pubblica il rilascio.</li>
+<li>Crea una <b>lista di tester</b> con le email degli account Google dei tester, oppure usa un Google Group.</li>
+<li>Copia il <b>link di adesione</b> (opt-in) del test e mandalo ai tester.</li>
+<li>Ogni tester apre il link con il suo account Google, accetta di partecipare e installa l'app dal Play Store.</li></ol></section>
+<section><h2>Come trovare 12 tester affidabili</h2>
+<p>Amici e parenti aiutano, ma raramente arrivano a 12 e spesso lasciano il test dopo qualche giorno. Altre strade:</p>
+<ul><li><b>Scambio con altri sviluppatori:</b> tu testi la loro app, loro testano la tua. Entrambi avete lo stesso interesse a restare iscritti per 14 giorni.</li>
+<li><b>Community di sviluppatori:</b> gruppi e forum dedicati ad Android e allo sviluppo indipendente.</li>
+<li><b>Servizi a pagamento:</b> forniscono tester, ma valuta con attenzione chi sono e cosa fanno con la tua app.</li></ul></section>
+<section><h2>Consigli per non perdere giorni</h2>
+<ul><li>Invita <b>più di 12 tester</b>: qualcuno uscirà o non installerà l'app.</li>
+<li>Controlla ogni giorno quanti tester risultano iscritti nella console.</li>
+<li>Dai ai tester istruzioni chiare: link di adesione, account da usare e come installare l'app.</li>
+<li>Rispondi ai feedback e correggi i problemi: ti serviranno anche per la richiesta di produzione.</li>
+<li>Non cambiare account Google dei tester a metà test.</li></ul></section>
+<section><h2>Come ti aiuta IronBlind</h2>
+<p>IronBlind mette in contatto sviluppatori che hanno lo stesso obiettivo. Pubblichi la tua app, scegli chi proporre uno scambio 1 a 1, vi scambiate le email per la lista tester e seguite i 14 giorni di test. Alla fine ci si lascia un feedback reciproco, che resta nel profilo. Puoi anche scegliere da quali paesi vuoi i tester.</p>
+<p><a href="faq.html">Leggi le domande frequenti</a></p></section>
+<section class="cta-box"><h2>Trova i tuoi 12 tester su IronBlind</h2><p>Registrati gratis, pubblica la tua app e scambia i test 1 a 1 con altri sviluppatori indipendenti.</p><a class="cta" href="./">Apri IronBlind</a></section>
+</main>
+<footer>Assistenza: <a href="mailto:Blinders.NL8993@gmail.com">Blinders.NL8993@gmail.com</a> · <a href="privacy.html">Privacy e dati</a> · <a href="guida-12-tester.html">Guida</a> · <a href="faq.html">FAQ</a><br>IronBlind non è affiliata a Google. Google Play è un marchio di Google LLC.</footer>
+</body>
+</html>
