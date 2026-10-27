@@ -103,11 +103,16 @@ const creditsTotal = u => Math.min(MAX_EXTRA, validInvites().length + otherCredi
 const freeSlots = u => Math.max(0, creditsTotal(u) - extraCount(u));
 const moonLabel = n => '🌕 ' + n + (n === 1 ? ' Luna' : ' Lune');
 let moonWrite = false;
+/* Test in corso di una persona: scambi attivi in cui ha avviato il test e non ha ancora lasciato il feedback. */
+const myTesting = () => mine().filter(sw => sw.status === 'active' && ms(sw.start && sw.start[me]) && !(sw.fb && sw.fb[me])).length;
+/* Salva nel profilo le Lune guadagnate e i test in corso, così si possono contare anche per la community. */
 function syncMoons() {
   const u = S.users.get(me); if (!u || moonWrite || busy) return;
-  const t = moonsEarned(); if (t <= (u.moons || 0)) return;
+  const patch = {}; const t = moonsEarned(); if (t > (u.moons || 0)) patch.moons = t;
+  const n = Math.min(100, myTesting()); if (n !== (u.testing || 0)) patch.testing = n;
+  if (!Object.keys(patch).length) return;
   moonWrite = true;
-  updateDoc(doc(db, 'users', me), { moons: t }).catch(e => console.error(e)).finally(() => { moonWrite = false; });
+  updateDoc(doc(db, 'users', me), patch).catch(e => console.error(e)).finally(() => { moonWrite = false; });
 }
 const slotsShown = u => { let free = freeSlots(u); return SLOTS.filter(k => { if (hasExtra(u, k)) return true; if (free > 0) { free--; return true; } return false; }); };
 async function recordInvite(old, hasApp) {
@@ -223,7 +228,15 @@ function countryFilter() {
   const list = COUNTRIES.filter(c => have.has(c) || c === S.fc);
   return '<label for="fc">Paese dello sviluppatore<select id="fc"><option value="">Tutti i paesi</option>' + list.map(c => '<option' + (c === S.fc ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>';
 }
-const exploreView = () => '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
+const fmtN = n => Number(n).toLocaleString('it-IT');
+function statsBanner() {
+  let devs = 0, apps = 0, tests = 0;
+  S.users.forEach((u, id) => { if (!u || !u.nick) return; devs++; apps += appsOf(id).length; tests += id === me ? Math.min(100, myTesting()) : Math.min(100, Math.max(0, Math.floor(+u.testing || 0))); });
+  const c = (x, n, l) => '<div class="sn" style="left:' + x + '%"><b>' + fmtN(n) + '</b><span>' + l + '</span></div>';
+  return '<div class="stats" role="group" aria-label="' + fmtN(devs) + ' sviluppatori iscritti, ' + fmtN(tests) + ' test in corso, ' + fmtN(apps) + ' app pubblicate"><img src="contatore.jpg" alt="" width="1376" height="768" decoding="async">'
+    + c(45.57, devs, 'Sviluppatori<br>Iscritti') + c(66.28, tests, 'Test in<br>Corso') + c(87.14, apps, 'App<br>Pubblicate') + '</div>';
+}
+const exploreView = () => statsBanner() + '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
 
 function swapCard(s) {
   const o = s.a === me ? s.b : s.a; const el = elapsed(s, me);
@@ -728,6 +741,7 @@ document.addEventListener('submit', async e => {
       if (Object.keys(extra).length) data.extra = extra;
       if (old.spent && old.spent.length) data.spent = old.spent;
       if (old.moons) data.moons = old.moons;
+      if (old.testing) data.testing = old.testing;
       if (old.moonsSpent) data.moonsSpent = old.moonsSpent;
       await setDoc(doc(db, 'users', me), data);
       const priv = { email, link: mainLink }; if (Object.keys(extraLinks).length) priv.extraLinks = extraLinks;
