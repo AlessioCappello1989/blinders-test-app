@@ -129,7 +129,8 @@ img{max-width:100%}
   .nav-in{max-width:1100px}
   .navb{flex:0 0 auto;padding:8px 18px}
   #toast{bottom:24px}
-  #list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;align-items:start}
+  #list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:stretch}
+  #list>*{min-width:0}
   #pf,.step{max-width:760px}
   #msgs{max-height:420px}
 }
@@ -144,7 +145,11 @@ img{max-width:100%}
 .slot.main{background:var(--surface)}
 .slot h3{font-size:16px}
 .slot input,.slot textarea,.slot select{background:var(--surface)}
-.card.app.extra{border:1.5px solid color-mix(in srgb,var(--accent) 45%,var(--line));border-left-width:5px;border-radius:14px;background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
+.card.app{border:1.5px solid var(--line);border-radius:14px;width:100%;margin:0}
+.card.app>div:last-child{margin-top:auto}
+.card.app .desc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card.app.extra{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));box-shadow:inset 5px 0 0 color-mix(in srgb,var(--accent) 55%,var(--line));background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
+@media (min-width:1250px){#list{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .mini{display:flex;flex-direction:column;gap:4px;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
 .mini.extra{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));border-left-width:5px;background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
 .box.mini{border-style:solid}
@@ -174,6 +179,6 @@ img{max-width:100%}
 </div>
 <nav class="nav" id="nav" hidden><div class="nav-in" id="navin"></div></nav>
 <div id="toast" hidden role="status"></div>
-<script type="module" src="./app.js?v=20261026m"></script>
+<script type="module" src="./app.js?v=20261026o"></script>
 </body>
 </html>
