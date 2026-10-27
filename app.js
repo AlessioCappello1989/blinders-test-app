@@ -392,12 +392,20 @@ function openSlot() {
   document.body.appendChild(bg); document.addEventListener('keydown', slotKey);
   const cb = bg.querySelector('[data-act="slotClose"]'); if (cb) cb.focus();
 }
+/* Aggiunge uno slot pagato all'utente e toglie la sua richiesta, se c'è. */
+async function grantSlot(uid) {
+  const cur = await getDoc(doc(db, 'paid', uid)); const n = Math.min(MAX_EXTRA, ((cur.exists() && cur.data().slots) || 0) + 1);
+  await setDoc(doc(db, 'paid', uid), { slots: n });
+  try { await deleteDoc(doc(db, 'slotRequests', uid)); } catch (e) { /* nessuna richiesta */ }
+  return n;
+}
 const isAdminUser = () => !!(auth && auth.currentUser && auth.currentUser.email === ADMIN_EMAIL && auth.currentUser.emailVerified);
 function adminBox() {
   if (!isAdminUser()) return '';
   const l = []; S.reqs.forEach((r, uid) => l.push([uid, r]));
   l.sort((a, b) => (a[1].at || 0) - (b[1].at || 0));
-  return '<section class="card"><h3>Richieste slot (solo tu)</h3>' + (l.length ? l.map(x => '<div class="box"><div class="row between"><b>' + esc(nameOf(x[0])) + '</b><span class="small muted">' + fmtD(x[1].at || Date.now()) + '</span></div><p class="small">PayPal: ' + esc(x[1].payer || 'non indicato') + '</p><code class="small" style="overflow-wrap:anywhere">' + esc(x[0]) + '</code><div class="row"><button type="button" class="btn primary sm" data-act="adminGrant" data-id="' + esc(x[0]) + '">Sblocca +1 slot</button><button type="button" class="btn ghost sm" data-act="adminDrop" data-id="' + esc(x[0]) + '">Elimina richiesta</button></div></div>').join('') : '<p class="small muted">Nessuna richiesta in attesa.</p>') + '</section>';
+  const byCode = '<div class="box"><b>Sblocca con il codice</b><p class="small muted">Se hai ricevuto un pagamento ma non c\'è la richiesta, incolla qui il codice scritto nel messaggio di PayPal.</p><label for="adm-code">Codice utente<input id="adm-code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla il codice"></label><div><button type="button" class="btn primary sm" data-act="adminGrantCode">Sblocca +1 slot</button></div></div>';
+  return '<section class="card"><h3>Richieste slot (solo tu)</h3>' + byCode + (l.length ? l.map(x => '<div class="box"><div class="row between"><b>' + esc(nameOf(x[0])) + '</b><span class="small muted">' + fmtD(x[1].at || Date.now()) + '</span></div><p class="small">PayPal: ' + esc(x[1].payer || 'non indicato') + '</p><code class="small" style="overflow-wrap:anywhere">' + esc(x[0]) + '</code><div class="row"><button type="button" class="btn primary sm" data-act="adminGrant" data-id="' + esc(x[0]) + '">Sblocca +1 slot</button><button type="button" class="btn ghost sm" data-act="adminDrop" data-id="' + esc(x[0]) + '">Elimina richiesta</button></div></div>').join('') : '<p class="small muted">Nessuna richiesta in attesa.</p>') + '</section>';
 }
 const SUPPORT = 'Blinders.NL8993@gmail.com';
 function deleteBox() {
@@ -629,8 +637,12 @@ document.addEventListener('click', async e => {
       toast('Richiesta inviata. Sblocchiamo lo slot dopo aver verificato il pagamento.'); closeSlot();
     } else if (act === 'adminGrant') {
       if (!isAdminUser()) return;
-      const cur = await getDoc(doc(db, 'paid', id)); const n = Math.min(MAX_EXTRA, ((cur.exists() && cur.data().slots) || 0) + 1);
-      await setDoc(doc(db, 'paid', id), { slots: n }); await deleteDoc(doc(db, 'slotRequests', id)); toast('Slot sbloccato per ' + nameOf(id));
+      await grantSlot(id); toast('Slot sbloccato per ' + nameOf(id));
+    } else if (act === 'adminGrantCode') {
+      if (!isAdminUser()) return;
+      const code = (($('#adm-code') || {}).value || '').trim();
+      if (!code || !S.users.has(code)) { toast('Codice non trovato. Controlla di averlo copiato per intero.'); return; }
+      const n = await grantSlot(code); toast('Slot sbloccato per ' + nameOf(code) + ' (totale pagati: ' + n + ')');
     } else if (act === 'adminDrop') {
       if (!isAdminUser()) return;
       await deleteDoc(doc(db, 'slotRequests', id)); toast('Richiesta eliminata');
