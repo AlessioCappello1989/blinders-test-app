@@ -233,8 +233,8 @@ function statsBanner() {
   let devs = 0, apps = 0, tests = 0;
   S.users.forEach((u, id) => { if (!u || !u.nick) return; devs++; apps += appsOf(id).length; tests += id === me ? Math.min(100, myTesting()) : Math.min(100, Math.max(0, Math.floor(+u.testing || 0))); });
   const c = (x, n, l) => '<div class="sn" style="left:' + x + '%"><b>' + fmtN(n) + '</b><span>' + l + '</span></div>';
-  return '<div class="stats" role="group" aria-label="' + fmtN(devs) + ' sviluppatori iscritti, ' + fmtN(tests) + ' test in corso, ' + fmtN(apps) + ' app pubblicate"><img src="contatore.jpg" alt="" width="1376" height="768" decoding="async">'
-    + c(45.57, devs, 'Sviluppatori<br>Iscritti') + c(66.28, tests, 'Test in<br>Corso') + c(87.14, apps, 'App<br>Pubblicate') + '</div>';
+  return '<div class="stats" role="group" aria-label="' + fmtN(devs) + ' sviluppatori iscritti, ' + fmtN(tests) + ' test in corso, ' + fmtN(apps) + ' app pubblicate"><img src="contatore2.jpg" alt="" width="1600" height="888" decoding="async">'
+    + c(46.3, devs, 'Sviluppatori<br>Iscritti') + c(67.4, tests, 'Test in<br>Corso') + c(88.5, apps, 'App<br>Pubblicate') + '</div>';
 }
 const exploreView = () => statsBanner() + '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
 
