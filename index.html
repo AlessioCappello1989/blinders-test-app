@@ -116,7 +116,19 @@ html{color-scheme:light}
 img{max-width:100%}
 .login{align-items:flex-start}
 .headl{flex-wrap:nowrap;min-width:0}
-.foot{font-size:13px;color:var(--muted);overflow-wrap:anywhere;padding-top:4px}
+.foot{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#000;border-radius:14px;padding:8px 14px}
+.topbar h1{margin:0;line-height:0;font-size:0}
+.logo-wide{display:block;height:auto;max-width:100%}
+.topbar .logo-wide{height:44px;width:auto}
+.topbar .btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+.foot{display:flex;flex-direction:column;align-items:center;gap:12px;padding-top:12px;text-align:center}
+.foot-brand{background:#000;border-radius:14px;padding:10px 22px}
+.foot-brand .logo-wide{height:40px;width:auto}
+.foot-links{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px;font-size:14px}
+.foot-links a,.linkbtn{color:var(--muted);text-decoration:none;font:inherit;background:none;border:0;padding:4px 0;cursor:pointer}
+.foot-links a:hover,.linkbtn:hover{color:var(--accent);text-decoration:underline}
+
 .logo{width:48px;height:48px;border-radius:12px;object-fit:cover;flex:none;background:#0B1A4A}
 .logo-big{width:112px;height:112px;border-radius:24px;object-fit:cover;background:#0B1A4A}
 .setup code{font:500 13px var(--f-mono);overflow-wrap:anywhere}
@@ -164,21 +176,24 @@ img{max-width:100%}
 </head>
 <body>
 <div class="app">
-  <header class="row between">
-    <div class="row headl">
-      <img class="logo" src="logo.png" width="48" height="48" alt="">
-      <div class="brand">
-        <h1>IronBlind Test App</h1>
-        <span class="tag">1 a 1 · 14 giorni · 12 tester</span>
-      </div>
-    </div>
+  <header class="topbar">
+    <h1 class="logo-wrap"><img class="logo-wide" src="logo-wide.jpg" width="900" height="267" alt="IronBlind Test App"></h1>
     <button id="out" class="btn ghost sm" data-act="logout" hidden>Esci</button>
   </header>
   <main id="view" class="stack" aria-live="polite"><div class="empty"><h3>Caricamento</h3><p class="muted">Sto aprendo i profili e gli scambi.</p></div></main>
-  <footer class="foot">Assistenza e segnalazioni: <a href="mailto:Blinders.NL8993@gmail.com">Blinders.NL8993@gmail.com</a> · <a href="guida-12-tester.html">Guida ai 12 tester</a> · <a href="faq.html">FAQ</a> · <a href="privacy.html">Privacy e dati</a></footer>
+  <footer class="foot">
+    <div class="foot-brand"><img class="logo-wide" src="logo-wide.jpg" width="900" height="267" alt="IronBlind"></div>
+    <nav class="foot-links" aria-label="Link utili">
+      <button type="button" class="linkbtn" data-act="aboutOpen">Chi siamo</button>
+      <a href="faq.html">FAQ</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="mailto:Blinders.NL8993@gmail.com">Assistenza</a>
+      <a href="guida-12-tester.html">Guida ai 12 tester</a>
+    </nav>
+  </footer>
 </div>
 <nav class="nav" id="nav" hidden><div class="nav-in" id="navin"></div></nav>
 <div id="toast" hidden role="status"></div>
-<script type="module" src="./app.js?v=20261026p"></script>
+<script type="module" src="./app.js?v=20261030a"></script>
 </body>
 </html>
