@@ -332,7 +332,7 @@ function isInstalled() {
 }
 const ICON_INFO = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
 function aboutBox() {
-  return '<section class="card"><button type="button" class="menuitem" data-act="aboutOpen"><span class="row">' + ICON_INFO + '<b>Chi siamo &amp; Guida App</b></span><span aria-hidden="true">›</span></button>'
+  return '<section class="card"><button type="button" class="menuitem" data-act="aboutOpen"><span class="row">' + ICON_INFO + '<b>Chi siamo</b></span><span aria-hidden="true">›</span></button>'
     + (PAYPAL_ME ? '<a class="menuitem" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(tipUrl()) + '"><span class="row"><span aria-hidden="true">☕</span><b>Offrimi un caffè</b></span><span aria-hidden="true">›</span></a>' : '') + '</section>';
 }
 let aboutFocus = null;
@@ -342,21 +342,26 @@ function closeAbout() {
   if (aboutFocus && document.contains(aboutFocus)) aboutFocus.focus(); aboutFocus = null;
 }
 function aboutKey(e) { if (e.key === 'Escape') closeAbout(); }
-function openAbout() {
+function openModal(title, body) {
   if ($('#about')) return;
   aboutFocus = document.activeElement;
-  const guide = isInstalled() ? '' : '<div class="step"><h3>📱 Come installare IronBlind sul telefono (PWA)</h3>'
-    + '<p>IronBlind è una Progressive Web App (PWA). Puoi aggiungerla alla schermata Home del telefono per usarla come un\'app nativa:</p>'
-    + '<ul class="guide"><li><b>Android (Chrome):</b> Menu ⋮ in alto a destra ➔ "Aggiungi a schermata Home" o "Installa app".</li>'
-    + '<li><b>iPhone/iPad (Safari):</b> Tasto Condividi (quadrato con freccia in alto) ➔ "Aggiungi alla schermata Home".</li></ul></div>';
   const bg = document.createElement('div'); bg.id = 'about'; bg.className = 'modal-bg';
-  bg.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="about-t"><div class="row between"><h2 id="about-t">Chi siamo &amp; Guida App</h2><button type="button" class="btn ghost sm" data-act="aboutClose" aria-label="Chiudi">✕</button></div>'
-    + '<div class="stack"><div><h3>🚀 Chi siamo</h3><p style="margin-top:6px">IronBlind (ironblind.it) nasce per aiutare gli sviluppatori indipendenti a superare il requisito di 12 tester per 14 giorni imposto da Google Play Console. La nostra community permette agli sviluppatori di fare squadra, testare reciprocamente le app e scambiare feedback costruttivi.</p></div>' + guide
-    + (PAYPAL_ME ? '<div class="step"><h3>☕ Sostieni IronBlind</h3><p>IronBlind è gratuita. Se ti è utile puoi offrirmi un caffè con PayPal, con l\'importo che preferisci. Non sblocca nulla: è solo un grazie.</p><a class="btn primary" style="text-align:center;text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(tipUrl()) + '">Offrimi un caffè con PayPal</a></div>' : '')
-    + '</div></div>';
+  bg.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="about-t"><div class="row between"><h2 id="about-t">' + title + '</h2><button type="button" class="btn ghost sm" data-act="aboutClose" aria-label="Chiudi">✕</button></div>'
+    + '<div class="stack">' + body + '</div></div>';
   bg.addEventListener('click', e => { if (e.target === bg) closeAbout(); });
   document.body.appendChild(bg); document.addEventListener('keydown', aboutKey);
   const cb = bg.querySelector('[data-act="aboutClose"]'); if (cb) cb.focus();
+}
+function openAbout() {
+  openModal('Chi siamo', '<div><h3>🚀 Chi siamo</h3><p style="margin-top:6px">IronBlind (ironblind.it) nasce per aiutare gli sviluppatori indipendenti a superare il requisito di 12 tester per 14 giorni imposto da Google Play Console. La nostra community permette agli sviluppatori di fare squadra, testare reciprocamente le app e scambiare feedback costruttivi.</p></div>'
+    + (PAYPAL_ME ? '<div class="step"><h3>☕ Sostieni IronBlind</h3><p>IronBlind è gratuita. Se ti è utile puoi offrirmi un caffè con PayPal, con l\'importo che preferisci. Non sblocca nulla: è solo un grazie.</p><a class="btn primary" style="text-align:center;text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(tipUrl()) + '">Offrimi un caffè con PayPal</a></div>' : ''));
+}
+function openInstall() {
+  openModal('Come installare l\'app', '<div class="step"><h3>📱 Come installare IronBlind sul telefono (PWA)</h3>'
+    + '<p>IronBlind è una Progressive Web App (PWA). Puoi aggiungerla alla schermata Home del telefono per usarla come un\'app nativa:</p>'
+    + '<ul class="guide"><li><b>Android (Chrome):</b> Menu ⋮ in alto a destra ➔ "Aggiungi a schermata Home" o "Installa app".</li>'
+    + '<li><b>iPhone/iPad (Safari):</b> Tasto Condividi (quadrato con freccia in alto) ➔ "Aggiungi alla schermata Home".</li></ul>'
+    + (isInstalled() ? '<p class="small muted">Stai già usando l\'app installata: non devi fare nulla.</p>' : '') + '</div>');
 }
 function moonCard(u) {
   if (!S.users.get(me)) return '';
@@ -598,6 +603,7 @@ document.addEventListener('click', async e => {
     if (act === 'askConclude') { S.confirmK = b.dataset.k; render(true); return; }
     if (act === 'noConclude') { S.confirmK = null; render(true); return; }
     if (act === 'aboutOpen') { openAbout(); return; }
+    if (act === 'installOpen') { openInstall(); return; }
     if (act === 'aboutClose') { closeAbout(); return; }
     if (act === 'logout') { await signOut(auth); return; }
     if (act === 'delOpen') { S.delOpen = true; render(true); return; }
