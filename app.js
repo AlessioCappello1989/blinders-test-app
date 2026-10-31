@@ -148,7 +148,7 @@ function syncWatch() {
       const list = sn.docs.map(read); const d = list[0];
       if (d) S.lastMsg.set(id, { at: d.at || 0, from: d.from, list: list.map(m => ({ at: m.at || 0, from: m.from })) });
       const open = S.route && S.route.t === 'swap' && S.route.id === id;
-      if (!first && d && d.from !== me && !open) toast('Nuovo messaggio da ' + nameOf(d.from));
+      if (!first && d && d.from !== me) { if (!open) toast('Nuovo messaggio da ' + nameOf(d.from)); sysNotify('Nuovo messaggio da ' + nameOf(d.from), String(d.text || '').slice(0, 100), id); }
       first = false;
       if (open) markSeen(id);
       render();
@@ -318,7 +318,7 @@ function profileView(uid, edit) {
     + (S.users.get(me) && ap.name && freeSlots(u) === 0 && extraCount(u) < MAX_EXTRA
       ? '<div class="box"><b>Vuoi far testare un\'altra app?</b><p class="small muted">Hai usato lo slot gratuito. Sblocca uno slot con le Lune, invitando un amico o subito per ' + SLOT_PRICE + '.</p>' + (S.slotReq ? '<p class="small"><b>Pagamento in verifica:</b> lo slot si sblocca appena confermato.</p>' : '') + '<div><button type="button" class="btn" data-act="slotOpen">+ Aggiungi un\'altra app</button></div></div>' : '')
     + '<div><button class="btn primary" type="submit">Salva profilo</button></div></form>'
-    + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + adminBox() + aboutBox() + deleteBox();
+    + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + adminBox() + notifBox() + aboutBox() + deleteBox();
 }
 
 /* ---------- Chi siamo & guida ---------- */
@@ -331,6 +331,56 @@ function isInstalled() {
   } catch (e) { return false; }
 }
 const ICON_INFO = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+/* ---------- Notifiche di sistema (solo con l'app aperta o in secondo piano) ---------- */
+const notifKey = () => 'ironblind-notif-' + me;
+const notifSupported = () => 'Notification' in window && 'serviceWorker' in navigator;
+function notifOn() { try { return notifSupported() && Notification.permission === 'granted' && localStorage.getItem(notifKey()) === '1'; } catch (e) { return false; } }
+function sysNotify(title, body, swapId) {
+  try {
+    if (!notifOn() || document.visibilityState !== 'hidden') return;
+    navigator.serviceWorker.ready.then(reg => reg.showNotification(title, {
+      body: body || '', icon: 'icon-192.png', badge: 'icon-192.png', tag: 'swap-' + swapId, renotify: true, data: { swap: swapId }
+    })).catch(() => { /* notifica non mostrata */ });
+  } catch (e) { /* notifiche non disponibili */ }
+}
+function notify(text, swapId) { toast(text); sysNotify('IronBlind', text, swapId); }
+async function enableNotif() {
+  try {
+    if (!notifSupported()) { toast('Questo browser non supporta le notifiche.'); return; }
+    const p = await Notification.requestPermission();
+    if (p !== 'granted') { toast('Permesso negato. Puoi attivarlo dalle impostazioni del sito nel browser.'); render(true); return; }
+    try { localStorage.setItem(notifKey(), '1'); } catch (e) { /* senza memoria locale non resta attivo */ }
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification('Notifiche attive', { body: 'Ti avviso di nuovi messaggi e richieste finché l\'app resta aperta.', icon: 'icon-192.png', badge: 'icon-192.png', tag: 'ironblind-test' });
+    toast('Notifiche attivate.');
+  } catch (e) { toast('Non sono riuscito ad attivare le notifiche.'); }
+  render(true);
+}
+function disableNotif() { try { localStorage.removeItem(notifKey()); } catch (e) { /* nulla */ } toast('Notifiche disattivate.'); render(true); }
+function notifBox() {
+  if (!notifSupported()) return '';
+  const denied = Notification.permission === 'denied', on = notifOn();
+  return '<section class="card"><div class="row between"><h3>🔔 Notifiche sul telefono</h3>' + (on ? '<span class="pill ok">Attive</span>' : '') + '</div>'
+    + '<p class="small muted">Ricevi una notifica per nuovi messaggi, proposte e scambi accettati. Funziona finché l\'app è aperta o in secondo piano: se Android la chiude, non arrivano.</p>'
+    + (denied ? '<p class="small">Le notifiche sono bloccate per questo sito: abilitale dalle impostazioni del browser.</p>'
+      : '<div>' + (on ? '<button type="button" class="btn ghost" data-act="notifOff">Disattiva notifiche</button>' : '<button type="button" class="btn primary" data-act="notifOn">Attiva notifiche</button>') + '</div>')
+    + '</section>';
+}
+let pendingSwap = null;
+try { const q = new URLSearchParams(location.search).get('swap'); if (q) pendingSwap = q; } catch (e) { /* nessun parametro */ }
+try {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* senza service worker niente notifiche di sistema */ });
+    navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.swap) { pendingSwap = e.data.swap; openPendingSwap(); } });
+  }
+} catch (e) { /* ambiente senza service worker */ }
+function openPendingSwap() {
+  if (!pendingSwap || !me || !S.swaps.has(pendingSwap)) return;
+  S.route = { t: 'swap', id: pendingSwap }; pendingSwap = null;
+  try { history.replaceState(null, '', location.pathname); } catch (e) { /* nulla */ }
+  render(true);
+}
+
 function aboutBox() {
   return '<section class="card"><button type="button" class="menuitem" data-act="aboutOpen"><span class="row">' + ICON_INFO + '<b>Chi siamo</b></span><span aria-hidden="true">›</span></button>'
     + (PAYPAL_ME ? '<a class="menuitem" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(tipUrl()) + '"><span class="row"><span aria-hidden="true">☕</span><b>Offrimi un caffè</b></span><span aria-hidden="true">›</span></a>' : '') + '</section>';
@@ -602,6 +652,8 @@ document.addEventListener('click', async e => {
     if (act === 'slotClose') { closeSlot(); return; }
     if (act === 'askConclude') { S.confirmK = b.dataset.k; render(true); return; }
     if (act === 'noConclude') { S.confirmK = null; render(true); return; }
+    if (act === 'notifOn') { enableNotif(); return; }
+    if (act === 'notifOff') { disableNotif(); return; }
     if (act === 'aboutOpen') { openAbout(); return; }
     if (act === 'installOpen') { openInstall(); return; }
     if (act === 'aboutClose') { closeAbout(); return; }
@@ -780,14 +832,14 @@ function startData() {
     if (loaded.swaps) {
       next.forEach((s, id) => {
         const old = S.swaps.get(id); const o = s.a === me ? s.b : s.a;
-        if (!old) { if (s.b === me && s.status === 'proposed') toast(nameOf(s.a) + ' ti ha proposto uno scambio'); return; }
+        if (!old) { if (s.b === me && s.status === 'proposed') notify(nameOf(s.a) + ' ti ha proposto uno scambio', id); return; }
         if (S.route && S.route.t === 'swap' && S.route.id === id) return;
-        if (old.status === 'proposed' && s.status === 'active' && s.a === me) toast(nameOf(o) + ' ha accettato lo scambio');
-        if (!ms(old.start && old.start[o]) && ms(s.start && s.start[o])) toast(nameOf(o) + ' ha avviato il test');
-        if (!(old.fb && old.fb[o]) && s.fb && s.fb[o]) toast(nameOf(o) + ' ha lasciato il feedback');
+        if (old.status === 'proposed' && s.status === 'active' && s.a === me) notify(nameOf(o) + ' ha accettato lo scambio', id);
+        if (!ms(old.start && old.start[o]) && ms(s.start && s.start[o])) notify(nameOf(o) + ' ha avviato il test', id);
+        if (!(old.fb && old.fb[o]) && s.fb && s.fb[o]) notify(nameOf(o) + ' ha lasciato il feedback', id);
       });
     }
-    S.swaps = next; loaded.swaps = true; render();
+    S.swaps = next; loaded.swaps = true; render(); openPendingSwap();
   }, toastErr));
   dataUnsubs.push(onSnapshot(collection(db, 'feedback'), upd('fb', 'fb'), toastErr));
   let paidFirst = true;
