@@ -134,7 +134,7 @@ img{max-width:100%}
 .setup code{font:500 13px var(--f-mono);overflow-wrap:anywhere}
 
 /* Desktop: più spazio, menu in alto, app in griglia. Sul cellulare non cambia nulla. */
-@media (min-width:900px) and (hover:hover) and (pointer:fine){
+@media (min-width:900px){
   body{font-size:16px;padding-block:76px 32px}
   .app{max-width:1100px}
   .nav{top:0;bottom:auto;border-top:0;border-bottom:1px solid var(--line);padding-block:8px}
@@ -161,7 +161,7 @@ img{max-width:100%}
 .card.app>div:last-child{margin-top:auto}
 .card.app .desc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .card.app.extra{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));box-shadow:inset 5px 0 0 color-mix(in srgb,var(--accent) 55%,var(--line));background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
-@media (min-width:1250px) and (hover:hover) and (pointer:fine){#list{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1250px){#list{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .mini{display:flex;flex-direction:column;gap:4px;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
 .mini.extra{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));border-left-width:5px;background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
 .box.mini{border-style:solid}
@@ -200,6 +200,6 @@ img{max-width:100%}
 </div>
 <nav class="nav" id="nav" hidden><div class="nav-in" id="navin"></div></nav>
 <div id="toast" hidden role="status"></div>
-<script type="module" src="./app.js?v=20261031f"></script>
+<script type="module" src="./app.js?v=20261031g"></script>
 </body>
 </html>

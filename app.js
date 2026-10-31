@@ -239,7 +239,7 @@ function statsBanner() {
 function introBox() {
   return '<section class="intro"><p class="intro-t">La piattaforma P2P per indie developer: scambiatevi i 12 tester di Google Play e fate conoscere la vostra idea.</p>'
     + '<p class="intro-s">Tu testi la loro app, loro testano la tua. Gratis, 1 a 1, in 14 giorni.</p>'
-    + '<button type="button" class="btn primary intro-b" data-act="installOpen">📱 Come installarla sul telefono</button></section>';
+    + (isInstalled() ? '' : '<button type="button" class="btn primary intro-b" data-act="installOpen">📱 Come installarla sul telefono</button>') + '</section>';
 }
 const exploreView = () => statsBanner() + introBox() + '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
 
