@@ -236,7 +236,12 @@ function statsBanner() {
   return '<div class="stats" role="group" aria-label="' + fmtN(devs) + ' sviluppatori iscritti, ' + fmtN(tests) + ' test in corso, ' + fmtN(apps) + ' app pubblicate"><img src="contatore2.jpg" alt="" width="1600" height="888" decoding="async">'
     + c(46.3, devs, 'Sviluppatori<br>Iscritti') + c(67.4, tests, 'Test in<br>Corso') + c(88.5, apps, 'App<br>Pubblicate') + '</div>';
 }
-const exploreView = () => statsBanner() + '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
+function introBox() {
+  return '<section class="intro"><p class="intro-t">La piattaforma P2P per indie developer: scambiatevi i 12 tester di Google Play e fate conoscere la vostra idea.</p>'
+    + '<p class="intro-s">Tu testi la loro app, loro testano la tua. Gratis, 1 a 1, in 14 giorni.</p>'
+    + (isInstalled() ? '' : '<button type="button" class="btn primary intro-b" data-act="installOpen">📱 Come installarla sul telefono</button>') + '</section>';
+}
+const exploreView = () => statsBanner() + introBox() + '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
 
 function swapCard(s) {
   const o = s.a === me ? s.b : s.a; const el = elapsed(s, me);
