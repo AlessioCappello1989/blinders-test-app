@@ -3,6 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261031o';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -169,8 +170,8 @@ const dayLabel = el => el === null ? 'Non avviato' : el >= 14 ? '14 giorni compl
 function tracker(el) { let h = '<div class="tracker" role="img" aria-label="' + esc(dayLabel(el)) + '">'; for (let i = 0; i < 14; i++) { let c = ''; if (el !== null) c = i < Math.floor(el) ? 'on' : (i === Math.floor(el) ? 'now' : ''); h += '<i class="' + c + '"></i>'; } return h + '</div>'; }
 function meter(n) { let h = '<div class="meter" role="img" aria-label="' + n + ' tester su 12">'; for (let i = 0; i < 12; i++) h += '<i class="' + (i < n ? 'on' : '') + '"></i>'; return h + '</div>'; }
 const rate = st => st.n ? '<span class="rate">★ ' + st.avg.toFixed(1) + ' · ' + st.n + '</span>' : '<span class="rate">Nessun feedback</span>';
-const fmtD = t => new Date(t).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-const fmtT = t => new Date(t).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+const fmtD = t => new Date(t).toLocaleDateString(lang() === 'it' ? 'it-IT' : 'en-GB', { day: 'numeric', month: 'short' });
+const fmtT = t => new Date(t).toLocaleTimeString(lang() === 'it' ? 'it-IT' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
 const link = u => typeof u === 'string' && /^https:\/\//i.test(u) ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">Apri link di test</a>' : '';
 function statusPill(s) { if (isDone(s)) return '<span class="pill ok">Completato</span>'; if (s.status === 'proposed') return '<span class="pill warn">' + (s.b === me ? 'Richiesta ricevuta' : 'In attesa') + '</span>'; return '<span class="pill">In corso</span>'; }
 const stars = n => '★'.repeat(n || 0) + '☆'.repeat(5 - (n || 0));
@@ -228,7 +229,7 @@ function countryFilter() {
   const list = COUNTRIES.filter(c => have.has(c) || c === S.fc);
   return '<label for="fc">Paese dello sviluppatore<select id="fc"><option value="">Tutti i paesi</option>' + list.map(c => '<option' + (c === S.fc ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>';
 }
-const fmtN = n => Number(n).toLocaleString('it-IT');
+const fmtN = n => Number(n).toLocaleString(lang() === 'it' ? 'it-IT' : 'en-GB');
 function statsBanner() {
   let devs = 0, apps = 0, tests = 0;
   S.users.forEach((u, id) => { if (!u || !u.nick) return; devs++; apps += appsOf(id).length; tests += id === me ? Math.min(100, myTesting()) : Math.min(100, Math.max(0, Math.floor(+u.testing || 0))); });
@@ -339,9 +340,11 @@ function lang() {
   const n = (navigator.languages && navigator.languages[0]) || navigator.language || 'it';
   return /^it(\b|-|_)/i.test(n) ? 'it' : 'en';
 }
+setLangGetter(lang);
+startI18n();
 function langBox() {
   const p = langPref(), cur = lang() === 'it' ? 'italiano' : 'English';
-  return '<section class="card"><h3>🌍 Lingua dei messaggi</h3><p class="small muted">I messaggi del robottino e dei traguardi seguono la lingua del telefono: italiano se è in italiano, altrimenti inglese. Ora: ' + cur + '.</p>'
+  return '<section class="card"><h3>🌍 Lingua / Language</h3><p class="small muted">La lingua dell\'app e dei messaggi segue quella del telefono: italiano se è in italiano, altrimenti inglese. Ora: ' + cur + '.</p>'
     + '<label for="langsel">Lingua<select id="langsel"><option value="auto"' + (p === 'auto' ? ' selected' : '') + '>Automatica (segue il telefono)</option><option value="it"' + (p === 'it' ? ' selected' : '') + '>Italiano</option><option value="en"' + (p === 'en' ? ' selected' : '') + '>English</option></select></label>'
     + '<div><button type="button" class="btn ghost sm" data-act="msPreview">Vedi un messaggio di esempio</button></div></section>';
 }
@@ -405,7 +408,7 @@ function showMilestone(key) {
   document.body.appendChild(bg); document.addEventListener('keydown', msKey);
   const b = bg.querySelector('[data-act="msClose"]'); if (b) b.focus();
 }
-document.addEventListener('change', e => { const t = e.target; if (t && t.id === 'langsel') { try { localStorage.setItem(langKey, t.value); } catch (x) { /* nessuna memoria locale */ } render(true); } });
+document.addEventListener('change', e => { const t = e.target; if (t && t.id === 'langsel') { try { localStorage.setItem(langKey, t.value); } catch (x) { /* nessuna memoria locale */ } startI18n(); render(true); } });
 
 /* ---------- Notifiche di sistema (solo con l'app aperta o in secondo piano) ---------- */
 const notifKey = () => 'ironblind-notif-' + me;
@@ -414,8 +417,8 @@ function notifOn() { try { return notifSupported() && Notification.permission ==
 function sysNotify(title, body, swapId) {
   try {
     if (!notifOn() || document.visibilityState !== 'hidden') return;
-    navigator.serviceWorker.ready.then(reg => reg.showNotification(title, {
-      body: body || '', icon: 'icon-192.png', badge: 'icon-192.png', tag: 'swap-' + swapId, renotify: true, data: { swap: swapId }
+    navigator.serviceWorker.ready.then(reg => reg.showNotification(tr(title), {
+      body: tr(body || ''), icon: 'icon-192.png', badge: 'icon-192.png', tag: 'swap-' + swapId, renotify: true, data: { swap: swapId }
     })).catch(() => { /* notifica non mostrata */ });
   } catch (e) { /* notifiche non disponibili */ }
 }
@@ -427,7 +430,7 @@ async function enableNotif() {
     if (p !== 'granted') { toast('Permesso negato. Puoi attivarlo dalle impostazioni del sito nel browser.'); render(true); return; }
     try { localStorage.setItem(notifKey(), '1'); } catch (e) { /* senza memoria locale non resta attivo */ }
     const reg = await navigator.serviceWorker.ready;
-    await reg.showNotification('Notifiche attive', { body: 'Ti avviso di nuovi messaggi e richieste finché l\'app resta aperta.', icon: 'icon-192.png', badge: 'icon-192.png', tag: 'ironblind-test' });
+    await reg.showNotification(tr('Notifiche attive'), { body: tr('Ti avviso di nuovi messaggi e richieste finché l\'app resta aperta.'), icon: 'icon-192.png', badge: 'icon-192.png', tag: 'ironblind-test' });
     toast('Notifiche attivate.');
   } catch (e) { toast('Non sono riuscito ad attivare le notifiche.'); }
   render(true);
@@ -729,6 +732,7 @@ document.addEventListener('click', async e => {
     if (act === 'askConclude') { S.confirmK = b.dataset.k; render(true); return; }
     if (act === 'noConclude') { S.confirmK = null; render(true); return; }
     if (act === 'msClose') { closeMs(); return; }
+    if (act === 'setLang') { try { localStorage.setItem(langKey, b.dataset.l); } catch (x) { /* nessuna memoria locale */ } startI18n(); render(true); return; }
     if (act === 'msPreview') { const ks = Object.keys(MS); showMilestone(ks[msPrevI++ % ks.length]); return; }
     if (act === 'notifOn') { enableNotif(); return; }
     if (act === 'notifOff') { disableNotif(); return; }
@@ -753,7 +757,7 @@ document.addEventListener('click', async e => {
     if (act === 'noClose') { S.confirm = null; render(true); return; }
     if (act === 'star') { S.star[id] = +b.dataset.n; view.querySelectorAll('.star').forEach((x, i) => x.classList.toggle('on', i < S.star[id])); return; }
     if (act === 'invite') {
-      const url = inviteLink(), text = 'Ti invito su IronBlind Test App: ci scambiamo i test di 14 giorni per le nostre app Android.';
+      const url = inviteLink(), text = tr('Ti invito su IronBlind Test App: ci scambiamo i test di 14 giorni per le nostre app Android.');
       if (navigator.share) { try { await navigator.share({ title: 'IronBlind Test App', text, url }); } catch (x) { /* condivisione annullata */ } return; }
       try { await navigator.clipboard.writeText(text + ' ' + url); toast('Link copiato!'); } catch (x) { toast('Copia non disponibile: ' + url); }
       return;
