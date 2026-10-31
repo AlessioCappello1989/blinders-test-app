@@ -318,7 +318,7 @@ function profileView(uid, edit) {
     + (S.users.get(me) && ap.name && freeSlots(u) === 0 && extraCount(u) < MAX_EXTRA
       ? '<div class="box"><b>Vuoi far testare un\'altra app?</b><p class="small muted">Hai usato lo slot gratuito. Sblocca uno slot con le Lune, invitando un amico o subito per ' + SLOT_PRICE + '.</p>' + (S.slotReq ? '<p class="small"><b>Pagamento in verifica:</b> lo slot si sblocca appena confermato.</p>' : '') + '<div><button type="button" class="btn" data-act="slotOpen">+ Aggiungi un\'altra app</button></div></div>' : '')
     + '<div><button class="btn primary" type="submit">Salva profilo</button></div></form>'
-    + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + adminBox() + notifBox() + aboutBox() + deleteBox();
+    + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + adminBox() + notifBox() + langBox() + aboutBox() + deleteBox();
 }
 
 /* ---------- Chi siamo & guida ---------- */
@@ -331,6 +331,82 @@ function isInstalled() {
   } catch (e) { return false; }
 }
 const ICON_INFO = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+/* ---------- Lingua e traguardi con il robottino ---------- */
+const langKey = 'ironblind-lang';
+function langPref() { try { const v = localStorage.getItem(langKey); return v === 'it' || v === 'en' ? v : 'auto'; } catch (e) { return 'auto'; } }
+function lang() {
+  const p = langPref(); if (p !== 'auto') return p;
+  const n = (navigator.languages && navigator.languages[0]) || navigator.language || 'it';
+  return /^it(\b|-|_)/i.test(n) ? 'it' : 'en';
+}
+function langBox() {
+  const p = langPref(), cur = lang() === 'it' ? 'italiano' : 'English';
+  return '<section class="card"><h3>🌍 Lingua dei messaggi</h3><p class="small muted">I messaggi del robottino e dei traguardi seguono la lingua del telefono: italiano se è in italiano, altrimenti inglese. Ora: ' + cur + '.</p>'
+    + '<label for="langsel">Lingua<select id="langsel"><option value="auto"' + (p === 'auto' ? ' selected' : '') + '>Automatica (segue il telefono)</option><option value="it"' + (p === 'it' ? ' selected' : '') + '>Italiano</option><option value="en"' + (p === 'en' ? ' selected' : '') + '>English</option></select></label>'
+    + '<div><button type="button" class="btn ghost sm" data-act="msPreview">Vedi un messaggio di esempio</button></div></section>';
+}
+/* Ogni traguardo: chi parla (bot = robottino, boy = ragazzo con la sciarpa), titolo e battute in italiano e inglese. */
+const MS = {
+  first_swap: { t: ['Primo scambio!', 'First swap!'], l: [['bot', 'Bip bip! Due sviluppatori, due app, zero scuse. Il tuo primo scambio è partito: ora tocca a voi tenere gli occhi aperti.', 'Beep boop! Two developers, two apps, zero excuses. Your first swap is on: now keep your eyes open.']] },
+  day7: { t: ['Metà strada!', 'Halfway there!'], l: [['bot', 'Giorno 7 su 14. Il tuo tester è ancora vivo e l\'app pure. Per ora, direi che va alla grande.', 'Day 7 of 14. Your tester is still alive and so is your app. So far, so good.']] },
+  day14: { t: ['14 giorni completati!', '14 days done!'], l: [['boy', 'Ce l\'hai fatta! Quattordici giorni e nessun bug ti ha fermato. Ora lascia il feedback: il tuo tester se lo merita.', 'You made it! Fourteen days and no bug could stop you. Now leave your feedback: your tester earned it.']] },
+  firstfb: { t: ['Primo feedback ricevuto', 'First feedback received'], l: [['boy', 'Qualcuno ha dedicato 14 giorni alla tua app e te l\'ha anche scritto. Dai un\'occhiata al tuo profilo.', 'Someone spent 14 days on your app and wrote it down. Check out your profile.']] },
+  moons20: { t: ['20 Lune!', '20 Moons!'], l: [['bot', 'Hai raccolto 20 Lune. Valgono uno slot extra gratis: la pazienza paga, anche quando non sembrava.', 'You collected 20 Moons. That is a free extra slot: patience pays, even when it did not look like it.']] },
+  tester6: { t: ['Sei a metà!', 'You are halfway!'], l: [['boy', '6 tester su 12. Il traguardo si vede già da qui. Non fermarti ora!', '6 testers out of 12. The finish line is already in sight. Do not stop now!']] },
+  tester12: { big: true, t: ['12 tester su 12!', '12 testers out of 12!'], l: [
+    ['bot', 'Bip bip! 12 tester su 12. Quasi non ci credo.', 'Beep boop! 12 testers out of 12. I can hardly believe it.'],
+    ['boy', 'Ce l\'abbiamo fatta! Adesso Google Play non ha più scuse.', 'We did it! Google Play has no more excuses.'],
+    ['bot', 'Vai a richiedere l\'accesso alla produzione. Noi facciamo il tifo da qui. 🚀', 'Go request production access. We will cheer from here. 🚀']] }
+};
+const MS_ORDER = ['tester12', 'tester6', 'moons20', 'firstfb', 'day14', 'day7', 'first_swap'];
+const msStoreKey = () => 'ironblind-ms-' + me;
+function msLoad() { try { const v = JSON.parse(localStorage.getItem(msStoreKey()) || 'null'); return v && Array.isArray(v.seen) ? v : null; } catch (e) { return null; } }
+function msSave(v) { try { localStorage.setItem(msStoreKey(), JSON.stringify(v)); } catch (e) { /* senza memoria locale i traguardi si ripetono */ } }
+/* Traguardi raggiunti adesso, calcolati solo da dati veri. */
+function msReached() {
+  const r = [];
+  const my = mine().filter(s => s.status !== 'declined');
+  if (my.some(s => s.status === 'active')) r.push('first_swap');
+  my.forEach(s => { const el = elapsed(s, me); if (el !== null && el >= 7) r.push('day7:' + s.id); if (el !== null && el >= 14) r.push('day14:' + s.id); });
+  let got = 0; S.fb.forEach(f => { if (f.to === me) got++; });
+  if (got > 0) r.push('firstfb');
+  if (moonTotal(S.users.get(me)) >= 20) r.push('moons20');
+  const best = Math.max(0, ...appsOf(me).map(a => stats(me, a).done));
+  if (best >= 6) r.push('tester6');
+  if (best >= 12) r.push('tester12');
+  return r;
+}
+const msBase = k => k.split(':')[0];
+function checkMilestones() {
+  try {
+    if (!me || !S.users.get(me) || $('#ms')) return;
+    const reached = msReached(); let st = msLoad();
+    if (!st) { msSave({ seen: reached }); return; } /* prima volta su questo dispositivo: niente raffica di messaggi vecchi */
+    const fresh = reached.filter(k => st.seen.indexOf(k) < 0);
+    if (!fresh.length) return;
+    fresh.sort((x, y) => MS_ORDER.indexOf(msBase(x)) - MS_ORDER.indexOf(msBase(y)));
+    const k = fresh[0]; st.seen.push(k); msSave(st); showMilestone(msBase(k));
+  } catch (e) { /* un errore nei traguardi non deve bloccare l'app */ }
+}
+let msPrevI = 0;
+function closeMs() { const m = $('#ms'); if (m) m.remove(); document.removeEventListener('keydown', msKey); }
+function msKey(e) { if (e.key === 'Escape') closeMs(); }
+function showMilestone(key) {
+  const d = MS[key]; if (!d || $('#ms')) return;
+  const i = lang() === 'it' ? 0 : 1, who = { bot: [i ? 'The little robot' : 'Il robottino', 'avatar-bot.png'], boy: [i ? 'The guy with the scarf' : 'Il ragazzo con la sciarpa', 'avatar-boy.png'] };
+  const rows = d.l.map((x, n) => '<div class="ms-row ' + x[0] + '" style="animation-delay:' + (n * 0.9) + 's"><img class="ms-av" src="' + who[x[0]][1] + '" alt="' + esc(who[x[0]][0]) + '" width="56" height="56"><div class="ms-bubble">' + esc(x[1 + i]) + '</div></div>').join('');
+  let conf = '';
+  if (d.big && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+    for (let n = 0; n < 28; n++) conf += '<i style="left:' + Math.round(Math.random() * 100) + '%;animation-delay:' + (Math.random() * 1.6).toFixed(2) + 's;background:' + ['#2748D8', '#1B8750', '#f3d77a', '#9DB2FF', '#fff'][n % 5] + '"></i>';
+  }
+  const bg = document.createElement('div'); bg.id = 'ms'; bg.className = 'modal-bg';
+  bg.innerHTML = (conf ? '<div class="confetti" aria-hidden="true">' + conf + '</div>' : '') + '<div class="modal ms" role="dialog" aria-modal="true" aria-labelledby="ms-t"><h2 id="ms-t">' + esc(d.t[i]) + '</h2><div class="ms-chat">' + rows + '</div><button type="button" class="btn primary" data-act="msClose">' + (i ? 'Thanks!' : 'Grazie!') + '</button></div>';
+  bg.addEventListener('click', e => { if (e.target === bg) closeMs(); });
+  document.body.appendChild(bg); document.addEventListener('keydown', msKey);
+  const b = bg.querySelector('[data-act="msClose"]'); if (b) b.focus();
+}
+document.addEventListener('change', e => { const t = e.target; if (t && t.id === 'langsel') { try { localStorage.setItem(langKey, t.value); } catch (x) { /* nessuna memoria locale */ } render(true); } });
+
 /* ---------- Notifiche di sistema (solo con l'app aperta o in secondo piano) ---------- */
 const notifKey = () => 'ironblind-notif-' + me;
 const notifSupported = () => 'Notification' in window && 'serviceWorker' in navigator;
@@ -596,7 +672,7 @@ function render(force) {
   if (!(loaded.users && loaded.swaps && loaded.fb && loaded.priv)) return;
   if (!firstRoute) { firstRoute = true; if (!S.users.get(me)) S.tab = 'profile'; }
   if (S.route && S.route.t === 'swap') markSeen(S.route.id);
-  syncWatch(); syncMoons();
+  syncWatch(); syncMoons(); setTimeout(checkMilestones, 400);
   const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
   document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App';
   $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['profile', 'Profilo']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '">' + t[1] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</button>').join('');
@@ -652,6 +728,8 @@ document.addEventListener('click', async e => {
     if (act === 'slotClose') { closeSlot(); return; }
     if (act === 'askConclude') { S.confirmK = b.dataset.k; render(true); return; }
     if (act === 'noConclude') { S.confirmK = null; render(true); return; }
+    if (act === 'msClose') { closeMs(); return; }
+    if (act === 'msPreview') { const ks = Object.keys(MS); showMilestone(ks[msPrevI++ % ks.length]); return; }
     if (act === 'notifOn') { enableNotif(); return; }
     if (act === 'notifOff') { disableNotif(); return; }
     if (act === 'aboutOpen') { openAbout(); return; }

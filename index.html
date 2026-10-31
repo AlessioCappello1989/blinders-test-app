@@ -128,6 +128,19 @@ img{max-width:100%}
 .foot-links{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px;font-size:14px}
 .foot-links a,.linkbtn{color:var(--muted);text-decoration:none;font:inherit;background:none;border:0;padding:4px 0;cursor:pointer}
 .social{display:flex;gap:12px;justify-content:center}.social a{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;background:#000;color:#fff}.social a:hover,.social a:focus-visible{background:var(--accent)}
+.ms{max-width:440px}
+.ms h2{text-align:center}
+.ms-chat{display:flex;flex-direction:column;gap:12px}
+.ms-row{display:flex;align-items:flex-end;gap:10px;opacity:0;transform:translateY(14px);animation:msin .5s ease forwards}
+.ms-row.boy{flex-direction:row-reverse}
+.ms-av{width:56px;height:56px;border-radius:50%;flex:none;background:#000}
+.ms-bubble{background:var(--cell);border-radius:14px 14px 14px 3px;padding:10px 14px;font-size:15px;line-height:1.4}
+.ms-row.boy .ms-bubble{background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-radius:14px 14px 3px 14px}
+@keyframes msin{to{opacity:1;transform:none}}
+.confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:21}
+.confetti i{position:absolute;top:-12px;width:9px;height:14px;border-radius:2px;animation:cf 2.6s linear infinite}
+@keyframes cf{to{transform:translateY(105vh) rotate(540deg)}}
+@media (prefers-reduced-motion:reduce){.ms-row{animation:none;opacity:1;transform:none}}
 .ph-badge{display:inline-block;line-height:0}.ph-badge img{width:250px;height:54px;max-width:100%}
 .foot-links a:hover,.linkbtn:hover{color:var(--accent);text-decoration:underline}
 
@@ -214,6 +227,6 @@ try{
   }
 }catch(e){}
 </script>
-<script type="module" src="./app.js?v=20261031l"></script>
+<script type="module" src="./app.js?v=20261031n"></script>
 </body>
 </html>
