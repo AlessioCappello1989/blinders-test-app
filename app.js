@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261031p';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261101a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -319,7 +319,7 @@ function profileView(uid, edit) {
     + (S.users.get(me) && ap.name && freeSlots(u) === 0 && extraCount(u) < MAX_EXTRA
       ? '<div class="box"><b>Vuoi far testare un\'altra app?</b><p class="small muted">Hai usato lo slot gratuito. Sblocca uno slot con le Lune, invitando un amico o subito per ' + SLOT_PRICE + '.</p>' + (S.slotReq ? '<p class="small"><b>Pagamento in verifica:</b> lo slot si sblocca appena confermato.</p>' : '') + '<div><button type="button" class="btn" data-act="slotOpen">+ Aggiungi un\'altra app</button></div></div>' : '')
     + '<div><button class="btn primary" type="submit">Salva profilo</button></div></form>'
-    + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + adminBox() + notifBox() + langBox() + aboutBox() + deleteBox();
+    + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + (isAdminUser() ? '' : '');
 }
 
 /* ---------- Chi siamo & guida ---------- */
@@ -460,6 +460,13 @@ function openPendingSwap() {
   render(true);
 }
 
+function settingsView() {
+  return '<section class="card"><h3>⚙️ Impostazioni</h3><p class="small muted">Notifiche, lingua, informazioni sull\'app e account.</p></section>'
+    + notifBox() + langBox() + aboutBox()
+    + '<section class="card"><h3>Seguici</h3><div class="row"><a class="btn ghost sm" target="_blank" rel="noopener noreferrer" href="https://www.instagram.com/ironblind_test_app">Instagram</a><a class="btn ghost sm" target="_blank" rel="noopener noreferrer" href="https://www.facebook.com/share/18xtgUa4cQ/">Facebook</a></div></section>'
+    + adminBox() + deleteBox()
+    + '<section class="card"><button type="button" class="btn ghost" data-act="logout">Esci</button></section>';
+}
 function aboutBox() {
   return '<section class="card"><button type="button" class="menuitem" data-act="aboutOpen"><span class="row">' + ICON_INFO + '<b>Chi siamo</b></span><span aria-hidden="true">›</span></button>'
     + (PAYPAL_ME ? '<a class="menuitem" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(tipUrl()) + '"><span class="row"><span aria-hidden="true">☕</span><b>Offrimi un caffè</b></span><span aria-hidden="true">›</span></a>' : '') + '</section>';
@@ -678,13 +685,14 @@ function render(force) {
   syncWatch(); syncMoons(); setTimeout(checkMilestones, 400);
   const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
   document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App';
-  $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['profile', 'Profilo']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '">' + t[1] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</button>').join('');
-  $('#nav').hidden = false; $('#out').hidden = false;
+  $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['profile', 'Profilo'], ['settings', 'Impostazioni']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '">' + t[1] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</button>').join('');
+  $('#nav').hidden = false; $('#out').hidden = true;
   let h = '';
   if (S.route && S.route.t === 'user') h += S.route.id === me ? profileView(me, true) : profileView(S.route.id, false);
   else if (S.route && S.route.t === 'swap') h += swapView(S.route.id);
   else if (S.tab === 'explore') h += exploreView();
   else if (S.tab === 'swaps') h += swapsView();
+  else if (S.tab === 'settings') h += settingsView();
   else h += profileView(me, true);
   view.innerHTML = h;
   syncSubs(); drawMsgs();
