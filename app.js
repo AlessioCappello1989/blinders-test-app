@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261101a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261101b';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -599,6 +599,27 @@ async function deleteAccount() {
     else toastErr(e);
   } finally { busy = false; if (me) render(true); }
 }
+function swapAppPicker(s, o) {
+  if (s.status !== 'proposed' || s.a !== me) return '';
+  const cur = aidOf(s, me), oA = aidOf(s, o);
+  const opts = appsOf(me).filter(m => m.id === cur || (canTest(o, me, m.id) && canTest(me, o, oA) && !pairOpen(o, m.id, oA)));
+  if (opts.length < 2) return '';
+  return '<label for="swapapp">Cambia app<select id="swapapp" data-sid="' + esc(s.id) + '">' + opts.map(m => '<option value="' + esc(m.id) + '"' + (m.id === cur ? ' selected' : '') + '>' + esc(m.name) + '</option>').join('') + '</select></label>';
+}
+async function changeSwapApp(sid, mA) {
+  const s = S.swaps.get(sid); if (!s || s.status !== 'proposed' || s.a !== me || busy) return;
+  const o = s.b, mineA = appOf(me, mA); if (!mineA) return;
+  const lk = linkFor(mA);
+  if (!lk) { toast('Aggiungi nel profilo il link di adesione al test di ' + mineA.name + '.'); render(true); return; }
+  busy = true;
+  try {
+    const apps = Object.assign({}, s.apps); apps[me] = { name: mineA.name };
+    const appIds = Object.assign({}, s.appIds || {}); appIds[me] = mA; appIds[o] = aidOf(s, o);
+    await updateDoc(doc(db, 'swaps', sid), { apps, appIds });
+    await setDoc(doc(db, 'swaps', sid, 'links', me), { link: lk });
+    toast('App aggiornata');
+  } catch (e) { toastErr(e); } finally { busy = false; render(true); }
+}
 function swapView(id) {
   const s = S.swaps.get(id) && Object.assign({ id }, S.swaps.get(id));
   const back = '<button class="btn ghost sm back" data-act="back">← Indietro</button>';
@@ -608,7 +629,7 @@ function swapView(id) {
   let h = back + '<div class="card"><div class="row between"><button class="who" data-act="user" data-id="' + esc(o) + '">' + av(o) + '<span class="n">' + esc(nameOf(o)) + '</span></button>' + statusPill(s) + '</div>'
     + '<div class="box mini' + xcls(aidOf(s, o)) + '"><div class="row between"><span class="small muted mono">TU TESTI</span>' + xtag(aidOf(s, o)) + '</div><b>' + esc(oApp.name || 'App') + '</b>'
     + (s.status === 'active' ? (S.theirLink ? link(S.theirLink) : '<span class="small muted">Il link di test non è disponibile.</span>') : '<span class="small muted">Il link di test si sblocca quando lo scambio viene accettato.</span>') + '</div>'
-    + '<div class="box mini' + xcls(aidOf(s, me)) + '"><div class="row between"><span class="small muted mono">LUI TESTA</span>' + xtag(aidOf(s, me)) + '</div><b>' + esc(mApp.name || 'La tua app') + '</b></div></div>';
+    + '<div class="box mini' + xcls(aidOf(s, me)) + '"><div class="row between"><span class="small muted mono">LUI TESTA</span>' + xtag(aidOf(s, me)) + '</div><b>' + esc(mApp.name || 'La tua app') + '</b>' + swapAppPicker(s, o) + '</div></div>';
   if (s.status === 'proposed') {
     if (s.b === me) return h + '<div class="card"><p>' + esc(nameOf(o)) + ' propone di testarsi a vicenda.</p><div class="row"><button class="btn primary" data-act="accept" data-id="' + esc(id) + '">Accetta</button><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Rifiuta</button></div></div>';
     return h + '<div class="card"><p>Richiesta inviata. Quando ' + esc(nameOf(o)) + ' accetta si apre la chat.</p><div><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Annulla richiesta</button></div></div>';
@@ -856,7 +877,7 @@ document.addEventListener('input', e => {
   if (e.target.id === 'q') { S.q = e.target.value; const l = $('#list'); if (l) l.innerHTML = exploreItems(); }
   const c = e.target.id && $('#c-' + e.target.id); if (c) c.textContent = e.target.value.length + '/' + e.target.maxLength;
 });
-document.addEventListener('change', e => { const t = e.target; if (t && t.id === 'fc') { S.fc = t.value; const l = $('#list'); if (l) l.innerHTML = exploreItems(); } if (t && t.classList && t.classList.contains('pick')) S.pick[t.dataset.key] = t.value; });
+document.addEventListener('change', e => { const t = e.target; if (t && t.id === 'fc') { S.fc = t.value; const l = $('#list'); if (l) l.innerHTML = exploreItems(); } if (t && t.id === 'swapapp') changeSwapApp(t.dataset.sid, t.value); if (t && t.classList && t.classList.contains('pick')) S.pick[t.dataset.key] = t.value; });
 document.addEventListener('submit', async e => {
   e.preventDefault();
   if (e.target.id === 'af') {

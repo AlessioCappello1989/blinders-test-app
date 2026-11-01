@@ -7,7 +7,7 @@ export function setLangGetter(f) { getLang = f; }
 const E = {
   /* generale */
   'Caricamento': 'Loading', 'Sto aprendo i profili e gli scambi.': 'Opening profiles and swaps.',
-  'Esci': 'Log out', 'Esplora': 'Explore', 'Scambi': 'Swaps', 'Profilo': 'Profile', 'Impostazioni': 'Settings', '⚙️ Impostazioni': '⚙️ Settings', 'Notifiche, lingua, informazioni sull\'app e account.': 'Notifications, language, app info and account.', 'Seguici': 'Follow us',
+  'Esci': 'Log out', 'Esplora': 'Explore', 'Scambi': 'Swaps', 'Profilo': 'Profile', 'Impostazioni': 'Settings', 'Cambia app': 'Change app', 'App aggiornata': 'App updated', '⚙️ Impostazioni': '⚙️ Settings', 'Notifiche, lingua, informazioni sull\'app e account.': 'Notifications, language, app info and account.', 'Seguici': 'Follow us',
   'Chi siamo': 'About us', "Come installare l'app": 'How to install the app', 'Assistenza': 'Support',
   'Guida ai 12 tester': 'Guide to the 12 testers', 'Link utili': 'Useful links',
   'IronBlind su Instagram': 'IronBlind on Instagram', 'IronBlind su Facebook': 'IronBlind on Facebook',
