@@ -7,7 +7,13 @@ export function setLangGetter(f) { getLang = f; }
 const E = {
   /* generale */
   'Caricamento': 'Loading', 'Sto aprendo i profili e gli scambi.': 'Opening profiles and swaps.',
-  'Esci': 'Log out', 'Esplora': 'Explore', 'Scambi': 'Swaps', 'Profilo': 'Profile', 'Impostazioni': 'Settings', '© 2026 IronBlind™. Il logo, il robottino e il ragazzo con la sciarpa sono personaggi e marchi di IronBlind™. Tutti i diritti riservati.': '© 2026 IronBlind™. The logo, the little robot and the guy with the scarf are IronBlind™ characters and trademarks. All rights reserved.', 'Cambia app': 'Change app', 'App aggiornata': 'App updated', '⚙️ Impostazioni': '⚙️ Settings', 'Notifiche, lingua, informazioni sull\'app e account.': 'Notifications, language, app info and account.', 'Seguici': 'Follow us',
+  'Esci': 'Log out', 'Esplora': 'Explore', 'Scambi': 'Swaps', 'Profilo': 'Profile',   'Tutte': 'All', '🚧 Il Cantiere': '🚧 In testing', '✅ Pubblicate': '✅ Published', '🚧 Nel Cantiere': '🚧 In testing', '✅ Online su Google Play': '✅ Live on Google Play', '▶ Vedi su Google Play': '▶ View on Google Play', 'Segnala': 'Report', 'Tester attivi': 'Active testers', 'La tua app': 'Your app', 'Elenco app': 'App list',
+  'Nessun progetto nel Cantiere': 'No projects in testing', 'Quando uno sviluppatore avvia i 14 giorni di test, la sua app compare qui con la barra di avanzamento.': 'When a developer starts the 14 days of testing, their app shows up here with a progress bar.',
+  'Ancora nessuna app pubblicata': 'No published apps yet', 'Hai già pubblicato la tua app su Google Play? Vai nel Profilo, spunta «già pubblicata» e aggiungi il link: comparirà qui.': 'Already published your app on Google Play? Go to Profile, tick “already published” and add the link: it will show up here.',
+  '✅ Questa app è già pubblicata su Google Play': '✅ This app is already published on Google Play', 'Link su Google Play': 'Google Play link', 'Se la spunti, l\'app compare nella vetrina «Pubblicate» di Esplora.': 'If you tick it, the app appears in the “Published” showcase in Explore.',
+  'Per la vetrina serve il link di Google Play (https://play.google.com/...)': 'The showcase needs a Google Play link (https://play.google.com/...)', 'Segnalazione inviata. Grazie!': 'Report sent. Thank you!', 'Tolta dalla vetrina': 'Removed from the showcase', 'Rimessa in vetrina': 'Back in the showcase', 'Segnalazioni ignorate': 'Reports dismissed',
+  'Vetrina: segnalazioni (solo tu)': 'Showcase: reports (only you)', 'Togli dalla vetrina': 'Remove from showcase', 'Ignora': 'Dismiss', 'Tolte dalla vetrina': 'Removed from the showcase', 'Rimetti in vetrina': 'Put back in showcase', ' segnalazione': ' report', ' segnalazioni': ' reports',
+  'Impostazioni': 'Settings', '© 2026 IronBlind™. Il logo, il robottino e il ragazzo con la sciarpa sono personaggi e marchi di IronBlind™. Tutti i diritti riservati.': '© 2026 IronBlind™. The logo, the little robot and the guy with the scarf are IronBlind™ characters and trademarks. All rights reserved.', 'Cambia app': 'Change app', 'App aggiornata': 'App updated', '⚙️ Impostazioni': '⚙️ Settings', 'Notifiche, lingua, informazioni sull\'app e account.': 'Notifications, language, app info and account.', 'Seguici': 'Follow us',
   'Chi siamo': 'About us', "Come installare l'app": 'How to install the app', 'Assistenza': 'Support',
   'Guida ai 12 tester': 'Guide to the 12 testers', 'Link utili': 'Useful links',
   'IronBlind su Instagram': 'IronBlind on Instagram', 'IronBlind su Facebook': 'IronBlind on Facebook',
@@ -166,6 +172,7 @@ const E = {
 const plural = (n, one, many) => (Number(n) === 1 ? one : many);
 /* Modelli con parti variabili: {} = testo qualsiasi (viene tradotto a sua volta). */
 const P = [
+  [/^Giorno (\d+) di 14$/, m => `Day ${m[1]} of 14`], [/^(\d+) tester attivi su 12$/, m => `${m[1]} of 12 testers active`], [/^(\d+) segnalazion[ei]$/, m => `${m[1]} ${plural(m[1], 'report', 'reports')}`],
   [/^La lingua dell'app e dei messaggi segue quella del telefono: italiano se è in italiano, altrimenti inglese\. Ora: (.+)\.$/, (m, t) => `The language of the app and messages follows your phone: Italian if it is in Italian, otherwise English. Now: ${t(m[1])}.`],
   [/^Tu su (.+)$/, m => `You on ${m[1]}`], [/^Lui su (.+)$/, m => `They on ${m[1]}`], [/^Valutazione$/, () => 'Rating'], [/^(\d+) stell[ae]$/, m => `${m[1]} ${plural(m[1], 'star', 'stars')}`],
   [/^(\d+) su (\d+) Lune$/, m => `${m[1]} of ${m[2]} Moons`],

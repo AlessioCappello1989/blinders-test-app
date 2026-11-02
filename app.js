@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261101c';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261103a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -11,7 +11,7 @@ const CATS = ['Giochi', 'Produttività', 'Social', 'Strumenti', 'Salute e fitnes
 const COUNTRIES = ['Italia', 'Albania', 'Argentina', 'Australia', 'Austria', 'Belgio', 'Brasile', 'Canada', 'Cina', 'Croazia', 'Danimarca', 'Egitto', 'Filippine', 'Finlandia', 'Francia', 'Germania', 'Giappone', 'Grecia', 'India', 'Indonesia', 'Irlanda', 'Messico', 'Paesi Bassi', 'Polonia', 'Portogallo', 'Regno Unito', 'Romania', 'Spagna', 'Stati Uniti', 'Svezia', 'Svizzera', 'Turchia', 'Ucraina', 'Altro'];
 
 const view = $('#view');
-const S = { tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined };
+const S = { xt: 'all', hidden: new Set(), reports: new Map(), tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined };
 /* Invito di un amico: il link ?invito=ID viene ricordato su questo dispositivo fino alla registrazione. */
 const INVITE_KEY = 'blinders-invite';
 let pendingInvite = null;
@@ -106,11 +106,27 @@ const moonLabel = n => '🌕 ' + n + (n === 1 ? ' Luna' : ' Lune');
 let moonWrite = false;
 /* Test in corso di una persona: scambi attivi in cui ha avviato il test e non ha ancora lasciato il feedback. */
 const myTesting = () => mine().filter(sw => sw.status === 'active' && ms(sw.start && sw.start[me]) && !(sw.fb && sw.fb[me])).length;
+/* Vetrina: app pubblicata su Google Play (link verificato solo nella forma) e app nel Cantiere (test in corso). */
+const PLAY = /^https:\/\/play\.google\.com\//i;
+const isPubApp = (uid, a) => !!(a && a.pub && PLAY.test(a.store || '') && !S.hidden.has(uid + '_' + a.id));
+const isBuildApp = a => !!(a && a.prog && a.prog.n > 0 && (a.prog.done || 0) < a.prog.n);
+const progDay = a => Math.max(1, Math.min(14, Math.floor((Date.now() - (a.prog.first || Date.now())) / DAY) + 1));
+/* Tester di una mia app: chi ha avviato il test; first = inizio del più vecchio test ancora in corso. */
+function progOf(aid) {
+  const t = []; mine().forEach(sw => { if (sw.status !== 'active' || aidOf(sw, me) !== aid) return; const o = sw.a === me ? sw.b : sw.a; const st = ms(sw.start && sw.start[o]); if (st) t.push(st); });
+  if (!t.length) return { n: 0, done: 0, first: 0 };
+  const run = t.filter(x => Date.now() - x < 14 * DAY);
+  return { n: t.length, done: t.length - run.length, first: Math.min.apply(null, run.length ? run : t) };
+}
 /* Salva nel profilo le Lune guadagnate e i test in corso, così si possono contare anche per la community. */
 function syncMoons() {
   const u = S.users.get(me); if (!u || moonWrite || busy) return;
   const patch = {}; const t = moonsEarned(); if (t > (u.moons || 0)) patch.moons = t;
   const n = Math.min(100, myTesting()); if (n !== (u.testing || 0)) patch.testing = n;
+  appsOf(me).forEach(a => {
+    const p = progOf(a.id), o = a.prog || { n: 0, done: 0, first: 0 };
+    if (p.n !== (o.n || 0) || p.done !== (o.done || 0) || p.first !== (o.first || 0)) patch[(a.id === 'main' ? 'app' : 'extra.' + a.id) + '.prog'] = p;
+  });
   if (!Object.keys(patch).length) return;
   moonWrite = true;
   updateDoc(doc(db, 'users', me), patch).catch(e => console.error(e)).finally(() => { moonWrite = false; });
@@ -188,46 +204,71 @@ function inviteBox(short) {
     + '<p class="small muted">Inviti disponibili: ' + n + '. Gli amici contano quando hanno pubblicato la loro app. Quando concludi un\'app extra lo slot si azzera e per riaverlo serve invitare un altro amico.</p></div>';
 }
 function exploreItems() {
-  const q = S.q.trim().toLowerCase();
+  const q = S.q.trim().toLowerCase(), tab = S.xt;
   const mineApps = appsOf(me);
   const arr = []; let hidden = 0;
   S.users.forEach((u, id) => {
-    if (id === me) return;
+    const own = id === me;
+    if (own && tab === 'all') return;
     if (S.fc && u.country !== S.fc) return;
     appsOf(id).forEach(a => {
+      if (tab === 'build' && !isBuildApp(a)) return;
+      if (tab === 'pub' && !isPubApp(id, a)) return;
       if (q && (a.name + ' ' + (u.nick || '') + ' ' + (a.cat || '')).toLowerCase().indexOf(q) < 0) return;
-      const ex = swapForCard(id, a.id);
-      const ok = canTest(me, id, a.id) && (!mineApps.length || mineApps.some(m => canTest(id, me, m.id)));
-      if (!ex && !ok) { hidden++; return; }
-      arr.push({ id, u, a, ex, st: stats(id, a) });
+      const ex = own ? null : swapForCard(id, a.id);
+      const ok = !own && canTest(me, id, a.id) && (!mineApps.length || mineApps.some(m => canTest(id, me, m.id)));
+      if (!own && !ex && !ok && tab !== 'pub') { hidden++; return; }
+      arr.push({ id, u, a, ex, own, st: stats(id, a) });
     });
   });
   arr.sort((x, y) => y.st.done - x.st.done || (y.u.createdAt || 0) - (x.u.createdAt || 0));
   const note = hidden ? '<p class="small muted">' + hidden + (hidden === 1 ? ' app nascosta perché non è' : ' app nascoste perché non sono') + ' compatibili con i paesi richiesti da te o da loro.</p>' : '';
-  if (!arr.length) return '<div class="empty"><h3>Nessuna app da testare per ora</h3><p class="muted">' + (q || S.fc ? 'Prova con un altro nome, categoria o paese.' : 'Pubblica la tua app dal profilo e invita altri sviluppatori.') + '</p></div>' + note;
+  if (!arr.length) {
+    if (tab === 'build') return '<div class="empty"><h3>Nessun progetto nel Cantiere</h3><p class="muted">Quando uno sviluppatore avvia i 14 giorni di test, la sua app compare qui con la barra di avanzamento.</p></div>' + note;
+    if (tab === 'pub') return '<div class="empty"><h3>Ancora nessuna app pubblicata</h3><p class="muted">Hai già pubblicato la tua app su Google Play? Vai nel Profilo, spunta «già pubblicata» e aggiungi il link: comparirà qui.</p></div>' + note;
+    return '<div class="empty"><h3>Nessuna app da testare per ora</h3><p class="muted">' + (q || S.fc ? 'Prova con un altro nome, categoria o paese.' : 'Pubblica la tua app dal profilo e invita altri sviluppatori.') + '</p></div>' + note;
+  }
   return arr.map(x => {
-    let act, pickH = '';
-    if (!mineApps.length || !countryOf(me)) act = '<button class="btn ghost" data-act="tab" data-tab="profile">Completa prima il tuo profilo</button>';
+    let act = '', pickH = '';
+    const pubd = isPubApp(x.id, x.a), build = isBuildApp(x.a);
+    if (x.own) act = '';
+    else if (!mineApps.length || !countryOk2()) act = '<button class="btn ghost" data-act="tab" data-tab="profile">Completa prima il tuo profilo</button>';
     else if (x.ex) act = '<button class="btn" data-act="swap" data-id="' + esc(x.ex.id) + '">Apri scambio</button>';
     else {
       const elig = mineApps.filter(m => canTest(x.id, me, m.id) && canTest(me, x.id, x.a.id) && !pairOpen(x.id, m.id, x.a.id));
-      if (!elig.length) act = '<p class="small muted">Nessuna delle tue app è compatibile o libera per questo scambio.</p>';
+      if (!elig.length) act = tab === 'pub' ? '' : '<p class="small muted">Nessuna delle tue app è compatibile o libera per questo scambio.</p>';
       else {
         const key = x.id + '-' + x.a.id; const cur = elig.find(m => m.id === S.pick[key]) || elig[0];
         if (elig.length > 1) pickH = '<label for="pick-' + esc(key) + '">Con quale tua app?<select class="pick" id="pick-' + esc(key) + '" data-key="' + esc(key) + '">' + elig.map(m => '<option value="' + esc(m.id) + '"' + (m.id === cur.id ? ' selected' : '') + '>' + esc(m.name) + '</option>').join('') + '</select></label>';
         act = '<button class="btn primary" data-act="propose" data-id="' + esc(x.id) + '" data-oa="' + esc(x.a.id) + '" data-ma="' + esc(cur.id) + '">Proponi scambio 1 a 1</button>';
       }
     }
+    let state = '', extra = '';
+    if (pubd) {
+      state = '<span class="pill ok">✅ Online su Google Play</span>';
+      extra = '<div class="row"><a class="btn" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(x.a.store) + '">▶ Vedi su Google Play</a>' + (x.own ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div>';
+    } else if (build) {
+      state = '<span class="pill build">🚧 Nel Cantiere</span>';
+      const d = progDay(x.a), pct = Math.round(d / 14 * 100), act2 = Math.max(0, Math.min(12, x.a.prog.n - (x.a.prog.done || 0)));
+      extra = '<div><div class="row between small"><b>Giorno ' + d + ' di 14</b><span class="muted">' + pct + '%</span></div><div class="bar w" role="progressbar" aria-valuemin="1" aria-valuemax="14" aria-valuenow="' + d + '"><i style="width:' + pct + '%"></i></div></div>'
+        + '<div class="row between small"><span class="muted">Tester attivi</span><span class="tst" role="img" aria-label="' + act2 + ' tester attivi su 12">' + Array.from({ length: 12 }, (_, k) => '<i class="' + (k < act2 ? 'on' : '') + '"></i>').join('') + '</span></div>';
+    }
     return '<article class="card app' + xcls(x.a.id) + '"><div class="row between"><button class="who" data-act="user" data-id="' + esc(x.id) + '">' + av(x.id) + '<span class="n">' + esc(nameOf(x.id)) + '</span></button>' + rate(x.st) + '</div>'
-      + '<div><div class="row" style="margin-bottom:4px"><span class="small muted mono">' + (isExtra(x.a.id) ? '' : '📱 ') + 'APP DA TESTARE</span>' + xtag(x.a.id) + '</div><h3 class="appname">' + esc(x.a.name) + '</h3><div class="row" style="margin-top:4px"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="chip">' + esc(x.u.country || 'Paese n.d.') + '</span><span class="chip">Cerca: ' + esc(x.a.want || 'tutti i paesi') + '</span><span class="small muted">' + x.st.done + ' tester completati</span></div></div>'
+      + '<div><div class="row" style="margin-bottom:4px"><span class="small muted mono">' + (isExtra(x.a.id) ? '' : '📱 ') + 'APP DA TESTARE</span>' + xtag(x.a.id) + (x.own ? '<span class="pill">La tua app</span>' : '') + state + '</div><h3 class="appname">' + esc(x.a.name) + '</h3><div class="row" style="margin-top:4px"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="chip">' + esc(x.u.country || 'Paese n.d.') + '</span><span class="chip">Cerca: ' + esc(x.a.want || 'tutti i paesi') + '</span><span class="small muted">' + x.st.done + ' tester completati</span></div></div>'
       + (x.a.desc ? '<p class="desc">' + esc(x.a.desc) + '</p>' : '')
-      + pickH + '<div>' + act + '</div></article>';
+      + extra + pickH + (act ? '<div>' + act + '</div>' : '') + '</article>';
   }).join('') + note;
+}
+const countryOk2 = () => !!countryOf(me);
+function xtabs() {
+  let b = 0, p = 0; S.users.forEach((u, id) => appsOf(id).forEach(a => { if (isBuildApp(a)) b++; if (isPubApp(id, a)) p++; }));
+  const t = [['all', 'Tutte', 0], ['build', '🚧 Il Cantiere', b], ['pub', '✅ Pubblicate', p]];
+  return '<div class="seg" role="tablist" aria-label="Elenco app">' + t.map(x => '<button type="button" role="tab" aria-selected="' + (S.xt === x[0]) + '" class="' + (S.xt === x[0] ? 'on' : '') + '" data-act="xtab" data-t="' + x[0] + '">' + x[1] + (x[2] ? ' <span class="cnt">' + x[2] + '</span>' : '') + '</button>').join('') + '</div>';
 }
 function countryFilter() {
   const have = new Set(); S.users.forEach((u, id) => { if (id !== me && u.country && appsOf(id).length) have.add(u.country); });
   const list = COUNTRIES.filter(c => have.has(c) || c === S.fc);
-  return '<label for="fc">Paese dello sviluppatore<select id="fc"><option value="">Tutti i paesi</option>' + list.map(c => '<option' + (c === S.fc ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>';
+  return '<label for="fc">Paese dello sviluppatore<select id="fc"><option value="">Tutti i paesi</option>' + list.map(c => '<option value="' + c + '"' + (c === S.fc ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></label>';
 }
 const fmtN = n => Number(n).toLocaleString(lang() === 'it' ? 'it-IT' : 'en-GB');
 function statsBanner() {
@@ -237,7 +278,7 @@ function statsBanner() {
   return '<div class="stats" role="group" aria-label="' + fmtN(devs) + ' sviluppatori iscritti, ' + fmtN(tests) + ' test in corso, ' + fmtN(apps) + ' app pubblicate"><img src="contatore2.jpg" alt="" width="1600" height="888" decoding="async">'
     + c(46.3, devs, 'Sviluppatori<br>Iscritti') + c(67.4, tests, 'Test in<br>Corso') + c(88.5, apps, 'App<br>Pubblicate') + '</div>';
 }
-const exploreView = () => statsBanner() + '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
+const exploreView = () => statsBanner() + xtabs() + '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
 
 function swapCard(s) {
   const o = s.a === me ? s.b : s.a; const el = elapsed(s, me);
@@ -275,7 +316,7 @@ function statBlock(uid, a, multi) {
 function appFields(k, ap, title, bonus) {
   const n = openCount(k), lock = n > 0 && !!ap.name, dis = lock ? ' disabled' : '';
   const wopts = '<option value="">Qualsiasi paese</option>' + COUNTRIES.map(c => '<option value="' + c + '"' + (ap.want === c ? ' selected' : '') + '>Solo ' + c + '</option>').join('');
-  const opts = CATS.map(c => '<option' + ((ap.cat || 'Altro') === c ? ' selected' : '') + '>' + c + '</option>').join('');
+  const opts = CATS.map(c => '<option value="' + c + '"' + ((ap.cat || 'Altro') === c ? ' selected' : '') + '>' + c + '</option>').join('');
   const note = lock ? '<div class="banner">App bloccata: hai ' + n + (n === 1 ? ' scambio aperto' : ' scambi aperti') + '. Puoi cambiarla quando tutti gli scambi di questa app sono completati, rifiutati o chiusi. Li trovi in <b>Scambi</b>.' + (k === 'main' && bonus < MAX_EXTRA ? ' Vuoi far testare un\'altra app subito? Usa le Lune o invita un amico qui sopra.' : '') + '</div>'
     : (k !== 'main' && !ap.name ? '<p class="small muted">Spazio sbloccato. Lascialo vuoto se non ti serve.</p>' : '');
   const lk = linkFor(k);
@@ -292,7 +333,12 @@ function appFields(k, ap, title, bonus) {
     + '<div class="grid2"><label for="f-cat-' + k + '">Categoria<select id="f-cat-' + k + '"' + dis + '>' + opts + '</select></label>'
     + '<label for="f-link-' + k + '">Link di adesione al test<input id="f-link-' + k + '" type="url" inputmode="url"' + dis + ' value="' + esc(lk) + '" placeholder="https://play.google.com/apps/testing/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te.</span></label></div>'
     + '<label for="f-want-' + k + '">Tester che ti servono<select id="f-want-' + k + '"' + dis + '>' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
-    + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>' + conclude + '</div>';
+    + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>' + pubBox(k, ap) + conclude + '</div>';
+}
+function pubBox(k, ap) {
+  if (!ap.name) return '';
+  return '<div class="box"><label class="check" for="f-pub-' + k + '"><input type="checkbox" id="f-pub-' + k + '"' + (ap.pub ? ' checked' : '') + '><span>✅ Questa app è già pubblicata su Google Play</span></label>'
+    + '<label for="f-store-' + k + '">Link su Google Play<input id="f-store-' + k + '" type="url" inputmode="url" maxlength="300" value="' + esc(ap.store || '') + '" placeholder="https://play.google.com/store/apps/details?id=..."><span class="field-note">Se la spunti, l\'app compare nella vetrina «Pubblicate» di Esplora.</span></label></div>';
 }
 function profileView(uid, edit) {
   const u = S.users.get(uid) || {}; const ap = u.app || {};
@@ -546,7 +592,16 @@ function adminBox() {
   const l = []; S.reqs.forEach((r, uid) => l.push([uid, r]));
   l.sort((a, b) => (a[1].at || 0) - (b[1].at || 0));
   const byCode = '<div class="box"><b>Sblocca con il codice</b><p class="small muted">Se hai ricevuto un pagamento ma non c\'è la richiesta, incolla qui il codice scritto nel messaggio di PayPal.</p><label for="adm-code">Codice utente<input id="adm-code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla il codice"></label><div><button type="button" class="btn primary sm" data-act="adminGrantCode">Sblocca +1 slot</button></div></div>';
-  return '<section class="card"><h3>Richieste slot (solo tu)</h3>' + byCode + (l.length ? l.map(x => '<div class="box"><div class="row between"><b>' + esc(nameOf(x[0])) + '</b><span class="small muted">' + fmtD(x[1].at || Date.now()) + '</span></div><p class="small">PayPal: ' + esc(x[1].payer || 'non indicato') + '</p><code class="small" style="overflow-wrap:anywhere">' + esc(x[0]) + '</code><div class="row"><button type="button" class="btn primary sm" data-act="adminGrant" data-id="' + esc(x[0]) + '">Sblocca +1 slot</button><button type="button" class="btn ghost sm" data-act="adminDrop" data-id="' + esc(x[0]) + '">Elimina richiesta</button></div></div>').join('') : '<p class="small muted">Nessuna richiesta in attesa.</p>') + '</section>';
+  return '<section class="card"><h3>Richieste slot (solo tu)</h3>' + byCode + (l.length ? l.map(x => '<div class="box"><div class="row between"><b>' + esc(nameOf(x[0])) + '</b><span class="small muted">' + fmtD(x[1].at || Date.now()) + '</span></div><p class="small">PayPal: ' + esc(x[1].payer || 'non indicato') + '</p><code class="small" style="overflow-wrap:anywhere">' + esc(x[0]) + '</code><div class="row"><button type="button" class="btn primary sm" data-act="adminGrant" data-id="' + esc(x[0]) + '">Sblocca +1 slot</button><button type="button" class="btn ghost sm" data-act="adminDrop" data-id="' + esc(x[0]) + '">Elimina richiesta</button></div></div>').join('') : '<p class="small muted">Nessuna richiesta in attesa.</p>') + '</section>' + reportsBox();
+}
+function reportsBox() {
+  const g = new Map(); S.reports.forEach(r => { const k = r.uid + '_' + r.aid; const e = g.get(k) || { uid: r.uid, aid: r.aid, n: 0 }; e.n++; g.set(k, e); });
+  if (!g.size && !S.hidden.size) return '';
+  const nm = (uid, aid) => { const a = appOf(uid, aid); return (a ? a.name : 'App') + ' · ' + nameOf(uid); };
+  let h = '<section class="card"><h3>Vetrina: segnalazioni (solo tu)</h3>';
+  g.forEach((e, k) => { const a = appOf(e.uid, e.aid); h += '<div class="box"><div class="row between"><b>' + esc(nm(e.uid, e.aid)) + '</b><span class="small muted">' + e.n + (e.n === 1 ? ' segnalazione' : ' segnalazioni') + '</span></div>' + (a && a.store ? '<p class="small" style="overflow-wrap:anywhere"><a href="' + esc(a.store) + '" target="_blank" rel="noopener noreferrer">' + esc(a.store) + '</a></p>' : '') + '<div class="row"><button type="button" class="btn primary sm" data-act="hideApp" data-k="' + esc(k) + '">Togli dalla vetrina</button><button type="button" class="btn ghost sm" data-act="dropReports" data-k="' + esc(k) + '">Ignora</button></div></div>'; });
+  if (S.hidden.size) { h += '<p class="small muted">Tolte dalla vetrina</p>'; S.hidden.forEach(k => { const i = k.lastIndexOf('_'); h += '<div class="box"><div class="row between"><b>' + esc(nm(k.slice(0, i), k.slice(i + 1))) + '</b><button type="button" class="btn ghost sm" data-act="unhideApp" data-k="' + esc(k) + '">Rimetti in vetrina</button></div></div>'; }); }
+  return h + '</section>';
 }
 const SUPPORT = 'Blinders.NL8993@gmail.com';
 function deleteBox() {
@@ -812,6 +867,24 @@ document.addEventListener('click', async e => {
       const code = (($('#adm-code') || {}).value || '').trim();
       if (!code || !S.users.has(code)) { toast('Codice non trovato. Controlla di averlo copiato per intero.'); return; }
       const n = await grantSlot(code); toast('Slot sbloccato per ' + nameOf(code) + ' (totale pagati: ' + n + ')');
+    } else if (act === 'xtab') {
+      S.xt = b.dataset.t || 'all'; render(true); return;
+    } else if (act === 'report') {
+      const tid = b.dataset.id, ta = b.dataset.a || 'main';
+      await setDoc(doc(db, 'reports', me + '_' + tid + '_' + ta), { uid: tid, aid: ta, by: me, at: Date.now() });
+      toast('Segnalazione inviata. Grazie!');
+    } else if (act === 'hideApp') {
+      if (!isAdminUser()) return;
+      await setDoc(doc(db, 'hidden', b.dataset.k), { at: Date.now() });
+      const dels = []; S.reports.forEach((r, rid) => { if (r.uid + '_' + r.aid === b.dataset.k) dels.push(deleteDoc(doc(db, 'reports', rid))); }); await Promise.all(dels);
+      toast('Tolta dalla vetrina');
+    } else if (act === 'unhideApp') {
+      if (!isAdminUser()) return;
+      await deleteDoc(doc(db, 'hidden', b.dataset.k)); toast('Rimessa in vetrina');
+    } else if (act === 'dropReports') {
+      if (!isAdminUser()) return;
+      const dels = []; S.reports.forEach((r, rid) => { if (r.uid + '_' + r.aid === b.dataset.k) dels.push(deleteDoc(doc(db, 'reports', rid))); }); await Promise.all(dels);
+      toast('Segnalazioni ignorate');
     } else if (act === 'adminDrop') {
       if (!isAdminUser()) return;
       await deleteDoc(doc(db, 'slotRequests', id)); toast('Richiesta eliminata');
@@ -907,6 +980,7 @@ document.addEventListener('submit', async e => {
     const old = S.users.get(me) || {};
     const ks = ['main'].concat(slotsShown(old));
     for (const k of ks) { const l = ($('#f-link-' + k).value || '').trim(); if (l && !/^https:\/\//i.test(l)) { toast('Il link deve iniziare con https://'); return; } }
+    for (const k of ks) { const pc = $('#f-pub-' + k), sl = $('#f-store-' + k); if (pc && pc.checked && !PLAY.test((sl && sl.value || '').trim())) { toast('Per la vetrina serve il link di Google Play (https://play.google.com/...)'); return; } }
     busy = true;
     try {
       const extra = {}, extraLinks = {}; let mainApp = null, mainLink = '';
@@ -915,6 +989,9 @@ document.addEventListener('submit', async e => {
         // Con scambi aperti su quell'app non si cambia: si riscrive quella già salvata.
         const locked = openCount(k) > 0 && !!prev.name;
         const app = locked ? prev : { name: $('#f-app-' + k).value.trim().slice(0, 50), want: $('#f-want-' + k).value, cat: $('#f-cat-' + k).value, desc: $('#f-desc-' + k).value.trim().slice(0, 500) };
+        const pc = $('#f-pub-' + k), sl = $('#f-store-' + k);
+        if (pc) { const st = (sl ? sl.value.trim() : '').slice(0, 300); if (pc.checked) { app.pub = true; app.store = st; } else { delete app.pub; if (st) app.store = st; else delete app.store; } }
+        if (prev.prog) app.prog = prev.prog;
         const lk = locked ? linkFor(k) : $('#f-link-' + k).value.trim();
         if (k === 'main') { mainApp = app; mainLink = lk; } else if (app.name) { extra[k] = app; extraLinks[k] = lk; }
       }
@@ -961,11 +1038,13 @@ function startData() {
   }, () => { S.paid = 0; }));
   dataUnsubs.push(onSnapshot(doc(db, 'slotRequests', me), sn => { S.slotReq = sn.exists() ? sn.data() : null; render(); }, () => { S.slotReq = null; }));
   if (isAdminUser()) dataUnsubs.push(onSnapshot(collection(db, 'slotRequests'), sn => { S.reqs = new Map(sn.docs.map(d => [d.id, read(d)])); render(); }, () => { S.reqs = new Map(); }));
+  dataUnsubs.push(onSnapshot(collection(db, 'hidden'), sn => { S.hidden = new Set(sn.docs.map(d => d.id)); render(); }, () => { S.hidden = new Set(); }));
+  if (isAdminUser()) dataUnsubs.push(onSnapshot(collection(db, 'reports'), sn => { S.reports = new Map(sn.docs.map(d => [d.id, read(d)])); render(); }, () => { S.reports = new Map(); }));
   dataUnsubs.push(onSnapshot(doc(db, 'refs', me), sn => { S.myRef = sn.exists() ? sn.data() : null; }, () => { S.myRef = null; }));
   dataUnsubs.push(onSnapshot(query(collection(db, 'refs'), where('by', '==', me)), sn => { S.refs = new Map(sn.docs.map(d => [d.id, read(d)])); render(); }, () => { /* senza inviti non c'è nulla da mostrare */ }));
   dataUnsubs.push(onSnapshot(doc(db, 'userPrivate', me), sn => { S.priv = sn.exists() ? sn.data() : { email: '' }; loaded.priv = true; render(); }, toastErr));
 }
-function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; msgWatch.forEach(u => u()); msgWatch.clear(); S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; S.refs = new Map(); S.myRef = undefined; S.paid = 0; S.slotReq = undefined; S.reqs = new Map(); closeSlot(); Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; S.delOpen = false; }
+function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; S.hidden = new Set(); S.reports = new Map(); msgWatch.forEach(u => u()); msgWatch.clear(); S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; S.refs = new Map(); S.myRef = undefined; S.paid = 0; S.slotReq = undefined; S.reqs = new Map(); closeSlot(); Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; S.delOpen = false; }
 
 if (!firebaseConfig.apiKey || /INCOLLA/.test(firebaseConfig.apiKey)) {
   gate('Manca la configurazione di Firebase', 'Apri il file firebase-config.js e incolla i valori del tuo progetto Firebase. I passaggi sono nel README.');

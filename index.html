@@ -192,6 +192,14 @@ img{max-width:100%}
 .stats .sn{position:absolute;top:49.7%;transform:translate(-50%,-50%);width:11.6cqw;display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.1;color:#d4eeff;pointer-events:none}
 .stats .sn b{font:800 max(4.4cqw,16px)/1 var(--f-display);text-shadow:0 0 .8cqw rgba(160,220,255,.35);letter-spacing:-.01em}
 .stats .sn span{margin-top:.7cqw;font:700 max(1.7cqw,7px)/1.15 var(--f-body);color:#bdd2e1}
+.seg{display:flex;gap:8px;overflow-x:auto;padding:2px 0;scrollbar-width:none}.seg::-webkit-scrollbar{display:none}
+.seg button{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:9px 14px;font:600 14px var(--f-body);cursor:pointer}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.seg .cnt{display:inline-block;min-width:20px;padding:0 6px;margin-left:4px;border-radius:999px;background:color-mix(in srgb,currentColor 18%,transparent);font-size:12px;text-align:center}
+.pill.build{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.bar.w i{background:var(--warn)}
+.tst{display:flex;gap:4px}.tst i{width:14px;height:14px;border-radius:50%;background:var(--cell)}.tst i.on{background:var(--ok)}
+label.check{flex-direction:row;align-items:center;gap:10px}label.check input{width:auto;flex:none}
 </style>
 </head>
 <body>
@@ -233,6 +241,6 @@ try{
   }
 }catch(e){}
 </script>
-<script type="module" src="./app.js?v=20261101c"></script>
+<script type="module" src="./app.js?v=20261103a"></script>
 </body>
 </html>
