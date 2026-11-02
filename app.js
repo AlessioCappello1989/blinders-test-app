@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261103a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261103b';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -94,7 +94,17 @@ function moonsEarned() {
   mine().forEach(sw => { if (sw.status === 'declined') return; const el = elapsed(sw, me); if (el !== null) n += Math.min(14, Math.floor(el)); });
   return n;
 }
-const moonTotal = u => Math.max((u && u.moons) || 0, moonsEarned());
+const WELCOME_N = 100, WELCOME_MOONS = 20;
+const bonusOf = u => Math.min(WELCOME_MOONS, Math.max(0, Math.floor(+(u && u.bonus) || 0)));
+const moonBase = u => Math.max((u && u.moons) || 0, moonsEarned());
+const moonTotal = u => moonBase(u) + bonusOf(u);
+/* Posizione di iscrizione: quante persone con il profilo creato prima di me, più me. */
+function joinRank(id) {
+  const u = S.users.get(id), t = (u && u.createdAt) || 0; let n = 1;
+  S.users.forEach((v, k) => { if (k === id || !v || !v.nick) return; const c = v.createdAt || 0; if (c < t || (c === t && k < id)) n++; });
+  return n;
+}
+const welcomeKey = () => 'ironblind-welcome-' + me;
 const moonBalance = u => Math.max(0, moonTotal(u) - ((u && u.moonsSpent) || 0));
 const moonSlots = u => Math.floor(((u && u.moonsSpent) || 0) / MOON_COST);
 const markers = u => ((u && u.spent) || []).filter(x => x === '#').length;
@@ -122,6 +132,8 @@ function progOf(aid) {
 function syncMoons() {
   const u = S.users.get(me); if (!u || moonWrite || busy) return;
   const patch = {}; const t = moonsEarned(); if (t > (u.moons || 0)) patch.moons = t;
+  let welcome = false;
+  if (loaded.users && u.nick && !u.bonus && joinRank(me) <= WELCOME_N) { patch.bonus = WELCOME_MOONS; welcome = true; }
   const n = Math.min(100, myTesting()); if (n !== (u.testing || 0)) patch.testing = n;
   appsOf(me).forEach(a => {
     const p = progOf(a.id), o = a.prog || { n: 0, done: 0, first: 0 };
@@ -129,7 +141,11 @@ function syncMoons() {
   });
   if (!Object.keys(patch).length) return;
   moonWrite = true;
-  updateDoc(doc(db, 'users', me), patch).catch(e => console.error(e)).finally(() => { moonWrite = false; });
+  updateDoc(doc(db, 'users', me), patch).then(() => {
+    if (!welcome) return;
+    try { if (localStorage.getItem(welcomeKey())) return; localStorage.setItem(welcomeKey(), '1'); } catch (e) { /* senza memoria locale può ripetersi */ }
+    setTimeout(() => showMilestone('welcome'), 500);
+  }).catch(e => console.error(e)).finally(() => { moonWrite = false; });
 }
 const slotsShown = u => { let free = freeSlots(u); return SLOTS.filter(k => { if (hasExtra(u, k)) return true; if (free > 0) { free--; return true; } return false; }); };
 async function recordInvite(old, hasApp) {
@@ -407,6 +423,10 @@ const MS = {
     ['boy', 'Ce l\'abbiamo fatta! Adesso Google Play non ha più scuse.', 'We did it! Google Play has no more excuses.'],
     ['bot', 'Vai a richiedere l\'accesso alla produzione. Noi facciamo il tifo da qui. 🚀', 'Go request production access. We will cheer from here. 🚀']] }
 };
+MS.welcome = { big: true, t: ['Benvenuto a bordo!', 'Welcome aboard!'], l: [
+  ['bot', 'Bip bip! Sei tra i primi 100 sviluppatori di IronBlind. Per ringraziarti ti regaliamo 20 Lune: valgono uno slot extra gratis.', 'Beep boop! You are one of the first 100 developers on IronBlind. To thank you, here are 20 Moons: that is a free extra slot.'],
+  ['boy', 'Grazie di esserci dall\'inizio: senza di te questa avventura non partirebbe. Benvenuto nell\'equipaggio!', 'Thank you for being here from the start: without you this adventure would not take off. Welcome to the crew!'],
+  ['bot', 'Trovi le Lune nel tuo Profilo. Buon test! 🚀', 'You will find your Moons in your Profile. Happy testing! 🚀']] };
 const MS_ORDER = ['tester12', 'tester6', 'moons20', 'firstfb', 'day14', 'day7', 'first_swap'];
 const msStoreKey = () => 'ironblind-ms-' + me;
 function msLoad() { try { const v = JSON.parse(localStorage.getItem(msStoreKey()) || 'null'); return v && Array.isArray(v.seen) ? v : null; } catch (e) { return null; } }
@@ -419,7 +439,7 @@ function msReached() {
   my.forEach(s => { const el = elapsed(s, me); if (el !== null && el >= 7) r.push('day7:' + s.id); if (el !== null && el >= 14) r.push('day14:' + s.id); });
   let got = 0; S.fb.forEach(f => { if (f.to === me) got++; });
   if (got > 0) r.push('firstfb');
-  if (moonTotal(S.users.get(me)) >= 20) r.push('moons20');
+  if (moonBase(S.users.get(me)) >= 20) r.push('moons20');
   const best = Math.max(0, ...appsOf(me).map(a => stats(me, a).done));
   if (best >= 6) r.push('tester6');
   if (best >= 12) r.push('tester12');
@@ -853,7 +873,7 @@ document.addEventListener('click', async e => {
       const u = S.users.get(me);
       if (!u || moonBalance(u) < MOON_COST) { toast('Non hai abbastanza Lune.'); return; }
       if (creditsTotal(u) >= MAX_EXTRA) { toast('Hai già il massimo di slot extra.'); return; }
-      await updateDoc(doc(db, 'users', me), { moonsSpent: (u.moonsSpent || 0) + MOON_COST, moons: moonTotal(u) });
+      await updateDoc(doc(db, 'users', me), { moonsSpent: (u.moonsSpent || 0) + MOON_COST, moons: moonBase(u) });
       closeSlot(); toast('Slot extra sbloccato con ' + MOON_COST + ' Lune! Aggiungi la nuova app dal Profilo.');
     } else if (act === 'slotPaid') {
       const payer = (($('#slot-payer') || {}).value || '').trim().slice(0, 100);
@@ -999,6 +1019,7 @@ document.addEventListener('submit', async e => {
       if (Object.keys(extra).length) data.extra = extra;
       if (old.spent && old.spent.length) data.spent = old.spent;
       if (old.moons) data.moons = old.moons;
+      if (old.bonus) data.bonus = old.bonus;
       if (old.testing) data.testing = old.testing;
       if (old.moonsSpent) data.moonsSpent = old.moonsSpent;
       await setDoc(doc(db, 'users', me), data);
