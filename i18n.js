@@ -14,6 +14,9 @@ const E = {
   'Per la vetrina serve il link di Google Play (https://play.google.com/...)': 'The showcase needs a Google Play link (https://play.google.com/...)', 'Segnalazione inviata. Grazie!': 'Report sent. Thank you!', 'Tolta dalla vetrina': 'Removed from the showcase', 'Rimessa in vetrina': 'Back in the showcase', 'Segnalazioni ignorate': 'Reports dismissed',
   'Vetrina: segnalazioni (solo tu)': 'Showcase: reports (only you)', 'Togli dalla vetrina': 'Remove from showcase', 'Ignora': 'Dismiss', 'Tolte dalla vetrina': 'Removed from the showcase', 'Rimetti in vetrina': 'Put back in showcase', ' segnalazione': ' report', ' segnalazioni': ' reports',
   'Benvenuto a bordo!': 'Welcome aboard!',
+  'Hai già un test attivo fuori da IronBlind?': 'Already have a test running outside IronBlind?', 'Tester esterni': 'External testers', 'Data di inizio del test': 'Test start date',
+  'Se hai già tester trovati altrove, l\'app compare nel Cantiere con il giorno di test. La data la trovi in Google Play Console. Resta un dato dichiarato da te.': 'If you already have testers from elsewhere, the app shows up in the Workshop with its test day. You can find the date in Google Play Console. It stays a figure declared by you.',
+  'I tester esterni vanno da 0 a 50.': 'External testers go from 0 to 50.', 'Indica la data di inizio del test esterno.': 'Enter the start date of the external test.', 'La data di inizio non può essere nel futuro.': 'The start date cannot be in the future.',
   'Impostazioni': 'Settings', '© 2026 IronBlind™. Il logo, il robottino e il ragazzo con la sciarpa sono personaggi e marchi di IronBlind™. Tutti i diritti riservati.': '© 2026 IronBlind™. The logo, the little robot and the guy with the scarf are IronBlind™ characters and trademarks. All rights reserved.', 'Cambia app': 'Change app', 'App aggiornata': 'App updated', '⚙️ Impostazioni': '⚙️ Settings', 'Notifiche, lingua, informazioni sull\'app e account.': 'Notifications, language, app info and account.', 'Seguici': 'Follow us',
   'Chi siamo': 'About us', "Come installare l'app": 'How to install the app', 'Assistenza': 'Support',
   'Guida ai 12 tester': 'Guide to the 12 testers', 'Link utili': 'Useful links',
@@ -173,6 +176,7 @@ const E = {
 const plural = (n, one, many) => (Number(n) === 1 ? one : many);
 /* Modelli con parti variabili: {} = testo qualsiasi (viene tradotto a sua volta). */
 const P = [
+  [/^di cui (\d+) estern[oi]$/, m => `${m[1]} external`],
   [/^Giorno (\d+) di 14$/, m => `Day ${m[1]} of 14`], [/^(\d+) tester attivi su 12$/, m => `${m[1]} of 12 testers active`], [/^(\d+) segnalazion[ei]$/, m => `${m[1]} ${plural(m[1], 'report', 'reports')}`],
   [/^La lingua dell'app e dei messaggi segue quella del telefono: italiano se è in italiano, altrimenti inglese\. Ora: (.+)\.$/, (m, t) => `The language of the app and messages follows your phone: Italian if it is in Italian, otherwise English. Now: ${t(m[1])}.`],
   [/^Tu su (.+)$/, m => `You on ${m[1]}`], [/^Lui su (.+)$/, m => `They on ${m[1]}`], [/^Valutazione$/, () => 'Rating'], [/^(\d+) stell[ae]$/, m => `${m[1]} ${plural(m[1], 'star', 'stars')}`],

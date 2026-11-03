@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261103b';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261103c';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -119,8 +119,17 @@ const myTesting = () => mine().filter(sw => sw.status === 'active' && ms(sw.star
 /* Vetrina: app pubblicata su Google Play (link verificato solo nella forma) e app nel Cantiere (test in corso). */
 const PLAY = /^https:\/\/play\.google\.com\//i;
 const isPubApp = (uid, a) => !!(a && a.pub && PLAY.test(a.store || '') && !S.hidden.has(uid + '_' + a.id));
-const isBuildApp = a => !!(a && a.prog && a.prog.n > 0 && (a.prog.done || 0) < a.prog.n);
-const progDay = a => Math.max(1, Math.min(14, Math.floor((Date.now() - (a.prog.first || Date.now())) / DAY) + 1));
+/* Test dell'app: scambi su IronBlind (prog) più eventuali tester esterni dichiarati dal proprietario (ext: n e data di inizio). */
+function buildInfo(a) {
+  const p = (a && a.prog) || { n: 0, done: 0, first: 0 }, e = a && a.ext && a.ext.n > 0 && a.ext.start ? a.ext : null;
+  const en = e ? Math.min(50, Math.floor(e.n)) : 0, edone = e && Date.now() - e.start >= 14 * DAY ? en : 0;
+  const n = (p.n || 0) + en, done = Math.min((p.done || 0) + edone, n);
+  const run = []; if ((p.n || 0) - (p.done || 0) > 0 && p.first) run.push(p.first); if (en && !edone) run.push(e.start);
+  const all = []; if (p.n && p.first) all.push(p.first); if (en) all.push(e.start);
+  return { n, done, ext: en, first: run.length ? Math.min.apply(null, run) : (all.length ? Math.min.apply(null, all) : 0) };
+}
+const isBuildApp = (uid, a) => { const i = buildInfo(a); return !!(a && i.n > 0 && i.done < i.n && !S.hidden.has(uid + '_' + a.id)); };
+const progDay = a => Math.max(1, Math.min(14, Math.floor((Date.now() - (buildInfo(a).first || Date.now())) / DAY) + 1));
 /* Tester di una mia app: chi ha avviato il test; first = inizio del più vecchio test ancora in corso. */
 function progOf(aid) {
   const t = []; mine().forEach(sw => { if (sw.status !== 'active' || aidOf(sw, me) !== aid) return; const o = sw.a === me ? sw.b : sw.a; const st = ms(sw.start && sw.start[o]); if (st) t.push(st); });
@@ -228,7 +237,7 @@ function exploreItems() {
     if (own && tab === 'all') return;
     if (S.fc && u.country !== S.fc) return;
     appsOf(id).forEach(a => {
-      if (tab === 'build' && !isBuildApp(a)) return;
+      if (tab === 'build' && !isBuildApp(id, a)) return;
       if (tab === 'pub' && !isPubApp(id, a)) return;
       if (q && (a.name + ' ' + (u.nick || '') + ' ' + (a.cat || '')).toLowerCase().indexOf(q) < 0) return;
       const ex = own ? null : swapForCard(id, a.id);
@@ -246,7 +255,7 @@ function exploreItems() {
   }
   return arr.map(x => {
     let act = '', pickH = '';
-    const pubd = isPubApp(x.id, x.a), build = isBuildApp(x.a);
+    const pubd = isPubApp(x.id, x.a), build = isBuildApp(x.id, x.a);
     if (x.own) act = '';
     else if (!mineApps.length || !countryOk2()) act = '<button class="btn ghost" data-act="tab" data-tab="profile">Completa prima il tuo profilo</button>';
     else if (x.ex) act = '<button class="btn" data-act="swap" data-id="' + esc(x.ex.id) + '">Apri scambio</button>';
@@ -265,9 +274,11 @@ function exploreItems() {
       extra = '<div class="row"><a class="btn" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(x.a.store) + '">▶ Vedi su Google Play</a>' + (x.own ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div>';
     } else if (build) {
       state = '<span class="pill build">🚧 Nel Cantiere</span>';
-      const d = progDay(x.a), pct = Math.round(d / 14 * 100), act2 = Math.max(0, Math.min(12, x.a.prog.n - (x.a.prog.done || 0)));
+      const d = progDay(x.a), pct = Math.round(d / 14 * 100), bi = buildInfo(x.a), act2 = Math.max(0, Math.min(12, bi.n - bi.done));
       extra = '<div><div class="row between small"><b>Giorno ' + d + ' di 14</b><span class="muted">' + pct + '%</span></div><div class="bar w" role="progressbar" aria-valuemin="1" aria-valuemax="14" aria-valuenow="' + d + '"><i style="width:' + pct + '%"></i></div></div>'
-        + '<div class="row between small"><span class="muted">Tester attivi</span><span class="tst" role="img" aria-label="' + act2 + ' tester attivi su 12">' + Array.from({ length: 12 }, (_, k) => '<i class="' + (k < act2 ? 'on' : '') + '"></i>').join('') + '</span></div>';
+        + '<div class="row between small"><span class="muted">Tester attivi</span><span class="tst" role="img" aria-label="' + act2 + ' tester attivi su 12">' + Array.from({ length: 12 }, (_, k) => '<i class="' + (k < act2 ? 'on' : '') + '"></i>').join('') + '</span></div>'
+        + (bi.ext ? '<p class="small muted">di cui ' + bi.ext + (bi.ext === 1 ? ' esterno' : ' esterni') + '</p>' : '')
+        + (x.own ? '' : '<div><button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button></div>');
     }
     return '<article class="card app' + xcls(x.a.id) + '"><div class="row between"><button class="who" data-act="user" data-id="' + esc(x.id) + '">' + av(x.id) + '<span class="n">' + esc(nameOf(x.id)) + '</span></button>' + rate(x.st) + '</div>'
       + '<div><div class="row" style="margin-bottom:4px"><span class="small muted mono">' + (isExtra(x.a.id) ? '' : '📱 ') + 'APP DA TESTARE</span>' + xtag(x.a.id) + (x.own ? '<span class="pill">La tua app</span>' : '') + state + '</div><h3 class="appname">' + esc(x.a.name) + '</h3><div class="row" style="margin-top:4px"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="chip">' + esc(x.u.country || 'Paese n.d.') + '</span><span class="chip">Cerca: ' + esc(x.a.want || 'tutti i paesi') + '</span><span class="small muted">' + x.st.done + ' tester completati</span></div></div>'
@@ -277,7 +288,7 @@ function exploreItems() {
 }
 const countryOk2 = () => !!countryOf(me);
 function xtabs() {
-  let b = 0, p = 0; S.users.forEach((u, id) => appsOf(id).forEach(a => { if (isBuildApp(a)) b++; if (isPubApp(id, a)) p++; }));
+  let b = 0, p = 0; S.users.forEach((u, id) => appsOf(id).forEach(a => { if (isBuildApp(id, a)) b++; if (isPubApp(id, a)) p++; }));
   const t = [['all', 'Tutte', 0], ['build', '🚧 Il Cantiere', b], ['pub', '✅ Pubblicate', p]];
   return '<div class="seg" role="tablist" aria-label="Elenco app">' + t.map(x => '<button type="button" role="tab" aria-selected="' + (S.xt === x[0]) + '" class="' + (S.xt === x[0] ? 'on' : '') + '" data-act="xtab" data-t="' + x[0] + '">' + x[1] + (x[2] ? ' <span class="cnt">' + x[2] + '</span>' : '') + '</button>').join('') + '</div>';
 }
@@ -351,9 +362,17 @@ function appFields(k, ap, title, bonus) {
     + '<label for="f-want-' + k + '">Tester che ti servono<select id="f-want-' + k + '"' + dis + '>' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
     + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>' + pubBox(k, ap) + conclude + '</div>';
 }
+const dateVal = t => { if (!t) return ''; const d = new Date(t), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
+function extBox(k, ap) {
+  const e = ap.ext || {};
+  return '<div class="box"><b>Hai già un test attivo fuori da IronBlind?</b>'
+    + '<div class="grid2"><label for="f-extn-' + k + '">Tester esterni<input id="f-extn-' + k + '" type="number" inputmode="numeric" min="0" max="50" value="' + (e.n > 0 ? e.n : '') + '" placeholder="0"></label>'
+    + '<label for="f-exts-' + k + '">Data di inizio del test<input id="f-exts-' + k + '" type="date" max="' + dateVal(Date.now()) + '" value="' + dateVal(e.start) + '"></label></div>'
+    + '<span class="field-note">Se hai già tester trovati altrove, l\'app compare nel Cantiere con il giorno di test. La data la trovi in Google Play Console. Resta un dato dichiarato da te.</span></div>';
+}
 function pubBox(k, ap) {
   if (!ap.name) return '';
-  return '<div class="box"><label class="check" for="f-pub-' + k + '"><input type="checkbox" id="f-pub-' + k + '"' + (ap.pub ? ' checked' : '') + '><span>✅ Questa app è già pubblicata su Google Play</span></label>'
+  return extBox(k, ap) + '<div class="box"><label class="check" for="f-pub-' + k + '"><input type="checkbox" id="f-pub-' + k + '"' + (ap.pub ? ' checked' : '') + '><span>✅ Questa app è già pubblicata su Google Play</span></label>'
     + '<label for="f-store-' + k + '">Link su Google Play<input id="f-store-' + k + '" type="url" inputmode="url" maxlength="300" value="' + esc(ap.store || '') + '" placeholder="https://play.google.com/store/apps/details?id=..."><span class="field-note">Se la spunti, l\'app compare nella vetrina «Pubblicate» di Esplora.</span></label></div>';
 }
 function profileView(uid, edit) {
@@ -1000,6 +1019,12 @@ document.addEventListener('submit', async e => {
     const old = S.users.get(me) || {};
     const ks = ['main'].concat(slotsShown(old));
     for (const k of ks) { const l = ($('#f-link-' + k).value || '').trim(); if (l && !/^https:\/\//i.test(l)) { toast('Il link deve iniziare con https://'); return; } }
+    for (const k of ks) {
+      const en = $('#f-extn-' + k); if (!en) continue; const n = en.value === '' ? 0 : Number(en.value), ds = $('#f-exts-' + k).value;
+      if (!Number.isInteger(n) || n < 0 || n > 50) { toast('I tester esterni vanno da 0 a 50.'); return; }
+      if (n > 0 && !ds) { toast('Indica la data di inizio del test esterno.'); return; }
+      if (n > 0 && new Date(ds + 'T00:00:00').getTime() > Date.now()) { toast('La data di inizio non può essere nel futuro.'); return; }
+    }
     for (const k of ks) { const pc = $('#f-pub-' + k), sl = $('#f-store-' + k); if (pc && pc.checked && !PLAY.test((sl && sl.value || '').trim())) { toast('Per la vetrina serve il link di Google Play (https://play.google.com/...)'); return; } }
     busy = true;
     try {
@@ -1011,6 +1036,8 @@ document.addEventListener('submit', async e => {
         const app = locked ? prev : { name: $('#f-app-' + k).value.trim().slice(0, 50), want: $('#f-want-' + k).value, cat: $('#f-cat-' + k).value, desc: $('#f-desc-' + k).value.trim().slice(0, 500) };
         const pc = $('#f-pub-' + k), sl = $('#f-store-' + k);
         if (pc) { const st = (sl ? sl.value.trim() : '').slice(0, 300); if (pc.checked) { app.pub = true; app.store = st; } else { delete app.pub; if (st) app.store = st; else delete app.store; } }
+        const en = $('#f-extn-' + k);
+        if (en) { const n = en.value === '' ? 0 : Number(en.value), ds = $('#f-exts-' + k).value; if (n > 0 && ds) app.ext = { n, start: new Date(ds + 'T00:00:00').getTime() }; else delete app.ext; }
         if (prev.prog) app.prog = prev.prog;
         const lk = locked ? linkFor(k) : $('#f-link-' + k).value.trim();
         if (k === 'main') { mainApp = app; mainLink = lk; } else if (app.name) { extra[k] = app; extraLinks[k] = lk; }
