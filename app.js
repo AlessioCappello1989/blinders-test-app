@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261103c';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261103d';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -119,23 +119,27 @@ const myTesting = () => mine().filter(sw => sw.status === 'active' && ms(sw.star
 /* Vetrina: app pubblicata su Google Play (link verificato solo nella forma) e app nel Cantiere (test in corso). */
 const PLAY = /^https:\/\/play\.google\.com\//i;
 const isPubApp = (uid, a) => !!(a && a.pub && PLAY.test(a.store || '') && !S.hidden.has(uid + '_' + a.id));
-/* Test dell'app: scambi su IronBlind (prog) più eventuali tester esterni dichiarati dal proprietario (ext: n e data di inizio). */
+/* Test dell'app: scambi su IronBlind (prog) più eventuali tester esterni dichiarati dal proprietario (ext: n e data di inizio).
+   Google Play conta i 14 giorni solo quando ci sono tutti e 12 i tester: il giorno 1 è quello in cui entra il dodicesimo. */
 function buildInfo(a) {
-  const p = (a && a.prog) || { n: 0, done: 0, first: 0 }, e = a && a.ext && a.ext.n > 0 && a.ext.start ? a.ext : null;
-  const en = e ? Math.min(50, Math.floor(e.n)) : 0, edone = e && Date.now() - e.start >= 14 * DAY ? en : 0;
-  const n = (p.n || 0) + en, done = Math.min((p.done || 0) + edone, n);
-  const run = []; if ((p.n || 0) - (p.done || 0) > 0 && p.first) run.push(p.first); if (en && !edone) run.push(e.start);
-  const all = []; if (p.n && p.first) all.push(p.first); if (en) all.push(e.start);
-  return { n, done, ext: en, first: run.length ? Math.min.apply(null, run) : (all.length ? Math.min.apply(null, all) : 0) };
+  const p = (a && a.prog) || { n: 0, first: 0 }, e = a && a.ext && a.ext.n > 0 && a.ext.start ? a.ext : null;
+  const en = e ? Math.min(50, Math.floor(e.n)) : 0;
+  const st = (p.starts && p.starts.length) ? p.starts.slice() : (p.n && p.first ? new Array(Math.min(12, p.n)).fill(p.first) : []);
+  for (let k = 0; k < Math.min(12, en); k++) st.push(e.start);
+  st.sort((x, y) => x - y);
+  const n = Math.max(st.length, (p.n || 0) + en), t12 = st.length >= 12 ? st[11] : 0, full = n >= 12 && t12 > 0;
+  const finished = full && Date.now() - t12 >= 14 * DAY;
+  const day = full ? Math.max(1, Math.min(14, Math.floor((Date.now() - t12) / DAY) + 1)) : 0;
+  return { n, ext: en, full, finished, day };
 }
-const isBuildApp = (uid, a) => { const i = buildInfo(a); return !!(a && i.n > 0 && i.done < i.n && !S.hidden.has(uid + '_' + a.id)); };
-const progDay = a => Math.max(1, Math.min(14, Math.floor((Date.now() - (buildInfo(a).first || Date.now())) / DAY) + 1));
+const isBuildApp = (uid, a) => { const i = buildInfo(a); return !!(a && i.n > 0 && !i.finished && !S.hidden.has(uid + '_' + a.id)); };
+const progDay = a => buildInfo(a).day;
 /* Tester di una mia app: chi ha avviato il test; first = inizio del più vecchio test ancora in corso. */
 function progOf(aid) {
   const t = []; mine().forEach(sw => { if (sw.status !== 'active' || aidOf(sw, me) !== aid) return; const o = sw.a === me ? sw.b : sw.a; const st = ms(sw.start && sw.start[o]); if (st) t.push(st); });
-  if (!t.length) return { n: 0, done: 0, first: 0 };
-  const run = t.filter(x => Date.now() - x < 14 * DAY);
-  return { n: t.length, done: t.length - run.length, first: Math.min.apply(null, run.length ? run : t) };
+  t.sort((x, y) => x - y);
+  if (!t.length) return { n: 0, starts: [] };
+  return { n: t.length, starts: t.slice(0, 12) };
 }
 /* Salva nel profilo le Lune guadagnate e i test in corso, così si possono contare anche per la community. */
 function syncMoons() {
@@ -145,8 +149,8 @@ function syncMoons() {
   if (loaded.users && u.nick && !u.bonus && joinRank(me) <= WELCOME_N) { patch.bonus = WELCOME_MOONS; welcome = true; }
   const n = Math.min(100, myTesting()); if (n !== (u.testing || 0)) patch.testing = n;
   appsOf(me).forEach(a => {
-    const p = progOf(a.id), o = a.prog || { n: 0, done: 0, first: 0 };
-    if (p.n !== (o.n || 0) || p.done !== (o.done || 0) || p.first !== (o.first || 0)) patch[(a.id === 'main' ? 'app' : 'extra.' + a.id) + '.prog'] = p;
+    const p = progOf(a.id), o = a.prog || { n: 0, starts: [] };
+    if (p.n !== (o.n || 0) || JSON.stringify(p.starts) !== JSON.stringify(o.starts || [])) patch[(a.id === 'main' ? 'app' : 'extra.' + a.id) + '.prog'] = p;
   });
   if (!Object.keys(patch).length) return;
   moonWrite = true;
@@ -274,8 +278,11 @@ function exploreItems() {
       extra = '<div class="row"><a class="btn" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(x.a.store) + '">▶ Vedi su Google Play</a>' + (x.own ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div>';
     } else if (build) {
       state = '<span class="pill build">🚧 Nel Cantiere</span>';
-      const d = progDay(x.a), pct = Math.round(d / 14 * 100), bi = buildInfo(x.a), act2 = Math.max(0, Math.min(12, bi.n - bi.done));
-      extra = '<div><div class="row between small"><b>Giorno ' + d + ' di 14</b><span class="muted">' + pct + '%</span></div><div class="bar w" role="progressbar" aria-valuemin="1" aria-valuemax="14" aria-valuenow="' + d + '"><i style="width:' + pct + '%"></i></div></div>'
+      const bi = buildInfo(x.a), act2 = Math.max(0, Math.min(12, bi.n));
+      const head = bi.full ? '<b>Giorno ' + bi.day + ' di 14</b><span class="muted">' + Math.round(bi.day / 14 * 100) + '%</span>' : '<b>' + act2 + ' tester su 12</b><span class="muted">' + Math.round(act2 / 12 * 100) + '%</span>';
+      const w = bi.full ? Math.round(bi.day / 14 * 100) : Math.round(act2 / 12 * 100);
+      extra = '<div><div class="row between small">' + head + '</div><div class="bar w" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + w + '"><i style="width:' + w + '%"></i></div></div>'
+        + (bi.full ? '' : '<p class="small muted">Il conto dei 14 giorni parte quando ci sono tutti e 12 i tester.</p>')
         + '<div class="row between small"><span class="muted">Tester attivi</span><span class="tst" role="img" aria-label="' + act2 + ' tester attivi su 12">' + Array.from({ length: 12 }, (_, k) => '<i class="' + (k < act2 ? 'on' : '') + '"></i>').join('') + '</span></div>'
         + (bi.ext ? '<p class="small muted">di cui ' + bi.ext + (bi.ext === 1 ? ' esterno' : ' esterni') + '</p>' : '')
         + (x.own ? '' : '<div><button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button></div>');

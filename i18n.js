@@ -17,6 +17,7 @@ const E = {
   'Hai già un test attivo fuori da IronBlind?': 'Already have a test running outside IronBlind?', 'Tester esterni': 'External testers', 'Data di inizio del test': 'Test start date',
   'Se hai già tester trovati altrove, l\'app compare nel Cantiere con il giorno di test. La data la trovi in Google Play Console. Resta un dato dichiarato da te.': 'If you already have testers from elsewhere, the app shows up in the Workshop with its test day. You can find the date in Google Play Console. It stays a figure declared by you.',
   'I tester esterni vanno da 0 a 50.': 'External testers go from 0 to 50.', 'Indica la data di inizio del test esterno.': 'Enter the start date of the external test.', 'La data di inizio non può essere nel futuro.': 'The start date cannot be in the future.',
+  'Il conto dei 14 giorni parte quando ci sono tutti e 12 i tester.': 'The 14-day count starts when all 12 testers are in.',
   'Impostazioni': 'Settings', '© 2026 IronBlind™. Il logo, il robottino e il ragazzo con la sciarpa sono personaggi e marchi di IronBlind™. Tutti i diritti riservati.': '© 2026 IronBlind™. The logo, the little robot and the guy with the scarf are IronBlind™ characters and trademarks. All rights reserved.', 'Cambia app': 'Change app', 'App aggiornata': 'App updated', '⚙️ Impostazioni': '⚙️ Settings', 'Notifiche, lingua, informazioni sull\'app e account.': 'Notifications, language, app info and account.', 'Seguici': 'Follow us',
   'Chi siamo': 'About us', "Come installare l'app": 'How to install the app', 'Assistenza': 'Support',
   'Guida ai 12 tester': 'Guide to the 12 testers', 'Link utili': 'Useful links',
@@ -176,6 +177,7 @@ const E = {
 const plural = (n, one, many) => (Number(n) === 1 ? one : many);
 /* Modelli con parti variabili: {} = testo qualsiasi (viene tradotto a sua volta). */
 const P = [
+  [/^(\d+) tester su 12$/, m => `${m[1]} of 12 testers`],
   [/^di cui (\d+) estern[oi]$/, m => `${m[1]} external`],
   [/^Giorno (\d+) di 14$/, m => `Day ${m[1]} of 14`], [/^(\d+) tester attivi su 12$/, m => `${m[1]} of 12 testers active`], [/^(\d+) segnalazion[ei]$/, m => `${m[1]} ${plural(m[1], 'report', 'reports')}`],
   [/^La lingua dell'app e dei messaggi segue quella del telefono: italiano se è in italiano, altrimenti inglese\. Ora: (.+)\.$/, (m, t) => `The language of the app and messages follows your phone: Italian if it is in Italian, otherwise English. Now: ${t(m[1])}.`],
