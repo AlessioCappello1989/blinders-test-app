@@ -171,6 +171,10 @@ const E = {
   'Apri IronBlind ogni giorno: la Luna del giorno si ottiene solo se quel giorno accedi.': 'Open IronBlind every day: the day’s Moon is earned only if you log in that day.',
   'Ogni giorno di test completato in cui accedi a IronBlind ti dà +1 Luna (massimo 14 per scambio).': 'Every completed test day on which you log in to IronBlind gives you +1 Moon (maximum 14 per swap).',
   'Ogni giorno di test completato in cui accedi a IronBlind = +1 Luna.': 'Every completed test day on which you log in to IronBlind = +1 Moon.',
+  'Con 20 Lune sblocchi uno slot extra.': 'With 20 Moons you unlock an extra slot.',
+  'Il massimo che puoi tenere è 30: oltre, le nuove Lune si perdono.': 'The most you can hold is 30: beyond that, new Moons are lost.',
+  'Sei al massimo: le nuove Lune si perdono finché non ne usi.': 'You are at the maximum: new Moons are lost until you use some.',
+  'Sei vicino al massimo: usa le Lune prima di perderle.': 'You are close to the maximum: use your Moons before you lose them.',
   'Giochi': 'Games', 'Produttività': 'Productivity', 'Social': 'Social', 'Strumenti': 'Tools', 'Salute e fitness': 'Health & fitness', 'Istruzione': 'Education', 'Finanza': 'Finance', 'Altro': 'Other',
   /* paesi */
   'Italia': 'Italy', 'Belgio': 'Belgium', 'Brasile': 'Brazil', 'Cina': 'China', 'Croazia': 'Croatia', 'Danimarca': 'Denmark', 'Egitto': 'Egypt', 'Filippine': 'Philippines', 'Finlandia': 'Finland', 'Francia': 'France',
@@ -238,6 +242,7 @@ const P = [
   [/^Richiesta già inviata:$/, () => 'Request already sent:'], [/^ stiamo verificando il pagamento\.$/, () => ' we are verifying the payment.'],
   [/^(\d+) giorni fa$/, m => `${m[1]} days ago`], [/^(\d+) giorni? senza accesso$/, m => `${m[1]} ${plural(m[1], 'day', 'days')} without login`],
   [/^(🌕 \d+ Lun[ae]) in questo scambio$/, (m, t) => `${t(m[1])} in this swap`],
+  [/^Hai (🌕 .+): servono 20\.$/, (m, t) => `You have ${t(m[1])}: you need 20.`],
   [/^(\d+)\/(\d+)$/, m => m[0]],
   [/^Ti invito su IronBlind Test App: ci scambiamo i test di 14 giorni per le nostre app Android\.$/, () => 'I invite you to IronBlind Test App: let’s swap the 14-day tests for our Android apps.']
 ];

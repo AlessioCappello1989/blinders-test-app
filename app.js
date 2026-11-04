@@ -122,7 +122,10 @@ function joinRank(id) {
   return n;
 }
 const welcomeKey = () => 'ironblind-welcome-' + me;
-const moonBalance = u => Math.max(0, moonTotal(u) - ((u && u.moonsSpent) || 0));
+/* Tetto: si possono tenere al massimo 30 Lune; quelle in più si perdono (moonsLost non diminuisce mai, così il tetto non si aggira spendendo). */
+const MOON_MAX = 30;
+const moonLost = u => Math.max(0, Math.floor(+(u && u.moonsLost) || 0));
+const moonBalance = u => Math.max(0, Math.min(MOON_MAX, moonTotal(u) - ((u && u.moonsSpent) || 0) - moonLost(u)));
 const moonSlots = u => Math.floor(((u && u.moonsSpent) || 0) / MOON_COST);
 const markers = u => ((u && u.spent) || []).filter(x => x === '#').length;
 /* Slot extra = inviti non usati + slot ottenuti con le Lune o pagati, meno quelli già consumati (massimo 3 app extra). */
@@ -162,6 +165,7 @@ function progOf(aid) {
 function syncMoons() {
   const u = S.users.get(me); if (!u || moonWrite || busy) return;
   const patch = {}; const t = moonsEarned(); if (t > (u.moons || 0)) patch.moons = t;
+  const ex = moonTotal(u) - ((u.moonsSpent || 0)) - moonLost(u) - MOON_MAX; if (ex > 0) patch.moonsLost = moonLost(u) + ex;
   let welcome = false;
   if (loaded.users && u.nick && !u.bonus && joinRank(me) <= WELCOME_N) { patch.bonus = WELCOME_MOONS; welcome = true; }
   if (loaded.users && u.nick) {
@@ -619,7 +623,9 @@ function moonCard(u) {
   const can = bal >= MOON_COST && creditsTotal(u) < MAX_EXTRA;
   return '<div class="card"><div class="row between"><h2>Le tue Lune</h2><span class="pill ok" aria-label="' + bal + ' Lune">' + moonLabel(bal) + '</span></div>'
     + '<div class="bar" role="img" aria-label="' + bal + ' su ' + MOON_COST + ' Lune"><i style="width:' + pct + '%"></i></div>'
-    + '<p class="small muted">Ogni giorno di test completato in cui accedi a IronBlind ti dà +1 Luna (massimo 14 per scambio). Con ' + MOON_COST + ' Lune sblocchi uno slot extra. Ne hai ' + Math.min(bal, MOON_COST) + '/' + MOON_COST + '.</p>'
+    + '<p class="small muted">Ogni giorno di test completato in cui accedi a IronBlind ti dà +1 Luna (massimo 14 per scambio). Con ' + MOON_COST + ' Lune sblocchi uno slot extra.</p>'
+    + '<p class="small muted">Il massimo che puoi tenere è ' + MOON_MAX + ': oltre, le nuove Lune si perdono.</p><p class="small mono muted">' + bal + '/' + MOON_MAX + '</p>'
+    + (can && bal >= MOON_MAX - 5 ? '<p class="small"><b>' + (bal >= MOON_MAX ? 'Sei al massimo: le nuove Lune si perdono finché non ne usi.' : 'Sei vicino al massimo: usa le Lune prima di perderle.') + '</b></p>' : '')
     + (can ? '<div><button type="button" class="btn primary" data-act="moonRedeem">Usa ' + MOON_COST + ' Lune per sbloccare uno Slot Extra</button></div>'
       : (bal >= MOON_COST ? '<p class="small muted">Hai già il massimo di slot extra.</p>' : '')) + '</div>';
 }
@@ -1083,6 +1089,7 @@ document.addEventListener('submit', async e => {
       if (old.spent && old.spent.length) data.spent = old.spent;
       if (old.moons) data.moons = old.moons;
       if (old.bonus) data.bonus = old.bonus;
+      if (old.moonsLost) data.moonsLost = old.moonsLost;
       if (old.seen) data.seen = old.seen;
       if (old.testing) data.testing = old.testing;
       if (old.moonsSpent) data.moonsSpent = old.moonsSpent;
