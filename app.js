@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261103d';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261104f';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -11,7 +11,7 @@ const CATS = ['Giochi', 'Produttività', 'Social', 'Strumenti', 'Salute e fitnes
 const COUNTRIES = ['Italia', 'Albania', 'Argentina', 'Australia', 'Austria', 'Belgio', 'Brasile', 'Canada', 'Cina', 'Croazia', 'Danimarca', 'Egitto', 'Filippine', 'Finlandia', 'Francia', 'Germania', 'Giappone', 'Grecia', 'India', 'Indonesia', 'Irlanda', 'Messico', 'Paesi Bassi', 'Polonia', 'Portogallo', 'Regno Unito', 'Romania', 'Spagna', 'Stati Uniti', 'Svezia', 'Svizzera', 'Turchia', 'Ucraina', 'Altro'];
 
 const view = $('#view');
-const S = { xt: 'all', hidden: new Set(), reports: new Map(), tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined };
+const S = { xt: 'all', hidden: new Set(), reports: new Map(), tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined, myProof: undefined, theirProof: undefined, draft: null, stale: null, staleDays: 30 };
 /* Invito di un amico: il link ?invito=ID viene ricordato su questo dispositivo fino alla registrazione. */
 const INVITE_KEY = 'blinders-invite';
 let pendingInvite = null;
@@ -499,6 +499,27 @@ function msReached() {
   return r;
 }
 const msBase = k => k.split(':')[0];
+/* ---------- Novità: finestra mostrata una volta per aggiornamento. Per annunciare una novità cambia id e testi qui sotto. ---------- */
+const NEWS = {
+  id: '20261104f',
+  items: [
+    '📷 Prova di installazione: per avviare il test alleghi uno screenshot dell\'app installata e il proprietario lo conferma. La foto viene cancellata dopo la conferma.',
+    '✅ Conferma del proprietario: puoi installare e avviare il test solo dopo che il proprietario ti ha aggiunto ai tester.',
+    '🌕 Lune: la Luna del giorno si ottiene solo se quel giorno accedi a IronBlind. Puoi tenerne al massimo 30.',
+    '🕒 Ultimo accesso: nello scambio vedi quando l\'altro tester ha aperto IronBlind l\'ultima volta.',
+    '📱 In Impostazioni trovi la guida "Come installare l\'app".'
+  ]
+};
+function checkNews() {
+  try {
+    const u = me && S.users.get(me); if (!u || !u.nick || $('#about') || $('#ms') || $('#slotm')) return;
+    const key = 'ironblind-news-' + me; let seenId = null; try { seenId = localStorage.getItem(key); } catch (e) { return; }
+    if (seenId === NEWS.id) return;
+    try { localStorage.setItem(key, NEWS.id); } catch (e) { return; }
+    if (!seenId && u.createdAt && Date.now() - u.createdAt < 2 * DAY) return; /* chi si è appena iscritto non ha bisogno delle novità */
+    openModal('Novità di IronBlind', '<p>Abbiamo aggiornato l\'app:</p><ul class="guide">' + NEWS.items.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul><div><button type="button" class="btn primary" data-act="aboutClose">Ho capito</button></div>');
+  } catch (e) { /* le novità non devono bloccare l'app */ }
+}
 function checkMilestones() {
   try {
     if (!me || !S.users.get(me) || $('#ms')) return;
@@ -527,6 +548,11 @@ function showMilestone(key) {
   document.body.appendChild(bg); document.addEventListener('keydown', msKey);
   const b = bg.querySelector('[data-act="msClose"]'); if (b) b.focus();
 }
+document.addEventListener('change', async e => {
+  const t = e.target; if (!t || t.id !== 'proofin' || !t.files || !t.files[0] || !(S.route && S.route.t === 'swap')) return;
+  const id = S.route.id;
+  try { S.draft = { id, img: await compressImage(t.files[0]) }; render(true); } catch (x) { toast('Non riesco a leggere la foto: usa uno screenshot.'); }
+});
 document.addEventListener('change', e => { const t = e.target; if (t && t.id === 'langsel') { try { localStorage.setItem(langKey, t.value); } catch (x) { /* nessuna memoria locale */ } startI18n(); render(true); } });
 
 /* ---------- Notifiche di sistema (solo con l'app aperta o in secondo piano) ---------- */
@@ -610,6 +636,7 @@ function openModal(title, body) {
 }
 function openAbout() {
   openModal('Chi siamo', '<div><h3>🚀 Chi siamo</h3><p style="margin-top:6px">IronBlind (ironblind.it) nasce per aiutare gli sviluppatori indipendenti a superare il requisito di 12 tester per 14 giorni imposto da Google Play Console. La nostra community permette agli sviluppatori di fare squadra, testare reciprocamente le app e scambiare feedback costruttivi.</p></div>'
+    + '<div class="step"><h3>🔒 Privacy degli scambi</h3><p class="small muted">Email, link di test e chat di uno scambio li vedono solo i due partecipanti. Gli screenshot di installazione li vede solo l\'altro partecipante e vengono cancellati dopo la sua conferma. Il proprietario del sito può vedere l\'elenco degli scambi (chi, quali app, stato) per annullare quelli rimasti fermi e cancellarne le foto, ma non legge email, link, chat né screenshot.</p></div>'
     + (PAYPAL_ME ? '<div class="step"><h3>☕ Sostieni IronBlind</h3><p>IronBlind è gratuita. Se ti è utile puoi offrirmi un caffè con PayPal, con l\'importo che preferisci. Non sblocca nulla: è solo un grazie.</p><a class="btn primary" style="text-align:center;text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(tipUrl()) + '">Offrimi un caffè con PayPal</a></div>' : ''));
 }
 function openInstall() {
@@ -668,7 +695,20 @@ function adminBox() {
   const l = []; S.reqs.forEach((r, uid) => l.push([uid, r]));
   l.sort((a, b) => (a[1].at || 0) - (b[1].at || 0));
   const byCode = '<div class="box"><b>Sblocca con il codice</b><p class="small muted">Se hai ricevuto un pagamento ma non c\'è la richiesta, incolla qui il codice scritto nel messaggio di PayPal.</p><label for="adm-code">Codice utente<input id="adm-code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Incolla il codice"></label><div><button type="button" class="btn primary sm" data-act="adminGrantCode">Sblocca +1 slot</button></div></div>';
-  return '<section class="card"><h3>Richieste slot (solo tu)</h3>' + byCode + (l.length ? l.map(x => '<div class="box"><div class="row between"><b>' + esc(nameOf(x[0])) + '</b><span class="small muted">' + fmtD(x[1].at || Date.now()) + '</span></div><p class="small">PayPal: ' + esc(x[1].payer || 'non indicato') + '</p><code class="small" style="overflow-wrap:anywhere">' + esc(x[0]) + '</code><div class="row"><button type="button" class="btn primary sm" data-act="adminGrant" data-id="' + esc(x[0]) + '">Sblocca +1 slot</button><button type="button" class="btn ghost sm" data-act="adminDrop" data-id="' + esc(x[0]) + '">Elimina richiesta</button></div></div>').join('') : '<p class="small muted">Nessuna richiesta in attesa.</p>') + '</section>' + reportsBox();
+  return '<section class="card"><h3>Richieste slot (solo tu)</h3>' + byCode + (l.length ? l.map(x => '<div class="box"><div class="row between"><b>' + esc(nameOf(x[0])) + '</b><span class="small muted">' + fmtD(x[1].at || Date.now()) + '</span></div><p class="small">PayPal: ' + esc(x[1].payer || 'non indicato') + '</p><code class="small" style="overflow-wrap:anywhere">' + esc(x[0]) + '</code><div class="row"><button type="button" class="btn primary sm" data-act="adminGrant" data-id="' + esc(x[0]) + '">Sblocca +1 slot</button><button type="button" class="btn ghost sm" data-act="adminDrop" data-id="' + esc(x[0]) + '">Elimina richiesta</button></div></div>').join('') : '<p class="small muted">Nessuna richiesta in attesa.</p>') + '</section>' + staleBox() + reportsBox();
+}
+/* Scambi fermi: solo il proprietario del sito. Si annullano e si cancellano gli screenshot. */
+const lastAct = s => Math.max(s.createdAt || 0, s.acceptedAt || 0, ms(s.start && s.start[s.a]), ms(s.start && s.start[s.b]));
+function staleBox() {
+  let h = '<section class="card"><h3>Scambi fermi (solo tu)</h3><p class="small muted">Scambi attivi senza novità da molti giorni. Annullandoli si cancellano anche gli screenshot di installazione.</p>'
+    + '<div class="row"><label for="st-days" style="flex:1">Giorni di fermo<input id="st-days" type="number" min="1" max="365" value="' + S.staleDays + '"></label><button type="button" class="btn sm" data-act="adminStale">Cerca</button></div>';
+  if (S.stale) {
+    if (!S.stale.length) h += '<p class="small muted">Nessuno scambio fermo.</p>';
+    else h += S.stale.map(x => { const an = (x.s.apps && x.s.apps[x.s.a] && x.s.apps[x.s.a].name) || 'App', bn = (x.s.apps && x.s.apps[x.s.b] && x.s.apps[x.s.b].name) || 'App'; const d = Math.floor((Date.now() - lastAct(x.s)) / DAY);
+      return '<div class="box"><b>' + esc(nameOf(x.s.a)) + ' (' + esc(an) + ') ⇄ ' + esc(nameOf(x.s.b)) + ' (' + esc(bn) + ')</b><p class="small muted">Fermo da ' + d + ' giorni</p><div class="row"><button type="button" class="btn primary sm" data-act="adminStaleOne" data-id="' + esc(x.id) + '">Annulla scambio e cancella foto</button><button type="button" class="btn ghost sm" data-act="adminProofOnly" data-id="' + esc(x.id) + '">Cancella solo la foto</button></div></div>'; }).join('')
+      + '<div><button type="button" class="btn primary sm" data-act="adminStaleAll">Annulla tutti (' + S.stale.length + ') e cancella le foto</button></div>';
+  }
+  return h + '</section>';
 }
 function reportsBox() {
   const g = new Map(); S.reports.forEach(r => { const k = r.uid + '_' + r.aid; const e = g.get(k) || { uid: r.uid, aid: r.aid, n: 0 }; e.n++; g.set(k, e); });
@@ -711,6 +751,7 @@ async function deleteAccount() {
       if (sw.status !== 'declined' && !isDone(sw)) await updateDoc(doc(db, 'swaps', sid), { status: 'declined' });
       await deleteDoc(doc(db, 'swaps', sid, 'links', me));
       await deleteDoc(doc(db, 'swaps', sid, 'emails', me));
+      await deleteDoc(doc(db, 'swaps', sid, 'proofs', me)).catch(() => {});
       const mine_ = await getDocs(query(collection(db, 'swaps', sid, 'messages'), where('from', '==', me)));
       for (const d of mine_.docs) await deleteDoc(d.ref);
     }
@@ -790,10 +831,27 @@ function swapView(id) {
       + '<p class="small muted">Apri IronBlind ogni giorno: la Luna del giorno si ottiene solo se quel giorno accedi.</p>';
   }
   const rdy = !!(s.ready && s.ready[o]);
-  if (el === null) step2 += S.theirLink === undefined ? '<p class="small muted">Caricamento…</p>' : !S.theirLink
+  const draft = S.draft && S.draft.id === id ? S.draft.img : null, saved = S.myProof && proofLive(S.myProof) ? S.myProof.img : null, shown = draft || saved;
+  if (el === null) step2 += S.theirLink === undefined || S.myProof === undefined ? '<p class="small muted">Caricamento…</p>' : !S.theirLink
     ? '<p class="small muted">Potrai avviare il test quando avrai il link dell\'app da installare.</p>'
-    : (rdy ? '<div><button class="btn primary" data-act="startTest" data-id="' + esc(id) + '">Ho installato l\'app, avvia i 14 giorni</button></div>'
+    : (rdy ? '<div class="box mini"><p class="small">Per avviare il test allega uno screenshot della pagina dell\'app su Play Store, con il pulsante "Disinstalla" o "Apri" e il nome dell\'app ben visibili. Controlla che non mostri notifiche o dati personali: lo vede solo ' + esc(nameOf(o)) + ' e viene cancellato dopo la sua conferma.</p>'
+        + (shown ? '<img class="proof" src="' + shown + '" alt="Anteprima dello screenshot">' : '')
+        + '<label class="btn" style="text-align:center">' + (shown ? '📷 Cambia screenshot' : '📷 Allega screenshot') + '<input id="proofin" type="file" accept="image/*" hidden></label>'
+        + (shown ? '<div><button class="btn primary" data-act="startTest" data-id="' + esc(id) + '">Ho installato l\'app, avvia i 14 giorni</button></div>' : '') + '</div>'
       : '<p class="small muted">Prima di installare aspetta che ' + esc(nameOf(o)) + ' ti aggiunga ai tester di Play Console: il pulsante di avvio si sblocca dopo la sua conferma.</p>');
+  if (S.myProof !== undefined && S.theirProof !== undefined) {
+    // Tester: stato della conferma. Proprietario: screenshot da confermare.
+    if (el === null) { /* non ho ancora avviato il mio test: niente da mostrare come tester */ }
+    else if (s.conf && s.conf[me]) step2 += '<p class="small"><span class="pill ok">✓ Installazione confermata da ' + esc(nameOf(o)) + '</span></p>';
+    else if (S.myProof && proofLive(S.myProof) && S.myProof.st === 'no') step2 += '<div class="box mini"><p class="small"><b>' + esc(nameOf(o)) + ' non trova la tua installazione.</b> Controlla di aver installato l\'app dal link e allega un nuovo screenshot.</p>'
+      + (draft ? '<img class="proof" src="' + draft + '" alt="Anteprima dello screenshot"><div><button class="btn primary" data-act="sendProof" data-id="' + esc(id) + '">Invia il nuovo screenshot</button></div>' : '')
+      + '<label class="btn" style="text-align:center">' + (draft ? '📷 Cambia screenshot' : '📷 Allega nuovo screenshot') + '<input id="proofin" type="file" accept="image/*" hidden></label></div>';
+    else if (S.myProof && proofLive(S.myProof)) step2 += '<p class="small muted">Screenshot inviato: aspetta che ' + esc(nameOf(o)) + ' confermi l\'installazione.</p>';
+    if (!ms(s.start && s.start[o])) { /* l'altro non ha ancora avviato */ }
+    else if (s.conf && s.conf[o]) step2 += '<p class="small"><span class="pill ok">✓ Hai confermato che ' + esc(nameOf(o)) + ' ha installato l\'app</span></p>';
+    else if (S.theirProof && proofLive(S.theirProof)) step2 += '<div class="box mini"><p class="small"><b>Screenshot di ' + esc(nameOf(o)) + '</b>: controlla che l\'app sia installata.</p><img class="proof" src="' + S.theirProof.img + '" alt="Screenshot dell\'installazione">'
+      + (S.theirProof.st === 'no' ? '<p class="small muted">Hai segnalato che non risulta: aspetta un nuovo screenshot.</p>' : '<div class="row"><button class="btn primary" data-act="proofOk" data-id="' + esc(id) + '">Confermo che ha installato</button><button class="btn ghost" data-act="proofNo" data-id="' + esc(id) + '">Non risulta</button></div>') + '</div>';
+  }
   step2 += '</div>';
   let step3 = '<div class="step"><h3><span class="k">3</span>Feedback reciproco</h3>';
   if (s.fb && s.fb[me]) step3 += '<p class="small">Hai inviato il tuo feedback. ' + (done ? 'Scambio completato: conta come un tester per entrambi.' : 'Aspetto quello di ' + esc(nameOf(o)) + '.') + '</p>';
@@ -846,7 +904,7 @@ function render(force) {
   if (!(loaded.users && loaded.swaps && loaded.fb && loaded.priv)) return;
   if (!firstRoute) { firstRoute = true; if (!S.users.get(me)) S.tab = 'profile'; }
   if (S.route && S.route.t === 'swap') markSeen(S.route.id);
-  syncWatch(); syncMoons(); setTimeout(checkMilestones, 400);
+  syncWatch(); syncMoons(); setTimeout(checkMilestones, 400); setTimeout(checkNews, 1200);
   if (!pingOn) { pingOn = true; setInterval(() => { if (me && !document.hidden) syncMoons(); }, 10 * 60 * 1000); document.addEventListener('visibilitychange', () => { if (me && !document.hidden) syncMoons(); }); }
   const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
   document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App';
@@ -864,7 +922,27 @@ function render(force) {
 }
 
 /* ---------- Sottoscrizioni dello scambio aperto (chat, email) ---------- */
-function stopSubs() { subUnsubs.forEach(u => u()); subUnsubs = []; subKey = ''; msgs = []; S.myEmail = undefined; S.theirEmail = undefined; S.theirLink = undefined; }
+function stopSubs() { subUnsubs.forEach(u => u()); subUnsubs = []; subKey = ''; msgs = []; S.myEmail = undefined; S.theirEmail = undefined; S.theirLink = undefined; S.myProof = undefined; S.theirProof = undefined; }
+/* ---------- Prova di installazione: screenshot piccolo salvato nello scambio, cancellato dopo la conferma del proprietario ---------- */
+const PROOF_DAYS = 10, PROOF_MAX = 400000; /* circa 300 KB di immagine (base64) */
+const proofLive = p => !!(p && p.img && Date.now() - (p.at || 0) < PROOF_DAYS * DAY);
+function compressImage(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      try {
+        for (const max of [1080, 900, 720, 560, 440, 340]) {
+          let w = im.naturalWidth, h = im.naturalHeight; if (w > max) { h = Math.round(h * max / w); w = max; }
+          const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(im, 0, 0, w, h);
+          for (const q of [0.7, 0.55, 0.4]) { const out = c.toDataURL('image/jpeg', q); if (out.length <= PROOF_MAX) { URL.revokeObjectURL(url); return res(out); } }
+        }
+        URL.revokeObjectURL(url); rej(new Error('big'));
+      } catch (e) { rej(e); }
+    };
+    im.onerror = () => rej(new Error('img')); im.src = url;
+  });
+}
+const dropProofs = (id, a, b) => Promise.all([a, b].map(u => deleteDoc(doc(db, 'swaps', id, 'proofs', u)).catch(() => {})));
 function syncSubs() {
   let id = null, o = null;
   if (me && S.route && S.route.t === 'swap') {
@@ -877,6 +955,14 @@ function syncSubs() {
   subUnsubs.push(onSnapshot(query(collection(db, 'swaps', id, 'messages'), orderBy('at', 'asc'), limit(200)), sn => { msgs = sn.docs.map(read); drawMsgs(); }, toastErr));
   // Il link di test dell'altro è leggibile solo a scambio accettato (regola di Firestore).
   subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'links', o), sn => { S.theirLink = sn.exists() ? sn.data().link : null; render(); }, () => { S.theirLink = null; }));
+  const pOld = r => { if (r.exists() && Date.now() - (r.data().at || 0) >= PROOF_DAYS * DAY) deleteDoc(r.ref).catch(() => {}); };
+  subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'proofs', o), sn => { pOld(sn); S.theirProof = sn.exists() ? sn.data() : null; render(); }, () => { S.theirProof = null; }));
+  let pFirst = true;
+  subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'proofs', me), sn => {
+    pOld(sn); const n = sn.exists() ? sn.data() : null;
+    if (!pFirst && n && n.st === 'no' && !(S.myProof && S.myProof.st === 'no')) notify(nameOf(o) + ' non trova la tua installazione: allega un nuovo screenshot', id);
+    pFirst = false; S.myProof = n; render();
+  }, () => { S.myProof = null; }));
   let theirUnsub = null;
   subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'emails', me), sn => {
     S.myEmail = sn.exists() ? sn.data().email : null;
@@ -951,6 +1037,24 @@ document.addEventListener('click', async e => {
     } else if (act === 'adminGrant') {
       if (!isAdminUser()) return;
       await grantSlot(id); toast('Slot sbloccato per ' + nameOf(id));
+    } else if (act === 'adminStale' || act === 'adminStaleOne' || act === 'adminProofOnly' || act === 'adminStaleAll') {
+      if (!isAdminUser()) return;
+      if (act === 'adminStale') {
+        const days = Math.max(1, Math.min(365, Math.floor(+(($('#st-days') || {}).value) || 30))); S.staleDays = days;
+        const sn = await getDocs(collection(db, 'swaps')); const list = [];
+        sn.docs.forEach(d => { const x = read(d); if (x.status === 'active' && !isDone(x) && Date.now() - lastAct(x) >= days * DAY) list.push({ id: d.id, s: x }); });
+        list.sort((p, q) => lastAct(p.s) - lastAct(q.s)); S.stale = list;
+      } else if (act === 'adminProofOnly') {
+        const x = (S.stale || []).find(v => v.id === id); if (x) { await dropProofs(id, x.s.a, x.s.b); toast('Foto cancellate'); }
+      } else {
+        const todo = act === 'adminStaleAll' ? (S.stale || []).slice() : (S.stale || []).filter(v => v.id === id);
+        for (let i = 0; i < todo.length; i += 100) {
+          const bt = writeBatch(db);
+          todo.slice(i, i + 100).forEach(x => { bt.update(doc(db, 'swaps', x.id), { status: 'declined' }); bt.delete(doc(db, 'swaps', x.id, 'proofs', x.s.a)); bt.delete(doc(db, 'swaps', x.id, 'proofs', x.s.b)); });
+          await bt.commit();
+        }
+        const gone = new Set(todo.map(x => x.id)); S.stale = (S.stale || []).filter(x => !gone.has(x.id)); toast(todo.length === 1 ? 'Scambio annullato, foto cancellate' : todo.length + ' scambi annullati, foto cancellate');
+      }
     } else if (act === 'adminGrantCode') {
       if (!isAdminUser()) return;
       const code = (($('#adm-code') || {}).value || '').trim();
@@ -1017,15 +1121,27 @@ document.addEventListener('click', async e => {
       ab.set(doc(db, 'swaps', id, 'links', me), { link: lk });
       ab.update(doc(db, 'swaps', id), { status: 'active', acceptedAt: Date.now() });
       await ab.commit(); toast('Scambio accettato');
-    } else if (act === 'decline') { await updateDoc(doc(db, 'swaps', id), { status: 'declined' }); S.route = null; S.confirm = null; toast(s.status === 'active' ? 'Scambio chiuso' : (s.a === me ? 'Richiesta annullata' : 'Richiesta rifiutata')); }
+    } else if (act === 'decline') { await updateDoc(doc(db, 'swaps', id), { status: 'declined' }); await dropProofs(id, s.a, s.b); S.route = null; S.confirm = null; toast(s.status === 'active' ? 'Scambio chiuso' : (s.a === me ? 'Richiesta annullata' : 'Richiesta rifiutata')); }
     else if (act === 'shareEmail') {
       if (!S.priv.email) { toast('Aggiungi la tua email nel profilo.'); return; }
       await setDoc(doc(db, 'swaps', id, 'emails', me), { email: S.priv.email, at: Date.now() }); toast('Email condivisa');
+    } else if (act === 'proofOk') {
+      const o = s.a === me ? s.b : s.a; const bt = writeBatch(db);
+      bt.update(doc(db, 'swaps', id), { ['conf.' + o]: true }); bt.delete(doc(db, 'swaps', id, 'proofs', o));
+      await bt.commit(); toast('Installazione confermata, screenshot cancellato');
+    } else if (act === 'proofNo') {
+      const o = s.a === me ? s.b : s.a; await updateDoc(doc(db, 'swaps', id, 'proofs', o), { st: 'no' }); toast('Segnalato: aspetta un nuovo screenshot');
+    } else if (act === 'sendProof') {
+      if (!(S.draft && S.draft.id === id)) { toast('Allega lo screenshot.'); return; }
+      await setDoc(doc(db, 'swaps', id, 'proofs', me), { img: S.draft.img, at: Date.now(), exp: new Date(Date.now() + PROOF_DAYS * DAY), st: 'pending' }); S.draft = null; toast('Screenshot inviato');
     } else if (act === 'ready') {
       await updateDoc(doc(db, 'swaps', id), { ['ready.' + me]: true }); toast('Confermato: ora può installare e avviare il test');
     } else if (act === 'startTest') {
       if (!S.theirLink) { toast('Prima ti serve il link dell\'app da installare.'); return; }
       if (!(s.ready && s.ready[s.a === me ? s.b : s.a])) { toast('Aspetta che ti aggiunga ai tester.'); return; }
+      const dr = S.draft && S.draft.id === id ? S.draft.img : null;
+      if (!dr && !(S.myProof && proofLive(S.myProof))) { toast('Allega lo screenshot dell\'installazione.'); return; }
+      if (dr) { await setDoc(doc(db, 'swaps', id, 'proofs', me), { img: dr, at: Date.now(), exp: new Date(Date.now() + PROOF_DAYS * DAY), st: 'pending' }); S.draft = null; }
       await updateDoc(doc(db, 'swaps', id), { ['start.' + me]: serverTimestamp() }); toast('Test avviato'); }
     else if (act === 'fb') {
       const n = S.star[id] || 0; if (!n) { toast('Scegli da 1 a 5 stelle.'); return; }
@@ -1034,6 +1150,7 @@ document.addEventListener('click', async e => {
       batch.set(doc(db, 'feedback', id + '_' + me), { swapId: id, from: me, to: o, stars: n, text: tx, app: (s.apps && s.apps[o] && s.apps[o].name) || '', at: Date.now() });
       batch.update(doc(db, 'swaps', id), { ['fb.' + me]: true });
       await batch.commit(); toast('Feedback inviato');
+      if (s.fb && s.fb[o]) await dropProofs(id, s.a, s.b);
     }
   } catch (err) { toastErr(err); }
   finally { busy = false; if (me) render(true); }
