@@ -586,7 +586,8 @@ function settingsView() {
     + '<section class="card"><button type="button" class="btn ghost" data-act="logout">Esci</button></section>';
 }
 function aboutBox() {
-  return '<section class="card"><button type="button" class="menuitem" data-act="aboutOpen"><span class="row">' + ICON_INFO + '<b>Chi siamo</b></span><span aria-hidden="true">›</span></button>'
+  return '<section class="card"><button type="button" class="menuitem" data-act="installOpen"><span class="row"><span aria-hidden="true">📱</span><b>Come installare l\'app</b></span><span aria-hidden="true">›</span></button>'
+    + '<button type="button" class="menuitem" data-act="aboutOpen"><span class="row">' + ICON_INFO + '<b>Chi siamo</b></span><span aria-hidden="true">›</span></button>'
     + (PAYPAL_ME ? '<a class="menuitem" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(tipUrl()) + '"><span class="row"><span aria-hidden="true">☕</span><b>Offrimi un caffè</b></span><span aria-hidden="true">›</span></a>' : '') + '</section>';
 }
 let aboutFocus = null;
