@@ -89,10 +89,27 @@ const hasExtra = (u, k) => !!(u && u.extra && u.extra[k] && u.extra[k].name);
 const paidSlots = () => Math.max(0, Math.min(MAX_EXTRA, Math.floor(+S.paid || 0)));
 const extraCount = u => SLOTS.filter(k => hasExtra(u, k)).length;
 /* Lune: +1 per ogni giorno di test completato (massimo 14 per scambio). Il valore più alto raggiunto si salva nel profilo. */
+/* Una Luna al giorno solo se quel giorno hai aperto IronBlind (nessuna tolleranza). I giorni precedenti alla prima registrazione degli accessi valgono sempre. */
+const dkey = t => { const d = new Date(t); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); };
+function swapMoons(sw) {
+  if (sw.status === 'declined') return 0;
+  const el = elapsed(sw, me); if (el === null) return 0;
+  const f = Math.min(14, Math.floor(el)); if (f < 1) return 0;
+  const sn = (S.users.get(me) || {}).seen; if (!sn) return f;
+  const b = new Date(ms(sw.start[me])); b.setHours(12, 0, 0, 0);
+  let c = 0; for (let j = 1; j <= 14; j++) { const k = dkey(b.getTime() + j * DAY); if (k < (sn.since || 0) || (sn.days || []).indexOf(k) > -1) c++; }
+  return Math.min(f, c);
+}
 function moonsEarned() {
   let n = 0;
-  mine().forEach(sw => { if (sw.status === 'declined') return; const el = elapsed(sw, me); if (el !== null) n += Math.min(14, Math.floor(el)); });
+  mine().forEach(sw => { n += swapMoons(sw); });
   return n;
+}
+/* Ultimo accesso di una persona: oggi, ieri o quanti giorni fa. */
+function lastSeen(uid) {
+  const a = ((S.users.get(uid) || {}).seen || {}).at; if (!a) return { t: 'mai', old: true };
+  const d = Math.round((new Date().setHours(12, 0, 0, 0) - new Date(a).setHours(12, 0, 0, 0)) / DAY);
+  return d <= 0 ? { t: 'oggi', old: false } : d === 1 ? { t: 'ieri', old: false } : { t: d + ' giorni fa', old: true };
 }
 const WELCOME_N = 100, WELCOME_MOONS = 20;
 const bonusOf = u => Math.min(WELCOME_MOONS, Math.max(0, Math.floor(+(u && u.bonus) || 0)));
@@ -113,7 +130,7 @@ const otherCredits = u => Math.max(0, moonSlots(u) + paidSlots() - markers(u));
 const creditsTotal = u => Math.min(MAX_EXTRA, validInvites().length + otherCredits(u));
 const freeSlots = u => Math.max(0, creditsTotal(u) - extraCount(u));
 const moonLabel = n => '🌕 ' + n + (n === 1 ? ' Luna' : ' Lune');
-let moonWrite = false;
+let moonWrite = false, pingOn = false;
 /* Test in corso di una persona: scambi attivi in cui ha avviato il test e non ha ancora lasciato il feedback. */
 const myTesting = () => mine().filter(sw => sw.status === 'active' && ms(sw.start && sw.start[me]) && !(sw.fb && sw.fb[me])).length;
 /* Vetrina: app pubblicata su Google Play (link verificato solo nella forma) e app nel Cantiere (test in corso). */
@@ -147,6 +164,11 @@ function syncMoons() {
   const patch = {}; const t = moonsEarned(); if (t > (u.moons || 0)) patch.moons = t;
   let welcome = false;
   if (loaded.users && u.nick && !u.bonus && joinRank(me) <= WELCOME_N) { patch.bonus = WELCOME_MOONS; welcome = true; }
+  if (loaded.users && u.nick) {
+    const now = Date.now(), tk = dkey(now), sn = u.seen || {}, days = sn.days || [];
+    if (days.indexOf(tk) < 0) patch.seen = { at: now, since: sn.since || tk, days: days.concat(tk).slice(-40) };
+    else if (now - (sn.at || 0) > 30 * 60 * 1000) patch.seen = { at: now, since: sn.since || tk, days };
+  }
   const n = Math.min(100, myTesting()); if (n !== (u.testing || 0)) patch.testing = n;
   appsOf(me).forEach(a => {
     const p = progOf(a.id), o = a.prog || { n: 0, starts: [] };
@@ -597,7 +619,7 @@ function moonCard(u) {
   const can = bal >= MOON_COST && creditsTotal(u) < MAX_EXTRA;
   return '<div class="card"><div class="row between"><h2>Le tue Lune</h2><span class="pill ok" aria-label="' + bal + ' Lune">' + moonLabel(bal) + '</span></div>'
     + '<div class="bar" role="img" aria-label="' + bal + ' su ' + MOON_COST + ' Lune"><i style="width:' + pct + '%"></i></div>'
-    + '<p class="small muted">Ogni giorno di test completato ti dà +1 Luna (massimo 14 per scambio). Con ' + MOON_COST + ' Lune sblocchi uno slot extra. Ne hai ' + Math.min(bal, MOON_COST) + '/' + MOON_COST + '.</p>'
+    + '<p class="small muted">Ogni giorno di test completato in cui accedi a IronBlind ti dà +1 Luna (massimo 14 per scambio). Con ' + MOON_COST + ' Lune sblocchi uno slot extra. Ne hai ' + Math.min(bal, MOON_COST) + '/' + MOON_COST + '.</p>'
     + (can ? '<div><button type="button" class="btn primary" data-act="moonRedeem">Usa ' + MOON_COST + ' Lune per sbloccare uno Slot Extra</button></div>'
       : (bal >= MOON_COST ? '<p class="small muted">Hai già il massimo di slot extra.</p>' : '')) + '</div>';
 }
@@ -607,7 +629,7 @@ function slotKey(e) { if (e.key === 'Escape') closeSlot(); }
 function openSlot() {
   closeSlot();
   const u = S.users.get(me) || {}; const bal = moonBalance(u); const code = esc(me);
-  const optA = '<div class="step"><h3>🌕 Con le Lune (gratis)</h3><p class="small muted">Ogni giorno di test completato = +1 Luna. Hai ' + moonLabel(bal) + ': servono ' + MOON_COST + '.</p>'
+  const optA = '<div class="step"><h3>🌕 Con le Lune (gratis)</h3><p class="small muted">Ogni giorno di test completato in cui accedi a IronBlind = +1 Luna. Hai ' + moonLabel(bal) + ': servono ' + MOON_COST + '.</p>'
     + (bal >= MOON_COST ? '<div><button type="button" class="btn primary" data-act="moonRedeem">Usa ' + MOON_COST + ' Lune per sbloccare uno Slot Extra</button></div>'
       : '<div class="bar"><i style="width:' + Math.round(bal / MOON_COST * 100) + '%"></i></div><p class="small muted">Te ne mancano ' + (MOON_COST - bal) + '.</p>') + '</div>';
   const optI = '<div class="step"><h3>👥 Invita un amico (gratis)</h3><p class="small muted">Quando si registra con il tuo link e pubblica la sua app, ottieni uno slot extra.</p><div><button type="button" class="btn" data-act="invite">Invita un amico</button></div></div>';
@@ -728,6 +750,7 @@ function swapView(id) {
   const o = s.a === me ? s.b : s.a;
   const oApp = (s.apps && s.apps[o]) || {}, mApp = (s.apps && s.apps[me]) || {};
   let h = back + '<div class="card"><div class="row between"><button class="who" data-act="user" data-id="' + esc(o) + '">' + av(o) + '<span class="n">' + esc(nameOf(o)) + '</span></button>' + statusPill(s) + '</div>'
+    + (s.status === 'active' ? (() => { const ls = lastSeen(o); return '<div class="row" style="gap:6px"><span class="small muted">🕒 Ultimo accesso:</span><span class="pill ' + (ls.old ? 'warn' : 'ok') + '">' + ls.t + '</span></div>'; })() : '')
     + '<div class="box mini' + xcls(aidOf(s, o)) + '"><div class="row between"><span class="small muted mono">TU TESTI</span>' + xtag(aidOf(s, o)) + '</div><b>' + esc(oApp.name || 'App') + '</b>'
     + (s.status === 'active' ? (S.theirLink ? link(S.theirLink) : '<span class="small muted">Il link di test non è disponibile.</span>') : '<span class="small muted">Il link di test si sblocca quando lo scambio viene accettato.</span>') + '</div>'
     + '<div class="box mini' + xcls(aidOf(s, me)) + '"><div class="row between"><span class="small muted mono">LUI TESTA</span>' + xtag(aidOf(s, me)) + '</div><b>' + esc(mApp.name || 'La tua app') + '</b>' + swapAppPicker(s, o) + '</div></div>';
@@ -749,6 +772,11 @@ function swapView(id) {
   let step2 = '<div class="step"><h3><span class="k">2</span>Test di 14 giorni</h3>'
     + '<div class="stack" style="gap:6px"><div class="row between"><b class="small">Tu su ' + esc(oApp.name || 'la sua app') + '</b><span class="small mono muted">' + esc(dayLabel(el)) + '</span></div>' + tracker(el) + '</div>'
     + '<div class="stack" style="gap:6px"><div class="row between"><b class="small">Lui su ' + esc(mApp.name || 'la tua app') + '</b><span class="small mono muted">' + esc(dayLabel(oel)) + '</span></div>' + tracker(oel) + '</div>';
+  if (el !== null && !done) {
+    const mm = swapMoons(s), fl = Math.min(14, Math.floor(el)), lost = fl - mm;
+    step2 += '<div class="row" style="gap:6px"><span class="small muted">' + moonLabel(mm) + ' in questo scambio</span>' + (lost > 0 ? '<span class="pill warn">' + lost + (lost === 1 ? ' giorno senza accesso' : ' giorni senza accesso') + '</span>' : '') + '</div>'
+      + '<p class="small muted">Apri IronBlind ogni giorno: la Luna del giorno si ottiene solo se quel giorno accedi.</p>';
+  }
   if (el === null) step2 += S.theirLink
     ? '<div><button class="btn primary" data-act="startTest" data-id="' + esc(id) + '">Ho installato l\'app, avvia i 14 giorni</button></div>'
     : '<p class="small muted">Potrai avviare il test quando avrai il link dell\'app da installare.</p>';
@@ -805,6 +833,7 @@ function render(force) {
   if (!firstRoute) { firstRoute = true; if (!S.users.get(me)) S.tab = 'profile'; }
   if (S.route && S.route.t === 'swap') markSeen(S.route.id);
   syncWatch(); syncMoons(); setTimeout(checkMilestones, 400);
+  if (!pingOn) { pingOn = true; setInterval(() => { if (me && !document.hidden) syncMoons(); }, 10 * 60 * 1000); document.addEventListener('visibilitychange', () => { if (me && !document.hidden) syncMoons(); }); }
   const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
   document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App';
   $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['profile', 'Profilo'], ['settings', 'Impostazioni']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '">' + t[1] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</button>').join('');
@@ -1054,6 +1083,7 @@ document.addEventListener('submit', async e => {
       if (old.spent && old.spent.length) data.spent = old.spent;
       if (old.moons) data.moons = old.moons;
       if (old.bonus) data.bonus = old.bonus;
+      if (old.seen) data.seen = old.seen;
       if (old.testing) data.testing = old.testing;
       if (old.moonsSpent) data.moonsSpent = old.moonsSpent;
       await setDoc(doc(db, 'users', me), data);

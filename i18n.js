@@ -167,6 +167,10 @@ const E = {
   'Manca la configurazione di Firebase': 'Firebase configuration is missing',
   'Apri il file firebase-config.js e incolla i valori del tuo progetto Firebase. I passaggi sono nel README.': 'Open firebase-config.js and paste the values of your Firebase project. The steps are in the README.',
   /* categorie */
+  '🕒 Ultimo accesso:': '🕒 Last seen:', 'oggi': 'today', 'ieri': 'yesterday', 'mai': 'never', 'in questo scambio': 'in this swap',
+  'Apri IronBlind ogni giorno: la Luna del giorno si ottiene solo se quel giorno accedi.': 'Open IronBlind every day: the day’s Moon is earned only if you log in that day.',
+  'Ogni giorno di test completato in cui accedi a IronBlind ti dà +1 Luna (massimo 14 per scambio).': 'Every completed test day on which you log in to IronBlind gives you +1 Moon (maximum 14 per swap).',
+  'Ogni giorno di test completato in cui accedi a IronBlind = +1 Luna.': 'Every completed test day on which you log in to IronBlind = +1 Moon.',
   'Giochi': 'Games', 'Produttività': 'Productivity', 'Social': 'Social', 'Strumenti': 'Tools', 'Salute e fitness': 'Health & fitness', 'Istruzione': 'Education', 'Finanza': 'Finance', 'Altro': 'Other',
   /* paesi */
   'Italia': 'Italy', 'Belgio': 'Belgium', 'Brasile': 'Brazil', 'Cina': 'China', 'Croazia': 'Croatia', 'Danimarca': 'Denmark', 'Egitto': 'Egypt', 'Filippine': 'Philippines', 'Finlandia': 'Finland', 'Francia': 'France',
@@ -232,6 +236,8 @@ const P = [
   [/^Pagamento in verifica: lo slot si sblocca appena confermato\.$/, () => 'Payment being verified: the slot unlocks as soon as it is confirmed.'],
   [/^Pagamento in verifica:$/, () => 'Payment being verified:'], [/^ lo slot si sblocca appena confermato\.$/, () => ' the slot unlocks as soon as it is confirmed.'],
   [/^Richiesta già inviata:$/, () => 'Request already sent:'], [/^ stiamo verificando il pagamento\.$/, () => ' we are verifying the payment.'],
+  [/^(\d+) giorni fa$/, m => `${m[1]} days ago`], [/^(\d+) giorni? senza accesso$/, m => `${m[1]} ${plural(m[1], 'day', 'days')} without login`],
+  [/^(🌕 \d+ Lun[ae]) in questo scambio$/, (m, t) => `${t(m[1])} in this swap`],
   [/^(\d+)\/(\d+)$/, m => m[0]],
   [/^Ti invito su IronBlind Test App: ci scambiamo i test di 14 giorni per le nostre app Android\.$/, () => 'I invite you to IronBlind Test App: let’s swap the 14-day tests for our Android apps.']
 ];
