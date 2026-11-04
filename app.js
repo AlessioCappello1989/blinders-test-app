@@ -760,7 +760,7 @@ function swapView(id) {
   let h = back + '<div class="card"><div class="row between"><button class="who" data-act="user" data-id="' + esc(o) + '">' + av(o) + '<span class="n">' + esc(nameOf(o)) + '</span></button>' + statusPill(s) + '</div>'
     + (s.status === 'active' ? (() => { const ls = lastSeen(o); return '<div class="row" style="gap:6px"><span class="small muted">🕒 Ultimo accesso:</span><span class="pill ' + (ls.old ? 'warn' : 'ok') + '">' + ls.t + '</span></div>'; })() : '')
     + '<div class="box mini' + xcls(aidOf(s, o)) + '"><div class="row between"><span class="small muted mono">TU TESTI</span>' + xtag(aidOf(s, o)) + '</div><b>' + esc(oApp.name || 'App') + '</b>'
-    + (s.status === 'active' ? (S.theirLink ? link(S.theirLink) : '<span class="small muted">Il link di test non è disponibile.</span>') : '<span class="small muted">Il link di test si sblocca quando lo scambio viene accettato.</span>') + '</div>'
+    + (s.status === 'active' ? (S.theirLink === undefined ? '<span class="small muted">Caricamento…</span>' : (S.theirLink ? link(S.theirLink) : '<span class="small muted">Il link di test non è disponibile.</span>')) : '<span class="small muted">Il link di test si sblocca quando lo scambio viene accettato.</span>') + '</div>'
     + '<div class="box mini' + xcls(aidOf(s, me)) + '"><div class="row between"><span class="small muted mono">LUI TESTA</span>' + xtag(aidOf(s, me)) + '</div><b>' + esc(mApp.name || 'La tua app') + '</b>' + swapAppPicker(s, o) + '</div></div>';
   if (s.status === 'proposed') {
     if (s.b === me) return h + '<div class="card"><p>' + esc(nameOf(o)) + ' propone di testarsi a vicenda.</p><div class="row"><button class="btn primary" data-act="accept" data-id="' + esc(id) + '">Accetta</button><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Rifiuta</button></div></div>';
@@ -769,7 +769,9 @@ function swapView(id) {
   const done = isDone(s);
   const mineE = S.myEmail, theirE = S.theirEmail;
   let step1 = '<div class="step"><h3><span class="k">1</span>Scambio delle email</h3>';
-  if (mineE && theirE) {
+  if (mineE === undefined || (mineE && theirE === undefined)) {
+    step1 += '<p class="small muted">Caricamento…</p>';
+  } else if (mineE && theirE) {
     step1 += '<div class="box"><div class="mail"><span class="small muted">La tua</span><code>' + esc(mineE) + '</code></div><div class="mail"><span class="small muted">La sua</span><code>' + esc(theirE) + '</code><button class="btn sm" data-act="copy" data-text="' + esc(theirE) + '">Copia</button></div></div><p class="small muted">Aggiungi la sua email tra i tester della tua app in Play Console e usa il suo link per entrare nel test.</p>';
   } else {
     step1 += '<p class="small muted">' + (mineE ? 'Hai condiviso la tua email. Aspetta che lo faccia anche ' + esc(nameOf(o)) + ' per vedere la sua.' : 'Le email si vedono solo quando le condividete entrambi. La sua si sblocca dopo che hai condiviso la tua.') + '</p>';
@@ -788,7 +790,7 @@ function swapView(id) {
       + '<p class="small muted">Apri IronBlind ogni giorno: la Luna del giorno si ottiene solo se quel giorno accedi.</p>';
   }
   const rdy = !!(s.ready && s.ready[o]);
-  if (el === null) step2 += !S.theirLink
+  if (el === null) step2 += S.theirLink === undefined ? '<p class="small muted">Caricamento…</p>' : !S.theirLink
     ? '<p class="small muted">Potrai avviare il test quando avrai il link dell\'app da installare.</p>'
     : (rdy ? '<div><button class="btn primary" data-act="startTest" data-id="' + esc(id) + '">Ho installato l\'app, avvia i 14 giorni</button></div>'
       : '<p class="small muted">Prima di installare aspetta che ' + esc(nameOf(o)) + ' ti aggiunga ai tester di Play Console: il pulsante di avvio si sblocca dopo la sua conferma.</p>');

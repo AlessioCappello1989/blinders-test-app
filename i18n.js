@@ -179,6 +179,7 @@ const E = {
   'Ho aggiunto la sua email ai tester': 'I have added their email as a tester',
   'Confermato: ora può installare e avviare il test': 'Confirmed: they can now install and start the test',
   'Aspetta che ti aggiunga ai tester.': 'Wait for them to add you as a tester.',
+  'Caricamento…': 'Loading…',
   'Giochi': 'Games', 'Produttività': 'Productivity', 'Social': 'Social', 'Strumenti': 'Tools', 'Salute e fitness': 'Health & fitness', 'Istruzione': 'Education', 'Finanza': 'Finance', 'Altro': 'Other',
   /* paesi */
   'Italia': 'Italy', 'Belgio': 'Belgium', 'Brasile': 'Brazil', 'Cina': 'China', 'Croazia': 'Croatia', 'Danimarca': 'Denmark', 'Egitto': 'Egypt', 'Filippine': 'Philippines', 'Finlandia': 'Finland', 'Francia': 'France',
