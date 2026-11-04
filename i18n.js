@@ -175,6 +175,10 @@ const E = {
   'Il massimo che puoi tenere è 30: oltre, le nuove Lune si perdono.': 'The most you can hold is 30: beyond that, new Moons are lost.',
   'Sei al massimo: le nuove Lune si perdono finché non ne usi.': 'You are at the maximum: new Moons are lost until you use some.',
   'Sei vicino al massimo: usa le Lune prima di perderle.': 'You are close to the maximum: use your Moons before you lose them.',
+  'Ti ha aggiunto ai tester': 'Added you as a tester',
+  'Ho aggiunto la sua email ai tester': 'I have added their email as a tester',
+  'Confermato: ora può installare e avviare il test': 'Confirmed: they can now install and start the test',
+  'Aspetta che ti aggiunga ai tester.': 'Wait for them to add you as a tester.',
   'Giochi': 'Games', 'Produttività': 'Productivity', 'Social': 'Social', 'Strumenti': 'Tools', 'Salute e fitness': 'Health & fitness', 'Istruzione': 'Education', 'Finanza': 'Finance', 'Altro': 'Other',
   /* paesi */
   'Italia': 'Italy', 'Belgio': 'Belgium', 'Brasile': 'Brazil', 'Cina': 'China', 'Croazia': 'Croatia', 'Danimarca': 'Denmark', 'Egitto': 'Egypt', 'Filippine': 'Philippines', 'Finlandia': 'Finland', 'Francia': 'France',
@@ -243,6 +247,10 @@ const P = [
   [/^(\d+) giorni fa$/, m => `${m[1]} days ago`], [/^(\d+) giorni? senza accesso$/, m => `${m[1]} ${plural(m[1], 'day', 'days')} without login`],
   [/^(🌕 \d+ Lun[ae]) in questo scambio$/, (m, t) => `${t(m[1])} in this swap`],
   [/^Hai (🌕 .+): servono 20\.$/, (m, t) => `You have ${t(m[1])}: you need 20.`],
+  [/^Prima di installare aspetta che (.+) ti aggiunga ai tester di Play Console: il pulsante di avvio si sblocca dopo la sua conferma\.$/, m => `Before installing, wait for ${m[1]} to add you as a tester in Play Console: the start button unlocks after their confirmation.`],
+  [/^Quando hai aggiunto la sua email tra i tester della tua app in Play Console, confermalo: solo allora (.+) potrà installare e avviare il test\.$/, m => `Once you have added their email as a tester of your app in Play Console, confirm it: only then can ${m[1]} install and start the test.`],
+  [/^✓ Hai aggiunto (.+) ai tester$/, m => `✓ You added ${m[1]} as a tester`],
+  [/^(.+) ti ha aggiunto ai tester: ora puoi installare e avviare il test$/, m => `${m[1]} added you as a tester: you can now install and start the test`],
   [/^(\d+)\/(\d+)$/, m => m[0]],
   [/^Ti invito su IronBlind Test App: ci scambiamo i test di 14 giorni per le nostre app Android\.$/, () => 'I invite you to IronBlind Test App: let’s swap the 14-day tests for our Android apps.']
 ];

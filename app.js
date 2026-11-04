@@ -199,7 +199,7 @@ function getSeen() { try { return JSON.parse(localStorage.getItem(seenKey()) || 
 function markSeen(id) {
   if (!S.swaps.get(id)) return;
   const all = getSeen(); const lm = S.lastMsg.get(id);
-  all[id] = { msg: Math.max(lm ? lm.at : 0, Date.now()), start: true, fb: true, acc: true };
+  all[id] = { msg: Math.max(lm ? lm.at : 0, Date.now()), start: true, fb: true, acc: true, ready: true };
   try { localStorage.setItem(seenKey(), JSON.stringify(all)); } catch (e) { /* senza memoria locale gli avvisi restano finché non cambia lo stato */ }
 }
 function unreadInfo(s) {
@@ -207,6 +207,7 @@ function unreadInfo(s) {
   const nMsg = lm ? lm.list.filter(m => m.from !== me && m.at > (seen.msg || 0)).length : 0;
   if (nMsg) out.push(nMsg === 1 ? 'Nuovo messaggio' : nMsg + ' nuovi messaggi');
   if (ms(s.start && s.start[o]) && !seen.start) out.push('Ha avviato il test');
+  if (s.ready && s.ready[o] && !seen.ready && !ms(s.start && s.start[me])) out.push('Ti ha aggiunto ai tester');
   if (s.fb && s.fb[o] && !seen.fb) out.push('Ha lasciato il feedback');
   if (s.a === me && s.status === 'active' && !seen.acc) out.push('Ha accettato lo scambio');
   return { labels: out, n: out.length + Math.max(0, nMsg - 1) };
@@ -774,6 +775,8 @@ function swapView(id) {
     step1 += '<p class="small muted">' + (mineE ? 'Hai condiviso la tua email. Aspetta che lo faccia anche ' + esc(nameOf(o)) + ' per vedere la sua.' : 'Le email si vedono solo quando le condividete entrambi. La sua si sblocca dopo che hai condiviso la tua.') + '</p>';
     if (!mineE) step1 += S.priv.email ? '<div><button class="btn primary" data-act="shareEmail" data-id="' + esc(id) + '">Condividi la mia email</button></div>' : '<div><button class="btn" data-act="tab" data-tab="profile">Aggiungi la tua email nel profilo</button></div>';
   }
+  if (!(s.ready && s.ready[me])) step1 += '<div class="box mini"><p class="small">Quando hai aggiunto la sua email tra i tester della tua app in Play Console, confermalo: solo allora ' + esc(nameOf(o)) + ' potrà installare e avviare il test.</p><div><button class="btn primary" data-act="ready" data-id="' + esc(id) + '">Ho aggiunto la sua email ai tester</button></div></div>';
+  else step1 += '<p class="small"><span class="pill ok">✓ Hai aggiunto ' + esc(nameOf(o)) + ' ai tester</span></p>';
   step1 += '</div>';
   const el = elapsed(s, me), oel = elapsed(s, o);
   let step2 = '<div class="step"><h3><span class="k">2</span>Test di 14 giorni</h3>'
@@ -784,9 +787,11 @@ function swapView(id) {
     step2 += '<div class="row" style="gap:6px"><span class="small muted">' + moonLabel(mm) + ' in questo scambio</span>' + (lost > 0 ? '<span class="pill warn">' + lost + (lost === 1 ? ' giorno senza accesso' : ' giorni senza accesso') + '</span>' : '') + '</div>'
       + '<p class="small muted">Apri IronBlind ogni giorno: la Luna del giorno si ottiene solo se quel giorno accedi.</p>';
   }
-  if (el === null) step2 += S.theirLink
-    ? '<div><button class="btn primary" data-act="startTest" data-id="' + esc(id) + '">Ho installato l\'app, avvia i 14 giorni</button></div>'
-    : '<p class="small muted">Potrai avviare il test quando avrai il link dell\'app da installare.</p>';
+  const rdy = !!(s.ready && s.ready[o]);
+  if (el === null) step2 += !S.theirLink
+    ? '<p class="small muted">Potrai avviare il test quando avrai il link dell\'app da installare.</p>'
+    : (rdy ? '<div><button class="btn primary" data-act="startTest" data-id="' + esc(id) + '">Ho installato l\'app, avvia i 14 giorni</button></div>'
+      : '<p class="small muted">Prima di installare aspetta che ' + esc(nameOf(o)) + ' ti aggiunga ai tester di Play Console: il pulsante di avvio si sblocca dopo la sua conferma.</p>');
   step2 += '</div>';
   let step3 = '<div class="step"><h3><span class="k">3</span>Feedback reciproco</h3>';
   if (s.fb && s.fb[me]) step3 += '<p class="small">Hai inviato il tuo feedback. ' + (done ? 'Scambio completato: conta come un tester per entrambi.' : 'Aspetto quello di ' + esc(nameOf(o)) + '.') + '</p>';
@@ -1014,8 +1019,11 @@ document.addEventListener('click', async e => {
     else if (act === 'shareEmail') {
       if (!S.priv.email) { toast('Aggiungi la tua email nel profilo.'); return; }
       await setDoc(doc(db, 'swaps', id, 'emails', me), { email: S.priv.email, at: Date.now() }); toast('Email condivisa');
+    } else if (act === 'ready') {
+      await updateDoc(doc(db, 'swaps', id), { ['ready.' + me]: true }); toast('Confermato: ora può installare e avviare il test');
     } else if (act === 'startTest') {
       if (!S.theirLink) { toast('Prima ti serve il link dell\'app da installare.'); return; }
+      if (!(s.ready && s.ready[s.a === me ? s.b : s.a])) { toast('Aspetta che ti aggiunga ai tester.'); return; }
       await updateDoc(doc(db, 'swaps', id), { ['start.' + me]: serverTimestamp() }); toast('Test avviato'); }
     else if (act === 'fb') {
       const n = S.star[id] || 0; if (!n) { toast('Scegli da 1 a 5 stelle.'); return; }
@@ -1117,6 +1125,7 @@ function startData() {
         if (S.route && S.route.t === 'swap' && S.route.id === id) return;
         if (old.status === 'proposed' && s.status === 'active' && s.a === me) notify(nameOf(o) + ' ha accettato lo scambio', id);
         if (!ms(old.start && old.start[o]) && ms(s.start && s.start[o])) notify(nameOf(o) + ' ha avviato il test', id);
+        if (!(old.ready && old.ready[o]) && s.ready && s.ready[o]) notify(nameOf(o) + ' ti ha aggiunto ai tester: ora puoi installare e avviare il test', id);
         if (!(old.fb && old.fb[o]) && s.fb && s.fb[o]) notify(nameOf(o) + ' ha lasciato il feedback', id);
       });
     }
