@@ -241,7 +241,9 @@ function elapsed(s, uid) { const t = ms(s.start && s.start[uid]); return t ? (Da
 const dayLabel = el => el === null ? 'Non avviato' : el >= 14 ? '14 giorni completati' : 'Giorno ' + (Math.floor(el) + 1) + ' di 14';
 function tracker(el) { let h = '<div class="tracker" role="img" aria-label="' + esc(dayLabel(el)) + '">'; for (let i = 0; i < 14; i++) { let c = ''; if (el !== null) c = i < Math.floor(el) ? 'on' : (i === Math.floor(el) ? 'now' : ''); h += '<i class="' + c + '"></i>'; } return h + '</div>'; }
 function meter(n) { let h = '<div class="meter" role="img" aria-label="' + n + ' tester su 12">'; for (let i = 0; i < 12; i++) h += '<i class="' + (i < n ? 'on' : '') + '"></i>'; return h + '</div>'; }
-const rate = st => st.n ? '<span class="rate">★ ' + st.avg.toFixed(1) + ' · ' + st.n + '</span>' : '<span class="rate">Nessun feedback</span>';
+/* Colore del voto: 4-5 giallo oro, 3 arancione, 2 arancione scuro, 1 rosso. */
+const rcls = v => v >= 4 ? 'rg' : v >= 3 ? 'ro' : v >= 2 ? 'rd' : 'rr';
+const rate = st => st.n ? '<span class="rate ' + rcls(st.avg) + '">★ ' + st.avg.toFixed(1) + ' · ' + st.n + '</span>' : '<span class="rate">Nessun feedback</span>';
 const fmtD = t => new Date(t).toLocaleDateString(lang() === 'it' ? 'it-IT' : 'en-GB', { day: 'numeric', month: 'short' });
 const fmtT = t => new Date(t).toLocaleTimeString(lang() === 'it' ? 'it-IT' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
 const link = u => typeof u === 'string' && /^https:\/\//i.test(u) ? '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">Apri link di test</a>' : '';
@@ -366,7 +368,7 @@ function swapsView() {
 function fbList(uid) {
   const a = []; S.fb.forEach(f => { if (f.to === uid) a.push(f); }); a.sort((x, y) => (y.at || 0) - (x.at || 0));
   if (!a.length) return '<p class="muted small">Nessun feedback ricevuto.</p>';
-  return a.map(f => '<div class="fbitem"><div class="row between"><b>' + esc(nameOf(f.from)) + '</b><span class="small muted mono">' + fmtD(f.at || Date.now()) + '</span></div><span class="st" aria-label="' + f.stars + ' stelle su 5">' + stars(f.stars) + '</span>' + (f.text ? '<p class="desc">' + esc(f.text) + '</p>' : '') + '</div>').join('');
+  return a.map(f => '<div class="fbitem"><div class="row between"><b>' + esc(nameOf(f.from)) + '</b><span class="small muted mono">' + fmtD(f.at || Date.now()) + '</span></div><span class="st ' + rcls(f.stars) + '" aria-label="' + f.stars + ' stelle su 5">' + stars(f.stars) + '</span>' + (f.text ? '<p class="desc">' + esc(f.text) + '</p>' : '') + '</div>').join('');
 }
 function statBlock(uid, a, multi) {
   const st = stats(uid, a);
@@ -857,11 +859,11 @@ function swapView(id) {
   if (s.fb && s.fb[me]) step3 += '<p class="small">Hai inviato il tuo feedback. ' + (done ? 'Scambio completato: conta come un tester per entrambi.' : 'Aspetto quello di ' + esc(nameOf(o)) + '.') + '</p>';
   else if (el !== null && el >= TEST_DAYS) {
     const n = S.star[id] || 0;
-    step3 += '<p class="small muted">Come ha lavorato ' + esc(nameOf(o)) + ' durante lo scambio?</p><div class="stars" role="group" aria-label="Valutazione">' + [1, 2, 3, 4, 5].map(i => '<button type="button" class="star' + (i <= n ? ' on' : '') + '" data-act="star" data-id="' + esc(id) + '" data-n="' + i + '" aria-label="' + i + ' stelle">★</button>').join('') + '</div>'
+    step3 += '<p class="small muted">Come ha lavorato ' + esc(nameOf(o)) + ' durante lo scambio?</p><div class="stars ' + (n ? rcls(n) : '') + '" role="group" aria-label="Valutazione">' + [1, 2, 3, 4, 5].map(i => '<button type="button" class="star' + (i <= n ? ' on' : '') + '" data-act="star" data-id="' + esc(id) + '" data-n="' + i + '" aria-label="' + i + ' stelle">★</button>').join('') + '</div>'
       + '<label for="fbtext">Commento<textarea id="fbtext" maxlength="600" placeholder="Puntualità, qualità delle segnalazioni, comunicazione"></textarea></label><div><button class="btn primary" data-act="fb" data-id="' + esc(id) + '">Invia feedback</button></div>';
   } else step3 += '<p class="small muted">Si sblocca dopo 14 giorni di test' + (el === null ? '. Avvia il tuo test per far partire il conteggio.' : ': mancano ' + Math.max(1, Math.ceil(14 - el)) + ' giorni.') + '</p>';
   const rf = S.fb.get(id + '_' + o);
-  if (rf) step3 += '<div class="fbitem"><b class="small">Feedback di ' + esc(nameOf(o)) + '</b><span class="st">' + stars(rf.stars) + '</span>' + (rf.text ? '<p class="desc">' + esc(rf.text) + '</p>' : '') + '</div>';
+  if (rf) step3 += '<div class="fbitem"><b class="small">Feedback di ' + esc(nameOf(o)) + '</b><span class="st ' + rcls(rf.stars) + '">' + stars(rf.stars) + '</span>' + (rf.text ? '<p class="desc">' + esc(rf.text) + '</p>' : '') + '</div>';
   step3 += '</div>';
   const chat = '<div class="step"><h3>Chat</h3><div class="chat"><div id="msgs"></div><form id="cf" class="send" autocomplete="off"><input id="msg" maxlength="200" placeholder="Scrivi a ' + esc(nameOf(o)) + ' (max 200 caratteri)" aria-label="Messaggio, massimo 200 caratteri"><button class="btn primary" type="submit">Invia</button></form></div></div>';
   const closeBox = done ? '' : '<div class="card"><p class="small muted">Se l\'altro non risponde più puoi chiudere lo scambio. La tua app si libera e potrai cambiarla.</p>'
@@ -1014,7 +1016,7 @@ document.addEventListener('click', async e => {
     if (act === 'back') { S.route = null; S.confirm = null; render(true); return; }
     if (act === 'askClose') { S.confirm = id; render(true); return; }
     if (act === 'noClose') { S.confirm = null; render(true); return; }
-    if (act === 'star') { S.star[id] = +b.dataset.n; view.querySelectorAll('.star').forEach((x, i) => x.classList.toggle('on', i < S.star[id])); return; }
+    if (act === 'star') { S.star[id] = +b.dataset.n; view.querySelectorAll('.star').forEach((x, i) => x.classList.toggle('on', i < S.star[id])); const bx = view.querySelector('.stars'); if (bx) bx.className = 'stars ' + rcls(S.star[id]); return; }
     if (act === 'invite') {
       const url = inviteLink(), text = tr('Ti invito su IronBlind Test App: ci scambiamo i test di 14 giorni per le nostre app Android.');
       if (navigator.share) { try { await navigator.share({ title: 'IronBlind Test App', text, url }); } catch (x) { /* condivisione annullata */ } return; }
