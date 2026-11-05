@@ -610,7 +610,7 @@ function openPendingSwap() {
 function settingsView() {
   return '<section class="card"><h3>⚙️ Impostazioni</h3><p class="small muted">Notifiche, lingua, informazioni sull\'app e account.</p></section>'
     + notifBox() + langBox() + aboutBox()
-    + '<section class="card"><h3>Seguici</h3><div class="row"><a class="btn ghost sm" target="_blank" rel="noopener noreferrer" href="https://www.instagram.com/ironblind_test_app">Instagram</a><a class="btn ghost sm" target="_blank" rel="noopener noreferrer" href="https://www.facebook.com/share/18xtgUa4cQ/">Facebook</a></div></section>'
+    + '<section class="card"><h3>Seguici</h3><div class="row"><a class="btn ghost sm" target="_blank" rel="noopener noreferrer" href="https://www.instagram.com/ironblind_test_app">Instagram</a><a class="btn ghost sm" target="_blank" rel="noopener noreferrer" href="https://www.facebook.com/share/18xtgUa4cQ/">Facebook</a><a class="btn ghost sm" target="_blank" rel="noopener noreferrer" href="https://x.com/Ironblind89">X</a></div></section>'
     + adminBox() + deleteBox()
     + '<section class="card"><button type="button" class="btn ghost" data-act="logout">Esci</button></section>';
 }
