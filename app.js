@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261106c';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261106d';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -11,7 +11,7 @@ const CATS = ['Giochi', 'Produttività', 'Social', 'Strumenti', 'Salute e fitnes
 const COUNTRIES = ['Italia', 'Albania', 'Argentina', 'Australia', 'Austria', 'Belgio', 'Brasile', 'Canada', 'Cina', 'Croazia', 'Danimarca', 'Egitto', 'Filippine', 'Finlandia', 'Francia', 'Germania', 'Giappone', 'Grecia', 'India', 'Indonesia', 'Irlanda', 'Messico', 'Paesi Bassi', 'Polonia', 'Portogallo', 'Regno Unito', 'Romania', 'Spagna', 'Stati Uniti', 'Svezia', 'Svizzera', 'Turchia', 'Ucraina', 'Altro'];
 
 const view = $('#view');
-const S = { swapApp: '', showArch: false, xt: 'all', hidden: new Set(), reports: new Map(), tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined, myProof: undefined, theirProof: undefined, draft: null, stale: null, staleDays: 30 };
+const S = { confirmC: null, swapApp: '', showArch: false, xt: 'all', hidden: new Set(), reports: new Map(), tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined, myProof: undefined, theirProof: undefined, draft: null, stale: null, staleDays: 30 };
 /* Invito di un amico: il link ?invito=ID viene ricordato su questo dispositivo fino alla registrazione. */
 const INVITE_KEY = 'blinders-invite';
 let pendingInvite = null;
@@ -403,14 +403,19 @@ function appFields(k, ap, title, bonus) {
       ? '<div class="box"><p class="small"><b>Concludere questa app?</b> Viene tolta dal profilo e lo slot si azzera. Per usarlo di nuovo dovrai invitare un altro amico. Gli scambi già completati restano.</p><div class="row"><button type="button" class="btn primary sm" data-act="concludeApp" data-k="' + k + '">Sì, concludi</button><button type="button" class="btn ghost sm" data-act="noConclude">Annulla</button></div></div>'
       : '<div><button type="button" class="btn ghost sm" data-act="askConclude" data-k="' + k + '">Concludi app e libera lo slot</button></div>';
   }
-  const pill = k === 'main' ? (lock ? '<span class="pill warn">Bloccata</span>' : '<span class="pill ok">Principale</span>')
-    : (lock ? '<span class="pill warn">Bloccata</span>' : ap.name ? '<span class="pill ok">In uso</span>' : '<span class="pill ok">Sbloccato · libero</span>');
+  const free = !lock && !!ap.name;
+  const pill = k === 'main' ? (lock ? '<span class="pill warn">Bloccata</span>' : '<span class="pill ok">Principale</span>' + (free ? ' <span class="pill build">Slot libero</span>' : ''))
+    : (lock ? '<span class="pill warn">Bloccata</span>' : ap.name ? '<span class="pill build">Slot libero</span>' : '<span class="pill ok">Sbloccato · libero</span>');
+  /* Slot libero (nessuno scambio aperto): si può svuotare per riusarlo con un'altra app; senza nome non compare più nei contatori. */
+  const clr = !free ? '' : S.confirmC === k
+    ? '<div class="box"><p class="small"><b>Svuotare questo slot?</b> Nome, link, descrizione e tester esterni dell\'app vengono cancellati e l\'app non compare più nei contatori. Lo slot resta tuo. Gli scambi già completati e i feedback restano.</p><div class="row"><button type="button" class="btn primary sm" data-act="clearApp" data-k="' + k + '">Sì, svuota</button><button type="button" class="btn ghost sm" data-act="noClear">Annulla</button></div></div>'
+    : '<div><button type="button" class="btn ghost sm" data-act="askClear" data-k="' + k + '">Svuota i campi dello slot</button></div>';
   return '<div class="slot' + (k === 'main' ? ' main' : '') + '"><div class="row between"><h3>' + title + '</h3>' + pill + '</div>' + note
     + '<label for="f-app-' + k + '">Nome dell\'app<input id="f-app-' + k + '" maxlength="50"' + dis + ' value="' + esc(ap.name || '') + '"><span class="field-note" id="c-f-app-' + k + '">' + (ap.name || '').length + '/50</span></label>'
     + '<div class="grid2"><label for="f-cat-' + k + '">Categoria<select id="f-cat-' + k + '"' + dis + '>' + opts + '</select></label>'
     + '<label for="f-link-' + k + '">Link di adesione al test<input id="f-link-' + k + '" type="url" inputmode="url"' + dis + ' value="' + esc(lk) + '" placeholder="https://play.google.com/apps/testing/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te.</span></label></div>'
     + '<label for="f-want-' + k + '">Tester che ti servono<select id="f-want-' + k + '"' + dis + '>' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
-    + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>' + pubBox(k, ap) + conclude + '</div>';
+    + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>' + pubBox(k, ap) + clr + conclude + '</div>';
 }
 const dateVal = t => { if (!t) return ''; const d = new Date(t), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
 function extBox(k, ap) {
@@ -1004,6 +1009,8 @@ document.addEventListener('click', async e => {
     if (act === 'login') { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (x) { if (x.code !== 'auth/popup-closed-by-user' && x.code !== 'auth/cancelled-popup-request') toast(x.code === 'auth/unauthorized-domain' ? 'Dominio non autorizzato: aggiungilo in Firebase > Authentication > Impostazioni.' : 'Accesso non riuscito. Riprova.'); } return; }
     if (act === 'slotOpen') { openSlot(); return; }
     if (act === 'slotClose') { closeSlot(); return; }
+    if (act === 'askClear') { S.confirmC = b.dataset.k; render(true); return; }
+    if (act === 'noClear') { S.confirmC = null; render(true); return; }
     if (act === 'askConclude') { S.confirmK = b.dataset.k; render(true); return; }
     if (act === 'noConclude') { S.confirmK = null; render(true); return; }
     if (act === 'msClose') { closeMs(); return; }
@@ -1105,6 +1112,18 @@ document.addEventListener('click', async e => {
     } else if (act === 'adminDrop') {
       if (!isAdminUser()) return;
       await deleteDoc(doc(db, 'slotRequests', id)); toast('Richiesta eliminata');
+    } else if (act === 'clearApp') {
+      const k = b.dataset.k, u = S.users.get(me);
+      if (!u || (k === 'main' ? !(u.app && u.app.name) : !hasExtra(u, k))) { S.confirmC = null; return; }
+      if (openCount(k) > 0) { toast('Questa app ha ancora scambi aperti.'); S.confirmC = null; return; }
+      const nu = Object.assign({}, u); nu.updatedAt = Date.now();
+      if (k === 'main') nu.app = { name: '', want: '', cat: 'Altro', desc: '' };
+      else { nu.extra = Object.assign({}, u.extra); delete nu.extra[k]; if (!Object.keys(nu.extra).length) delete nu.extra; }
+      await setDoc(doc(db, 'users', me), nu);
+      const pv = { email: S.priv.email || '', link: k === 'main' ? '' : (S.priv.link || '') }; const el = Object.assign({}, S.priv.extraLinks || {}); delete el[k];
+      if (Object.keys(el).length) pv.extraLinks = el;
+      await setDoc(doc(db, 'userPrivate', me), pv);
+      S.confirmC = null; toast('Slot svuotato: puoi inserire una nuova app.');
     } else if (act === 'concludeApp') {
       const k = b.dataset.k, u = S.users.get(me);
       if (!u || !hasExtra(u, k)) { S.confirmK = null; return; }

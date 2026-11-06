@@ -203,6 +203,9 @@ const E = {
   'IronBlind su X': 'IronBlind on X',
   'Archivia': 'Archive', 'Ripristina': 'Restore', 'Nascondi archiviati': 'Hide archived', 'Scambio archiviato': 'Swap archived', 'Scambio ripristinato': 'Swap restored',
   'Tutte le mie app': 'All my apps', 'Filtra per app': 'Filter by app',
+  'Slot libero': 'Free slot', 'Svuota i campi dello slot': 'Clear the slot fields', 'Sì, svuota': 'Yes, clear', 'Slot svuotato: puoi inserire una nuova app.': 'Slot cleared: you can add a new app.',
+  "Svuotare questo slot?": 'Clear this slot?',
+  "Nome, link, descrizione e tester esterni dell'app vengono cancellati e l'app non compare più nei contatori. Lo slot resta tuo. Gli scambi già completati e i feedback restano.": 'The app’s name, link, description and external testers are deleted and the app no longer appears in the counters. The slot stays yours. Completed swaps and feedback are kept.',
   'Giochi': 'Games', 'Produttività': 'Productivity', 'Social': 'Social', 'Strumenti': 'Tools', 'Salute e fitness': 'Health & fitness', 'Istruzione': 'Education', 'Finanza': 'Finance', 'Altro': 'Other',
   /* paesi */
   'Italia': 'Italy', 'Belgio': 'Belgium', 'Brasile': 'Brazil', 'Cina': 'China', 'Croazia': 'Croatia', 'Danimarca': 'Denmark', 'Egitto': 'Egypt', 'Filippine': 'Philippines', 'Finlandia': 'Finland', 'Francia': 'France',
