@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261106d';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261106e';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -11,7 +11,7 @@ const CATS = ['Giochi', 'Produttività', 'Social', 'Strumenti', 'Salute e fitnes
 const COUNTRIES = ['Italia', 'Albania', 'Argentina', 'Australia', 'Austria', 'Belgio', 'Brasile', 'Canada', 'Cina', 'Croazia', 'Danimarca', 'Egitto', 'Filippine', 'Finlandia', 'Francia', 'Germania', 'Giappone', 'Grecia', 'India', 'Indonesia', 'Irlanda', 'Messico', 'Paesi Bassi', 'Polonia', 'Portogallo', 'Regno Unito', 'Romania', 'Spagna', 'Stati Uniti', 'Svezia', 'Svizzera', 'Turchia', 'Ucraina', 'Altro'];
 
 const view = $('#view');
-const S = { confirmC: null, swapApp: '', showArch: false, xt: 'all', hidden: new Set(), reports: new Map(), tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined, myProof: undefined, theirProof: undefined, draft: null, stale: null, staleDays: 30 };
+const S = { draftU: null, myCheck: undefined, theirCheck: undefined, confirmC: null, swapApp: '', showArch: false, xt: 'all', hidden: new Set(), reports: new Map(), tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined, myProof: undefined, theirProof: undefined, draft: null, stale: null, staleDays: 30 };
 /* Invito di un amico: il link ?invito=ID viene ricordato su questo dispositivo fino alla registrazione. */
 const INVITE_KEY = 'blinders-invite';
 let pendingInvite = null;
@@ -522,13 +522,14 @@ function msReached() {
 const msBase = k => k.split(':')[0];
 /* ---------- Novità: finestra mostrata una volta per aggiornamento. Per annunciare una novità cambia id e testi qui sotto. ---------- */
 const NEWS = {
-  id: '20261104f',
+  id: '20261106e',
   items: [
-    '📷 Prova di installazione: per avviare il test alleghi uno screenshot dell\'app installata e il proprietario lo conferma. La foto viene cancellata dopo la conferma.',
-    '✅ Conferma del proprietario: puoi installare e avviare il test solo dopo che il proprietario ti ha aggiunto ai tester.',
-    '🌕 Lune: la Luna del giorno si ottiene solo se quel giorno accedi a IronBlind. Puoi tenerne al massimo 30.',
-    '🕒 Ultimo accesso: nello scambio vedi quando l\'altro tester ha aperto IronBlind l\'ultima volta.',
-    '📱 In Impostazioni trovi la guida "Come installare l\'app".'
+    '🔎 Prova di utilizzo: se hai un dubbio che un tester non usi la tua app, puoi chiedergli uno screenshot. Ha 24 ore per inviarlo.',
+    '📦 Archivia: gli scambi completati si possono archiviare e ripristinare dalla pagina Scambi.',
+    '🔍 Filtro per app: se hai più app, in Scambi puoi filtrare per nome.',
+    '🧩 Slot libero: un\'app senza scambi aperti si può svuotare per riusare lo slot.',
+    '🧪 Tester esterni: ora compaiono anche nella card "Tester completati" del Profilo.',
+    '𝕏 Ci trovi anche su X: il link è in Impostazioni.'
   ]
 };
 function checkNews() {
@@ -570,9 +571,9 @@ function showMilestone(key) {
   const b = bg.querySelector('[data-act="msClose"]'); if (b) b.focus();
 }
 document.addEventListener('change', async e => {
-  const t = e.target; if (!t || t.id !== 'proofin' || !t.files || !t.files[0] || !(S.route && S.route.t === 'swap')) return;
-  const id = S.route.id;
-  try { S.draft = { id, img: await compressImage(t.files[0]) }; render(true); } catch (x) { toast('Non riesco a leggere la foto: usa uno screenshot.'); }
+  const t = e.target; if (!t || (t.id !== 'proofin' && t.id !== 'usein') || !t.files || !t.files[0] || !(S.route && S.route.t === 'swap')) return;
+  const id = S.route.id, key = t.id === 'usein' ? 'draftU' : 'draft';
+  try { S[key] = { id, img: await compressImage(t.files[0]) }; render(true); } catch (x) { toast('Non riesco a leggere la foto: usa uno screenshot.'); }
 });
 document.addEventListener('change', e => { const t = e.target; if (t && t.id === 'langsel') { try { localStorage.setItem(langKey, t.value); } catch (x) { /* nessuna memoria locale */ } startI18n(); render(true); } });
 
@@ -773,6 +774,7 @@ async function deleteAccount() {
       await deleteDoc(doc(db, 'swaps', sid, 'links', me));
       await deleteDoc(doc(db, 'swaps', sid, 'emails', me));
       await deleteDoc(doc(db, 'swaps', sid, 'proofs', me)).catch(() => {});
+      await deleteDoc(doc(db, 'swaps', sid, 'checks', me)).catch(() => {});
       const mine_ = await getDocs(query(collection(db, 'swaps', sid, 'messages'), where('from', '==', me)));
       for (const d of mine_.docs) await deleteDoc(d.ref);
     }
@@ -873,6 +875,24 @@ function swapView(id) {
     else if (S.theirProof && proofLive(S.theirProof)) step2 += '<div class="box mini"><p class="small"><b>Screenshot di ' + esc(nameOf(o)) + '</b>: controlla che l\'app sia installata.</p><img class="proof" src="' + S.theirProof.img + '" alt="Screenshot dell\'installazione">'
       + (S.theirProof.st === 'no' ? '<p class="small muted">Hai segnalato che non risulta: aspetta un nuovo screenshot.</p>' : '<div class="row"><button class="btn primary" data-act="proofOk" data-id="' + esc(id) + '">Confermo che ha installato</button><button class="btn ghost" data-act="proofNo" data-id="' + esc(id) + '">Non risulta</button></div>') + '</div>';
   }
+  /* Prova di utilizzo su richiesta */
+  if (S.myCheck !== undefined && S.theirCheck !== undefined && s.status === 'active') {
+    const dU = S.draftU && S.draftU.id === id ? S.draftU.img : null, mc = S.myCheck, tc = S.theirCheck;
+    if (mc && (mc.st === 'asked' || mc.st === 'no')) {
+      step2 += '<div class="box mini"><p class="small"><b>' + esc(nameOf(o)) + (mc.st === 'no' ? ' non è convinto della prova.' : ' ti ha chiesto una prova di utilizzo.') + '</b></p><p class="small">Allega uno screenshot dell\'app aperta, con data e ora del telefono ben visibili' + (mc.st === 'asked' ? ' (entro il ' + fmtDT(mc.req + CHECK_HOURS * 36e5) + ').' : '.') + '</p>'
+        + (dU ? '<img class="proof" src="' + dU + '" alt="Anteprima dello screenshot"><div><button class="btn primary" data-act="sendUse" data-id="' + esc(id) + '">Invia la prova</button></div>' : '')
+        + '<label class="btn" style="text-align:center">' + (dU ? '📷 Cambia screenshot' : '📷 Allega screenshot') + '<input id="usein" type="file" accept="image/*" hidden></label></div>';
+    } else if (mc && mc.st === 'sent') step2 += '<p class="small muted">Prova di utilizzo inviata: aspetta che ' + esc(nameOf(o)) + ' la confermi.</p>';
+    if (ms(s.start && s.start[o]) && !isDone(s)) {
+      if (!tc) step2 += '<div class="box mini"><p class="small">Hai un dubbio che ' + esc(nameOf(o)) + ' stia usando la tua app? Puoi chiedere una prova di utilizzo: avrà 24 ore per inviare uno screenshot.</p><div><button class="btn ghost" data-act="askUse" data-id="' + esc(id) + '">Chiedi una prova di utilizzo</button></div></div>';
+      else if (tc.st === 'asked') step2 += Date.now() > tc.req + CHECK_HOURS * 36e5
+        ? '<div class="box mini"><p class="small"><b>Prova non inviata.</b> Il tempo a disposizione è scaduto.</p><div class="row"><button class="btn ghost" data-act="askUse" data-id="' + esc(id) + '">Chiedi di nuovo</button></div></div>'
+        : '<p class="small muted">Richiesta inviata: ' + esc(nameOf(o)) + ' ha tempo fino al ' + fmtDT(tc.req + CHECK_HOURS * 36e5) + '.</p>';
+      else if (tc.st === 'sent' && proofLive(tc)) step2 += '<div class="box mini"><p class="small"><b>Prova di utilizzo di ' + esc(nameOf(o)) + '</b>: controlla che l\'app sia aperta e che data e ora siano di oggi.</p><img class="proof" src="' + tc.img + '" alt="Screenshot di utilizzo">'
+        + '<div class="row"><button class="btn primary" data-act="useOk" data-id="' + esc(id) + '">Confermo che la usa</button><button class="btn ghost" data-act="useNo" data-id="' + esc(id) + '">Non mi convince</button></div></div>';
+      else if (tc.st === 'no') step2 += '<p class="small muted">Hai segnalato che la prova non convince: aspetta un nuovo screenshot.</p><div><button class="btn ghost" data-act="askUse" data-id="' + esc(id) + '">Chiedi di nuovo</button></div>';
+    }
+  }
   step2 += '</div>';
   let step3 = '<div class="step"><h3><span class="k">3</span>Feedback reciproco</h3>';
   if (s.fb && s.fb[me]) step3 += '<p class="small">Hai inviato il tuo feedback. ' + (done ? 'Scambio completato: conta come un tester per entrambi.' : 'Aspetto quello di ' + esc(nameOf(o)) + '.') + '</p>';
@@ -943,7 +963,7 @@ function render(force) {
 }
 
 /* ---------- Sottoscrizioni dello scambio aperto (chat, email) ---------- */
-function stopSubs() { subUnsubs.forEach(u => u()); subUnsubs = []; subKey = ''; msgs = []; S.myEmail = undefined; S.theirEmail = undefined; S.theirLink = undefined; S.myProof = undefined; S.theirProof = undefined; }
+function stopSubs() { subUnsubs.forEach(u => u()); subUnsubs = []; subKey = ''; msgs = []; S.myEmail = undefined; S.theirEmail = undefined; S.theirLink = undefined; S.myProof = undefined; S.theirProof = undefined; S.myCheck = undefined; S.theirCheck = undefined; }
 /* ---------- Prova di installazione: screenshot piccolo salvato nello scambio, cancellato dopo la conferma del proprietario ---------- */
 const PROOF_DAYS = 10, PROOF_MAX = 400000; /* circa 300 KB di immagine (base64) */
 const proofLive = p => !!(p && p.img && Date.now() - (p.at || 0) < PROOF_DAYS * DAY);
@@ -963,7 +983,10 @@ function compressImage(file) {
     im.onerror = () => rej(new Error('img')); im.src = url;
   });
 }
-const dropProofs = (id, a, b) => Promise.all([a, b].map(u => deleteDoc(doc(db, 'swaps', id, 'proofs', u)).catch(() => {})));
+const dropProofs = (id, a, b) => Promise.all([a, b].flatMap(u => [deleteDoc(doc(db, 'swaps', id, 'proofs', u)).catch(() => {}), deleteDoc(doc(db, 'swaps', id, 'checks', u)).catch(() => {})]));
+/* Prova di utilizzo su richiesta: il proprietario la chiede, chi testa ha 24 ore per inviare uno screenshot. */
+const CHECK_HOURS = 24;
+const fmtDT = t => new Date(t).toLocaleString(lang() === 'en' ? 'en-GB' : 'it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 function syncSubs() {
   let id = null, o = null;
   if (me && S.route && S.route.t === 'swap') {
@@ -984,6 +1007,20 @@ function syncSubs() {
     if (!pFirst && n && n.st === 'no' && !(S.myProof && S.myProof.st === 'no')) notify(nameOf(o) + ' non trova la tua installazione: allega un nuovo screenshot', id);
     pFirst = false; S.myProof = n; render();
   }, () => { S.myProof = null; }));
+  const cOld = r => { if (r.exists() && Date.now() - (r.data().at || r.data().req || 0) >= PROOF_DAYS * DAY) deleteDoc(r.ref).catch(() => {}); };
+  let cFirst = true;
+  subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'checks', me), sn => {
+    cOld(sn); const n = sn.exists() ? sn.data() : null, was = S.myCheck;
+    if (!cFirst && n && n.st === 'asked' && !(was && was.req === n.req)) notify(nameOf(o) + ' ti ha chiesto una prova di utilizzo: hai 24 ore per inviare uno screenshot', id);
+    if (!cFirst && n && n.st === 'no' && was && was.st !== 'no') notify(nameOf(o) + ' non è convinto della prova di utilizzo: invia un nuovo screenshot', id);
+    cFirst = false; S.myCheck = n; render();
+  }, () => { S.myCheck = null; }));
+  let tFirst = true;
+  subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'checks', o), sn => {
+    cOld(sn); const n = sn.exists() ? sn.data() : null, was = S.theirCheck;
+    if (!tFirst && n && n.st === 'sent' && !(was && was.st === 'sent' && was.at === n.at)) notify(nameOf(o) + ' ha inviato la prova di utilizzo', id);
+    tFirst = false; S.theirCheck = n; render();
+  }, () => { S.theirCheck = null; }));
   let theirUnsub = null;
   subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'emails', me), sn => {
     S.myEmail = sn.exists() ? sn.data().email : null;
@@ -1168,6 +1205,17 @@ document.addEventListener('click', async e => {
     else if (act === 'shareEmail') {
       if (!S.priv.email) { toast('Aggiungi la tua email nel profilo.'); return; }
       await setDoc(doc(db, 'swaps', id, 'emails', me), { email: S.priv.email, at: Date.now() }); toast('Email condivisa');
+    } else if (act === 'askUse') {
+      const o = s.a === me ? s.b : s.a;
+      await deleteDoc(doc(db, 'swaps', id, 'checks', o)).catch(() => {});
+      await setDoc(doc(db, 'swaps', id, 'checks', o), { req: Date.now(), by: me, st: 'asked' }); toast('Richiesta inviata: ha 24 ore per rispondere');
+    } else if (act === 'sendUse') {
+      if (!(S.draftU && S.draftU.id === id)) { toast('Allega lo screenshot.'); return; }
+      await updateDoc(doc(db, 'swaps', id, 'checks', me), { img: S.draftU.img, at: Date.now(), exp: new Date(Date.now() + PROOF_DAYS * DAY), st: 'sent' }); S.draftU = null; toast('Prova inviata');
+    } else if (act === 'useOk') {
+      const o = s.a === me ? s.b : s.a; await deleteDoc(doc(db, 'swaps', id, 'checks', o)); toast('Prova confermata, screenshot cancellato');
+    } else if (act === 'useNo') {
+      const o = s.a === me ? s.b : s.a; await updateDoc(doc(db, 'swaps', id, 'checks', o), { st: 'no' }); toast('Segnalato: aspetta un nuovo screenshot');
     } else if (act === 'proofOk') {
       const o = s.a === me ? s.b : s.a; const bt = writeBatch(db);
       bt.update(doc(db, 'swaps', id), { ['conf.' + o]: true }); bt.delete(doc(db, 'swaps', id, 'proofs', o));
