@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261106a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261106b';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -11,7 +11,7 @@ const CATS = ['Giochi', 'Produttività', 'Social', 'Strumenti', 'Salute e fitnes
 const COUNTRIES = ['Italia', 'Albania', 'Argentina', 'Australia', 'Austria', 'Belgio', 'Brasile', 'Canada', 'Cina', 'Croazia', 'Danimarca', 'Egitto', 'Filippine', 'Finlandia', 'Francia', 'Germania', 'Giappone', 'Grecia', 'India', 'Indonesia', 'Irlanda', 'Messico', 'Paesi Bassi', 'Polonia', 'Portogallo', 'Regno Unito', 'Romania', 'Spagna', 'Stati Uniti', 'Svezia', 'Svizzera', 'Turchia', 'Ucraina', 'Altro'];
 
 const view = $('#view');
-const S = { showArch: false, xt: 'all', hidden: new Set(), reports: new Map(), tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined, myProof: undefined, theirProof: undefined, draft: null, stale: null, staleDays: 30 };
+const S = { swapApp: '', showArch: false, xt: 'all', hidden: new Set(), reports: new Map(), tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined, myProof: undefined, theirProof: undefined, draft: null, stale: null, staleDays: 30 };
 /* Invito di un amico: il link ?invito=ID viene ricordato su questo dispositivo fino alla registrazione. */
 const INVITE_KEY = 'blinders-invite';
 let pendingInvite = null;
@@ -359,10 +359,15 @@ function swapCard(s, arch) {
   return h + '</article>';
 }
 function swapsView() {
-  const ar = archSet(), every = mine().filter(s => s.status !== 'declined'), all = every.filter(s => !ar.has(s.id)), arch = every.filter(s => ar.has(s.id) && isDone(s));
+  const ar = archSet(), base = mine().filter(s => s.status !== 'declined');
+  const mineName = s => (s.apps && s.apps[me] && s.apps[me].name) || '';
+  const names = [...new Set(base.map(mineName).filter(Boolean))];
+  if (S.swapApp && names.indexOf(S.swapApp) < 0) S.swapApp = '';
+  const every = S.swapApp ? base.filter(s => mineName(s) === S.swapApp) : base, all = every.filter(s => !ar.has(s.id)), arch = every.filter(s => ar.has(s.id) && isDone(s));
+  const filt = names.length > 1 ? '<div class="seg" role="tablist" aria-label="Filtra per app">' + [''].concat(names).map(n => '<button type="button" role="tab" aria-selected="' + (S.swapApp === n) + '" class="' + (S.swapApp === n ? 'on' : '') + '" data-act="swapapp" data-n="' + esc(n) + '">' + (n ? esc(n) : 'Tutte le mie app') + ' <span class="cnt">' + base.filter(s => !n || mineName(s) === n).length + '</span></button>').join('') + '</div>' : '';
   if (!every.length) return '<div class="empty"><h3>Nessuno scambio</h3><p class="muted">Scegli un\'app in Esplora e proponi uno scambio: tu testi la sua, lui testa la tua.</p><div><button class="btn primary" data-act="tab" data-tab="explore">Vai a Esplora</button></div></div>';
   const sec = (t, l) => l.length ? '<section class="stack"><h2>' + t + '</h2>' + l.map(x => swapCard(x)).join('') + '</section>' : '';
-  return sec('Richieste ricevute', all.filter(s => s.status === 'proposed' && s.b === me))
+  return filt + sec('Richieste ricevute', all.filter(s => s.status === 'proposed' && s.b === me))
     + sec('In corso', all.filter(s => s.status === 'active' && !isDone(s)))
     + sec('Richieste inviate', all.filter(s => s.status === 'proposed' && s.a === me))
     + sec('Completati', all.filter(isDone))
@@ -1067,6 +1072,8 @@ document.addEventListener('click', async e => {
       const code = (($('#adm-code') || {}).value || '').trim();
       if (!code || !S.users.has(code)) { toast('Codice non trovato. Controlla di averlo copiato per intero.'); return; }
       const n = await grantSlot(code); toast('Slot sbloccato per ' + nameOf(code) + ' (totale pagati: ' + n + ')');
+    } else if (act === 'swapapp') {
+      S.swapApp = b.dataset.n || '';
     } else if (act === 'toggleArch') {
       S.showArch = !S.showArch;
     } else if (act === 'archive' || act === 'unarchive') {
