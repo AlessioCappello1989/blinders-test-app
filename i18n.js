@@ -286,6 +286,8 @@ const P = [
   [/^Annulla tutti \((\d+)\) e cancella le foto$/, m => `Cancel all (${m[1]}) and delete the photos`],
   [/^(\d+) scambi annullati, foto cancellate$/, m => `${m[1]} swaps cancelled, photos deleted`],
   [/^Archiviati \((\d+)\)$/, m => `Archived (${m[1]})`],
+  [/^Inclusi (\d+) tester esterni dichiarati da te\.$/, m => `Includes ${m[1]} external testers declared by you.`],
+  [/^🔄 (\d+) tester esterni dichiarati in corso: giorno (\d+) di 14\.$/, m => `🔄 ${m[1]} declared external testers in progress: day ${m[2]} of 14.`],
   [/^(\d+)\/(\d+)$/, m => m[0]],
   [/^Ti invito su IronBlind Test App: ci scambiamo i test di 14 giorni per le nostre app Android\.$/, () => 'I invite you to IronBlind Test App: let’s swap the 14-day tests for our Android apps.']
 ];

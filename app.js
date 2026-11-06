@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261106b';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261106c';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -240,7 +240,7 @@ function stats(id, a) {
 function elapsed(s, uid) { const t = ms(s.start && s.start[uid]); return t ? (Date.now() - t) / DAY : null; }
 const dayLabel = el => el === null ? 'Non avviato' : el >= 14 ? '14 giorni completati' : 'Giorno ' + (Math.floor(el) + 1) + ' di 14';
 function tracker(el) { let h = '<div class="tracker" role="img" aria-label="' + esc(dayLabel(el)) + '">'; for (let i = 0; i < 14; i++) { let c = ''; if (el !== null) c = i < Math.floor(el) ? 'on' : (i === Math.floor(el) ? 'now' : ''); h += '<i class="' + c + '"></i>'; } return h + '</div>'; }
-function meter(n) { let h = '<div class="meter" role="img" aria-label="' + n + ' tester su 12">'; for (let i = 0; i < 12; i++) h += '<i class="' + (i < n ? 'on' : '') + '"></i>'; return h + '</div>'; }
+function meter(n, run) { run = run || 0; let h = '<div class="meter" role="img" aria-label="' + n + ' tester su 12' + (run ? ', ' + run + ' in corso' : '') + '">'; for (let i = 0; i < 12; i++) h += '<i class="' + (i < n ? 'on' : i < n + run ? 'run' : '') + '"></i>'; return h + '</div>'; }
 /* Colore del voto: 4-5 giallo oro, 3 arancione, 2 arancione scuro, 1 rosso. */
 const rcls = v => v >= 4 ? 'rg' : v >= 3 ? 'ro' : v >= 2 ? 'rd' : 'rr';
 const rate = st => st.n ? '<span class="rate ' + rcls(st.avg) + '">★ ' + st.avg.toFixed(1) + ' · ' + st.n + '</span>' : '<span class="rate">Nessun feedback</span>';
@@ -382,8 +382,12 @@ function fbList(uid) {
 }
 function statBlock(uid, a, multi) {
   const st = stats(uid, a);
-  return '<div class="card"><div class="row between"><h3>Tester completati' + (multi && a ? ' · ' + esc(a.name) : '') + '</h3><span class="mono">' + Math.min(st.done, 12) + '/12</span></div>' + meter(Math.min(st.done, 12))
+  /* Tester esterni dichiarati: contano come completati quando sono passati 14 giorni dalla data di inizio, prima sono "in corso". */
+  const ex = a && a.ext && a.ext.n > 0 && a.ext.start ? Math.min(50, Math.floor(a.ext.n)) : 0, exDone = ex && Date.now() - a.ext.start >= 14 * DAY ? ex : 0;
+  const done = Math.min(12, st.done + exDone), run = Math.min(12 - done, ex - exDone), exDay = ex && !exDone ? Math.max(1, Math.floor((Date.now() - a.ext.start) / DAY) + 1) : 0;
+  return '<div class="card"><div class="row between"><h3>Tester completati' + (multi && a ? ' · ' + esc(a.name) : '') + '</h3><span class="mono">' + done + '/12</span></div>' + meter(done, run)
     + '<p class="small muted">Google Play chiede 12 tester per 14 giorni consecutivi. Conta ogni persona che ha testato la tua app per 14 giorni e ha lasciato il feedback.</p>'
+    + (ex ? '<p class="small muted">' + (exDone ? 'Inclusi ' + ex + ' tester esterni dichiarati da te.' : '🔄 ' + ex + ' tester esterni dichiarati in corso: giorno ' + Math.min(14, exDay) + ' di 14.') + '</p>' : '')
     + '<div class="row between"><span class="small muted">Valutazione media</span>' + rate(st) + '</div></div>';
 }
 function appFields(k, ap, title, bonus) {
