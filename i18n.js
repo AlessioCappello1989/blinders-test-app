@@ -201,6 +201,7 @@ const E = {
   '🔒 Privacy degli scambi': '🔒 Swap privacy',
   "Email, link di test e chat di uno scambio li vedono solo i due partecipanti. Gli screenshot di installazione li vede solo l'altro partecipante e vengono cancellati dopo la sua conferma. Il proprietario del sito può vedere l'elenco degli scambi (chi, quali app, stato) per annullare quelli rimasti fermi e cancellarne le foto, ma non legge email, link, chat né screenshot.": 'Emails, test links and the chat of a swap are visible only to the two participants. Installation screenshots are visible only to the other participant and are deleted after their confirmation. The site owner can see the list of swaps (who, which apps, status) to cancel those left idle and delete their photos, but cannot read emails, links, chats or screenshots.',
   'IronBlind su X': 'IronBlind on X',
+  'Archivia': 'Archive', 'Ripristina': 'Restore', 'Nascondi archiviati': 'Hide archived', 'Scambio archiviato': 'Swap archived', 'Scambio ripristinato': 'Swap restored',
   'Giochi': 'Games', 'Produttività': 'Productivity', 'Social': 'Social', 'Strumenti': 'Tools', 'Salute e fitness': 'Health & fitness', 'Istruzione': 'Education', 'Finanza': 'Finance', 'Altro': 'Other',
   /* paesi */
   'Italia': 'Italy', 'Belgio': 'Belgium', 'Brasile': 'Brazil', 'Cina': 'China', 'Croazia': 'Croatia', 'Danimarca': 'Denmark', 'Egitto': 'Egypt', 'Filippine': 'Philippines', 'Finlandia': 'Finland', 'Francia': 'France',
@@ -283,6 +284,7 @@ const P = [
   [/^Fermo da (\d+) giorni$/, m => `Idle for ${m[1]} days`],
   [/^Annulla tutti \((\d+)\) e cancella le foto$/, m => `Cancel all (${m[1]}) and delete the photos`],
   [/^(\d+) scambi annullati, foto cancellate$/, m => `${m[1]} swaps cancelled, photos deleted`],
+  [/^Archiviati \((\d+)\)$/, m => `Archived (${m[1]})`],
   [/^(\d+)\/(\d+)$/, m => m[0]],
   [/^Ti invito su IronBlind Test App: ci scambiamo i test di 14 giorni per le nostre app Android\.$/, () => 'I invite you to IronBlind Test App: let’s swap the 14-day tests for our Android apps.']
 ];

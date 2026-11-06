@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261104f';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261106a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -11,7 +11,7 @@ const CATS = ['Giochi', 'Produttività', 'Social', 'Strumenti', 'Salute e fitnes
 const COUNTRIES = ['Italia', 'Albania', 'Argentina', 'Australia', 'Austria', 'Belgio', 'Brasile', 'Canada', 'Cina', 'Croazia', 'Danimarca', 'Egitto', 'Filippine', 'Finlandia', 'Francia', 'Germania', 'Giappone', 'Grecia', 'India', 'Indonesia', 'Irlanda', 'Messico', 'Paesi Bassi', 'Polonia', 'Portogallo', 'Regno Unito', 'Romania', 'Spagna', 'Stati Uniti', 'Svezia', 'Svizzera', 'Turchia', 'Ucraina', 'Altro'];
 
 const view = $('#view');
-const S = { xt: 'all', hidden: new Set(), reports: new Map(), tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined, myProof: undefined, theirProof: undefined, draft: null, stale: null, staleDays: 30 };
+const S = { showArch: false, xt: 'all', hidden: new Set(), reports: new Map(), tab: 'explore', route: null, users: new Map(), swaps: new Map(), fb: new Map(), refs: new Map(), myRef: undefined, priv: { email: '' }, paid: 0, slotReq: undefined, reqs: new Map(), q: '', fc: '', star: {}, pick: {}, myEmail: undefined, theirEmail: undefined, myProof: undefined, theirProof: undefined, draft: null, stale: null, staleDays: 30 };
 /* Invito di un amico: il link ?invito=ID viene ricordato su questo dispositivo fino alla registrazione. */
 const INVITE_KEY = 'blinders-invite';
 let pendingInvite = null;
@@ -343,7 +343,9 @@ function statsBanner() {
 }
 const exploreView = () => statsBanner() + xtabs() + '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
 
-function swapCard(s) {
+/* Archivio personale: scambi completati nascosti dall'elenco (salvati nel tuo profilo, l'altro non se ne accorge). */
+const archSet = () => new Set(((S.users.get(me) || {}).arch) || []);
+function swapCard(s, arch) {
   const o = s.a === me ? s.b : s.a; const el = elapsed(s, me);
   const oa = (s.apps && s.apps[o] && s.apps[o].name) || 'la sua app', ma = (s.apps && s.apps[me] && s.apps[me].name) || 'la tua app';
   let h = '<article class="card"><div class="row between"><button class="who" data-act="swap" data-id="' + esc(s.id) + '">' + av(o) + '<span class="n">' + esc(nameOf(o)) + '</span>' + (unreadInfo(s).n ? '<span class="dot" role="status" aria-label="' + unreadInfo(s).n + ' novità">' + (unreadInfo(s).n > 9 ? '9+' : unreadInfo(s).n) + '</span>' : '') + '</button>' + statusPill(s) + '</div>'
@@ -352,17 +354,20 @@ function swapCard(s) {
     + (unreadOf(s).length ? '<div class="row">' + unreadOf(s).map(l => '<span class="pill warn">' + l + '</span>').join('') + '</div>' : '');
   if (s.status === 'active' && !isDone(s)) h += tracker(el) + '<p class="small muted mono">' + esc(dayLabel(el)) + '</p>';
   if (s.status === 'proposed' && s.b === me) h += '<div class="row"><button class="btn primary" data-act="accept" data-id="' + esc(s.id) + '">Accetta</button><button class="btn ghost" data-act="decline" data-id="' + esc(s.id) + '">Rifiuta</button></div>';
-  else h += '<div><button class="btn" data-act="swap" data-id="' + esc(s.id) + '">Apri</button></div>';
+  else h += '<div class="row"><button class="btn" data-act="swap" data-id="' + esc(s.id) + '">Apri</button>'
+    + (isDone(s) ? '<button class="btn ghost" data-act="' + (arch ? 'unarchive' : 'archive') + '" data-id="' + esc(s.id) + '">' + (arch ? 'Ripristina' : 'Archivia') + '</button>' : '') + '</div>';
   return h + '</article>';
 }
 function swapsView() {
-  const all = mine().filter(s => s.status !== 'declined');
-  if (!all.length) return '<div class="empty"><h3>Nessuno scambio</h3><p class="muted">Scegli un\'app in Esplora e proponi uno scambio: tu testi la sua, lui testa la tua.</p><div><button class="btn primary" data-act="tab" data-tab="explore">Vai a Esplora</button></div></div>';
-  const sec = (t, l) => l.length ? '<section class="stack"><h2>' + t + '</h2>' + l.map(swapCard).join('') + '</section>' : '';
+  const ar = archSet(), every = mine().filter(s => s.status !== 'declined'), all = every.filter(s => !ar.has(s.id)), arch = every.filter(s => ar.has(s.id) && isDone(s));
+  if (!every.length) return '<div class="empty"><h3>Nessuno scambio</h3><p class="muted">Scegli un\'app in Esplora e proponi uno scambio: tu testi la sua, lui testa la tua.</p><div><button class="btn primary" data-act="tab" data-tab="explore">Vai a Esplora</button></div></div>';
+  const sec = (t, l) => l.length ? '<section class="stack"><h2>' + t + '</h2>' + l.map(x => swapCard(x)).join('') + '</section>' : '';
   return sec('Richieste ricevute', all.filter(s => s.status === 'proposed' && s.b === me))
     + sec('In corso', all.filter(s => s.status === 'active' && !isDone(s)))
     + sec('Richieste inviate', all.filter(s => s.status === 'proposed' && s.a === me))
-    + sec('Completati', all.filter(isDone));
+    + sec('Completati', all.filter(isDone))
+    + (arch.length ? '<section class="stack"><div><button class="btn ghost" data-act="toggleArch">' + (S.showArch ? 'Nascondi archiviati' : 'Archiviati (' + arch.length + ')') + '</button></div>'
+      + (S.showArch ? arch.map(x => swapCard(x, true)).join('') : '') + '</section>' : '');
 }
 
 function fbList(uid) {
@@ -1062,6 +1067,12 @@ document.addEventListener('click', async e => {
       const code = (($('#adm-code') || {}).value || '').trim();
       if (!code || !S.users.has(code)) { toast('Codice non trovato. Controlla di averlo copiato per intero.'); return; }
       const n = await grantSlot(code); toast('Slot sbloccato per ' + nameOf(code) + ' (totale pagati: ' + n + ')');
+    } else if (act === 'toggleArch') {
+      S.showArch = !S.showArch;
+    } else if (act === 'archive' || act === 'unarchive') {
+      const cur = ((S.users.get(me) || {}).arch) || [];
+      const nx = act === 'archive' ? cur.filter(v => v !== id).concat(id).slice(-200) : cur.filter(v => v !== id);
+      await updateDoc(doc(db, 'users', me), { arch: nx }); toast(act === 'archive' ? 'Scambio archiviato' : 'Scambio ripristinato');
     } else if (act === 'xtab') {
       S.xt = b.dataset.t || 'all'; render(true); return;
     } else if (act === 'report') {
@@ -1221,6 +1232,7 @@ document.addEventListener('submit', async e => {
       if (old.bonus) data.bonus = old.bonus;
       if (old.moonsLost) data.moonsLost = old.moonsLost;
       if (old.seen) data.seen = old.seen;
+      if (old.arch) data.arch = old.arch;
       if (old.testing) data.testing = old.testing;
       if (old.moonsSpent) data.moonsSpent = old.moonsSpent;
       await setDoc(doc(db, 'users', me), data);
