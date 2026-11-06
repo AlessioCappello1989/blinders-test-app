@@ -175,6 +175,21 @@ img{max-width:100%}
 @media (hover:hover){.card{transition:border-color .15s}.card:hover{border-color:var(--accent)}}
 .menuitem{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:none;border:0;padding:4px 0;font:inherit;color:inherit;cursor:pointer;text-align:left;min-height:40px}
 .menuitem:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.intro{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;flex-direction:column;align-items:center}
+.intro-skip{position:absolute;right:12px;top:12px;z-index:2}
+.intro-view{flex:1;width:100%;max-width:480px;overflow:hidden;min-height:0}
+.intro-track{display:flex;height:100%;transition:transform .35s ease;touch-action:pan-y}
+.intro-slide{min-width:100%;height:100%;padding:56px 24px 8px;display:flex;flex-direction:column;align-items:center;text-align:center;overflow-y:auto}
+.intro-art{height:min(42vh,320px);width:100%;display:flex;align-items:center;justify-content:center;flex:none}
+.intro-shot{width:min(78vw,280px);height:100%;max-height:300px;border-radius:16px;border:1px solid var(--line);background-color:var(--surface);background-size:100% auto;background-position:top;background-repeat:no-repeat;box-shadow:0 6px 20px rgba(0,0,0,.15)}
+.intro-bot{width:min(60vw,210px);height:min(60vw,210px);object-fit:contain;border-radius:50%}
+.intro-emoji{font-size:110px;line-height:1}
+.intro-slide h2{font:700 25px/1.15 var(--f-display);margin:20px 0 10px}
+.intro-slide p{font-size:15.5px;line-height:1.45;color:var(--muted);margin:0;max-width:320px}
+.intro-bottom{width:100%;max-width:480px;padding:10px 24px 22px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.intro-dots{display:flex;gap:8px}.intro-dots i{width:9px;height:9px;border-radius:9px;background:var(--cell);transition:.25s}.intro-dots i.on{width:24px;background:var(--accent)}
+.intro-go{width:100%;border-radius:999px;font-size:17px;padding:14px}
+@media (prefers-reduced-motion:reduce){.intro-track,.intro-dots i{transition:none}}
 .modal-bg{position:fixed;inset:0;z-index:20;background:rgba(11,26,74,.55);display:flex;align-items:center;justify-content:center;padding:16px}
 .modal{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:16px;width:100%;max-width:480px;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
 .guide{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
@@ -249,6 +264,6 @@ try{
   }
 }catch(e){}
 </script>
-<script type="module" src="./app.js?v=20261106e"></script>
+<script type="module" src="./app.js?v=20261107a"></script>
 </body>
 </html>

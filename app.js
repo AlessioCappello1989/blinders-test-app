@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261106e';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261107a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -520,10 +520,56 @@ function msReached() {
   return r;
 }
 const msBase = k => k.split(':')[0];
+/* ---------- Presentazione di benvenuto: si mostra una volta ai nuovi iscritti (e da Impostazioni). ---------- */
+const INTRO = [
+  { img: 'avatar-bot.png', round: 1, t: 'Benvenuto su IronBlind 👋', p: 'Per pubblicare su Google Play servono 12 tester per 14 giorni. Qui li trovi scambiandoti i test 1 a 1 con altri sviluppatori Android.' },
+  { img: 'intro/profile.jpg', t: 'Crea il tuo profilo 🧩', p: 'Aggiungi la tua app e il link di test su Google Play. La tua email resta privata finché non decidi di condividerla.' },
+  { img: 'intro/explore.jpg', t: 'Scegli chi testare 🔍', p: 'Sfoglia le app in Esplora e proponi uno scambio: tu testi la sua app, lui testa la tua. Decidi tu con chi.' },
+  { img: 'intro/swaps.jpg', t: '14 giorni, passo dopo passo ✅', p: 'Aggiungetevi come tester, installate le app e tenetele per 14 giorni. Alla fine vi lasciate un feedback con le stelle.' },
+  { emoji: '🌙', t: 'Guadagna Lune 🌙', p: 'Ricevi 1 Luna al giorno per ogni scambio attivo, a patto di aprire l\'app. Con 20 Lune sblocchi un\'app in più. Il massimo è 30.' }
+];
+let introI = 0;
+function closeIntro() { const m = $('#intro'); if (m) m.remove(); document.removeEventListener('keydown', introKey); }
+function introKey(e) { if (e.key === 'Escape') closeIntro(); else if (e.key === 'ArrowRight') introShow(introI + 1); else if (e.key === 'ArrowLeft') introShow(introI - 1); }
+function introShow(k) {
+  const m = $('#intro'); if (!m) return;
+  introI = Math.max(0, Math.min(INTRO.length - 1, k));
+  m.querySelector('.intro-track').style.transform = 'translateX(-' + introI * 100 + '%)';
+  m.querySelectorAll('.intro-dots i').forEach((d, j) => { d.className = j === introI ? 'on' : ''; });
+  const last = introI === INTRO.length - 1;
+  m.querySelector('.intro-go').textContent = last ? 'Inizia' : 'Avanti';
+  m.querySelector('.intro-go').dataset.act = last ? 'introClose' : 'introNext';
+  m.querySelector('.intro-skip').style.visibility = last ? 'hidden' : 'visible';
+}
+function openIntro() {
+  if ($('#intro')) return;
+  const bg = document.createElement('div'); bg.id = 'intro'; bg.className = 'intro'; bg.setAttribute('role', 'dialog'); bg.setAttribute('aria-modal', 'true'); bg.setAttribute('aria-label', 'Presentazione di IronBlind');
+  bg.innerHTML = '<button type="button" class="btn ghost sm intro-skip" data-act="introClose">Salta</button><div class="intro-view"><div class="intro-track">'
+    + INTRO.map(s => '<div class="intro-slide"><div class="intro-art">' + (s.emoji ? '<span class="intro-emoji" aria-hidden="true">' + s.emoji + '</span>' : s.round ? '<img class="intro-bot" src="' + s.img + '" alt="">' : '<div class="intro-shot" style="background-image:url(' + s.img + ')" role="img" aria-label=""></div>') + '</div><h2>' + esc(s.t) + '</h2><p>' + esc(s.p) + '</p></div>').join('')
+    + '</div></div><div class="intro-bottom"><div class="intro-dots">' + INTRO.map(() => '<i></i>').join('') + '</div><button type="button" class="btn primary intro-go" data-act="introNext">Avanti</button></div>';
+  let x0 = null; const v = bg.querySelector('.intro-view');
+  v.addEventListener('pointerdown', e => { x0 = e.clientX; });
+  v.addEventListener('pointerup', e => { if (x0 === null) return; const d = e.clientX - x0; x0 = null; if (Math.abs(d) > 40) introShow(introI + (d < 0 ? 1 : -1)); });
+  document.body.appendChild(bg); document.addEventListener('keydown', introKey); introI = 0; introShow(0);
+  const g = bg.querySelector('.intro-go'); if (g) g.focus();
+}
+function checkIntro() {
+  try {
+    if (!me || $('#intro')) return;
+    const key = 'ironblind-intro-' + me; let seen = null; try { seen = localStorage.getItem(key); } catch (e) { return; }
+    if (seen) return;
+    try { localStorage.setItem(key, '1'); } catch (e) { return; }
+    const u = S.users.get(me);
+    /* chi ha già un profilo creato da più di 2 giorni non la rivede */
+    if (u && u.nick && !(u.createdAt && Date.now() - u.createdAt < 2 * DAY)) return;
+    openIntro();
+  } catch (e) { /* la presentazione non deve bloccare l'app */ }
+}
 /* ---------- Novità: finestra mostrata una volta per aggiornamento. Per annunciare una novità cambia id e testi qui sotto. ---------- */
 const NEWS = {
-  id: '20261106e',
+  id: '20261107a',
   items: [
+    '👋 Presentazione di benvenuto: ai nuovi iscritti spiega come funziona IronBlind. Puoi rivederla in Impostazioni.',
     '🔎 Prova di utilizzo: se hai un dubbio che un tester non usi la tua app, puoi chiedergli uno screenshot. Ha 24 ore per inviarlo.',
     '📦 Archivia: gli scambi completati si possono archiviare e ripristinare dalla pagina Scambi.',
     '🔍 Filtro per app: se hai più app, in Scambi puoi filtrare per nome.',
@@ -534,7 +580,7 @@ const NEWS = {
 };
 function checkNews() {
   try {
-    const u = me && S.users.get(me); if (!u || !u.nick || $('#about') || $('#ms') || $('#slotm')) return;
+    const u = me && S.users.get(me); if (!u || !u.nick || $('#intro') || $('#about') || $('#ms') || $('#slotm')) return;
     const key = 'ironblind-news-' + me; let seenId = null; try { seenId = localStorage.getItem(key); } catch (e) { return; }
     if (seenId === NEWS.id) return;
     try { localStorage.setItem(key, NEWS.id); } catch (e) { return; }
@@ -544,7 +590,7 @@ function checkNews() {
 }
 function checkMilestones() {
   try {
-    if (!me || !S.users.get(me) || $('#ms')) return;
+    if (!me || !S.users.get(me) || $('#ms') || $('#intro')) return;
     const reached = msReached(); let st = msLoad();
     if (!st) { msSave({ seen: reached }); return; } /* prima volta su questo dispositivo: niente raffica di messaggi vecchi */
     const fresh = reached.filter(k => st.seen.indexOf(k) < 0);
@@ -635,7 +681,8 @@ function settingsView() {
     + '<section class="card"><button type="button" class="btn ghost" data-act="logout">Esci</button></section>';
 }
 function aboutBox() {
-  return '<section class="card"><button type="button" class="menuitem" data-act="installOpen"><span class="row"><span aria-hidden="true">📱</span><b>Come installare l\'app</b></span><span aria-hidden="true">›</span></button>'
+  return '<section class="card"><button type="button" class="menuitem" data-act="introOpen"><span class="row"><span aria-hidden="true">👋</span><b>Rivedi la presentazione</b></span><span aria-hidden="true">›</span></button>'
+    + '<button type="button" class="menuitem" data-act="installOpen"><span class="row"><span aria-hidden="true">📱</span><b>Come installare l\'app</b></span><span aria-hidden="true">›</span></button>'
     + '<button type="button" class="menuitem" data-act="aboutOpen"><span class="row">' + ICON_INFO + '<b>Chi siamo</b></span><span aria-hidden="true">›</span></button>'
     + (PAYPAL_ME ? '<a class="menuitem" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(tipUrl()) + '"><span class="row"><span aria-hidden="true">☕</span><b>Offrimi un caffè</b></span><span aria-hidden="true">›</span></a>' : '') + '</section>';
 }
@@ -945,7 +992,7 @@ function render(force) {
   if (!(loaded.users && loaded.swaps && loaded.fb && loaded.priv)) return;
   if (!firstRoute) { firstRoute = true; if (!S.users.get(me)) S.tab = 'profile'; }
   if (S.route && S.route.t === 'swap') markSeen(S.route.id);
-  syncWatch(); syncMoons(); setTimeout(checkMilestones, 400); setTimeout(checkNews, 1200);
+  syncWatch(); syncMoons(); setTimeout(checkIntro, 200); setTimeout(checkMilestones, 400); setTimeout(checkNews, 1200);
   if (!pingOn) { pingOn = true; setInterval(() => { if (me && !document.hidden) syncMoons(); }, 10 * 60 * 1000); document.addEventListener('visibilitychange', () => { if (me && !document.hidden) syncMoons(); }); }
   const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
   document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App';
@@ -1050,6 +1097,9 @@ document.addEventListener('click', async e => {
     if (act === 'noClear') { S.confirmC = null; render(true); return; }
     if (act === 'askConclude') { S.confirmK = b.dataset.k; render(true); return; }
     if (act === 'noConclude') { S.confirmK = null; render(true); return; }
+    if (act === 'introNext') { introShow(introI + 1); return; }
+    if (act === 'introClose') { closeIntro(); return; }
+    if (act === 'introOpen') { openIntro(); return; }
     if (act === 'msClose') { closeMs(); return; }
     if (act === 'setLang') { try { localStorage.setItem(langKey, b.dataset.l); } catch (x) { /* nessuna memoria locale */ } startI18n(); render(true); return; }
     if (act === 'msPreview') { const ks = Object.keys(MS); showMilestone(ks[msPrevI++ % ks.length]); return; }

@@ -5,6 +5,14 @@ let getLang = () => 'it';
 export function setLangGetter(f) { getLang = f; }
 
 const E = {
+  /* presentazione di benvenuto */
+  'Benvenuto su IronBlind 👋': 'Welcome to IronBlind 👋', 'Per pubblicare su Google Play servono 12 tester per 14 giorni. Qui li trovi scambiandoti i test 1 a 1 con altri sviluppatori Android.': 'To publish on Google Play you need 12 testers for 14 days. Here you find them by swapping tests 1 to 1 with other Android developers.',
+  'Crea il tuo profilo 🧩': 'Create your profile 🧩', 'Aggiungi la tua app e il link di test su Google Play. La tua email resta privata finché non decidi di condividerla.': 'Add your app and its Google Play test link. Your email stays private until you decide to share it.',
+  'Scegli chi testare 🔍': 'Choose who to test 🔍', 'Sfoglia le app in Esplora e proponi uno scambio: tu testi la sua app, lui testa la tua. Decidi tu con chi.': 'Browse the apps in Explore and propose a swap: you test their app, they test yours. You decide with whom.',
+  '14 giorni, passo dopo passo ✅': '14 days, step by step ✅', 'Aggiungetevi come tester, installate le app e tenetele per 14 giorni. Alla fine vi lasciate un feedback con le stelle.': 'Add each other as testers, install the apps and keep them for 14 days. At the end you leave each other star feedback.',
+  'Guadagna Lune 🌙': 'Earn Moons 🌙', "Ricevi 1 Luna al giorno per ogni scambio attivo, a patto di aprire l'app. Con 20 Lune sblocchi un'app in più. Il massimo è 30.": 'You get 1 Moon a day for each active swap, as long as you open the app. With 20 Moons you unlock an extra app. The maximum is 30.',
+  'Salta': 'Skip', 'Avanti': 'Next', 'Inizia': 'Start', 'Rivedi la presentazione': 'Watch the intro again', 'Presentazione di IronBlind': 'IronBlind intro',
+  '👋 Presentazione di benvenuto: ai nuovi iscritti spiega come funziona IronBlind. Puoi rivederla in Impostazioni.': '👋 Welcome intro: it explains how IronBlind works to new members. You can watch it again in Settings.',
   /* generale */
   'Caricamento': 'Loading', 'Sto aprendo i profili e gli scambi.': 'Opening profiles and swaps.',
   'Esci': 'Log out', 'Esplora': 'Explore', 'Scambi': 'Swaps', 'Profilo': 'Profile',   'Tutte': 'All', '🚧 Il Cantiere': '🚧 In testing', '✅ Pubblicate': '✅ Published', '🚧 Nel Cantiere': '🚧 In testing', '✅ Online su Google Play': '✅ Live on Google Play', '▶ Vedi su Google Play': '▶ View on Google Play', 'Segnala': 'Report', 'Tester attivi': 'Active testers', 'La tua app': 'Your app', 'Elenco app': 'App list',
