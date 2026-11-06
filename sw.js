@@ -1,5 +1,12 @@
 /* IronBlind: service worker minimo, serve solo a mostrare le notifiche di sistema. */
-self.addEventListener('install', () => self.skipWaiting());
+const SHELL = 'ironblind-shell-1';
+self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(SHELL).then(c => c.add('./')).catch(() => {})); });
+// Rete per prima (gli aggiornamenti arrivano subito); offline si mostra l'ultima pagina salvata.
+self.addEventListener('fetch', e => {
+  if (e.request.mode !== 'navigate') return;
+  e.respondWith(fetch(e.request).then(r => { const k = r.clone(); caches.open(SHELL).then(c => c.put('./', k)).catch(() => {}); return r; })
+    .catch(() => caches.match('./').then(r => r || Response.error())));
+});
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 self.addEventListener('notificationclick', e => {
   e.notification.close();

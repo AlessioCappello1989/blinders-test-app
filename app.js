@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261107a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261107b';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -523,9 +523,9 @@ const msBase = k => k.split(':')[0];
 /* ---------- Presentazione di benvenuto: si mostra una volta ai nuovi iscritti (e da Impostazioni). ---------- */
 const INTRO = [
   { img: 'avatar-bot.png', round: 1, t: 'Benvenuto su IronBlind 👋', p: 'Per pubblicare su Google Play servono 12 tester per 14 giorni. Qui li trovi scambiandoti i test 1 a 1 con altri sviluppatori Android.' },
-  { img: 'intro/profile.jpg', t: 'Crea il tuo profilo 🧩', p: 'Aggiungi la tua app e il link di test su Google Play. La tua email resta privata finché non decidi di condividerla.' },
-  { img: 'intro/explore.jpg', t: 'Scegli chi testare 🔍', p: 'Sfoglia le app in Esplora e proponi uno scambio: tu testi la sua app, lui testa la tua. Decidi tu con chi.' },
-  { img: 'intro/swaps.jpg', t: '14 giorni, passo dopo passo ✅', p: 'Aggiungetevi come tester, installate le app e tenetele per 14 giorni. Alla fine vi lasciate un feedback con le stelle.' },
+  { img: 'profile.jpg', t: 'Crea il tuo profilo 🧩', p: 'Aggiungi la tua app e il link di test su Google Play. La tua email resta privata finché non decidi di condividerla.' },
+  { img: 'explore.jpg', t: 'Scegli chi testare 🔍', p: 'Sfoglia le app in Esplora e proponi uno scambio: tu testi la sua app, lui testa la tua. Decidi tu con chi.' },
+  { img: 'swaps.jpg', t: '14 giorni, passo dopo passo ✅', p: 'Aggiungetevi come tester, installate le app e tenetele per 14 giorni. Alla fine vi lasciate un feedback con le stelle.' },
   { emoji: '🌙', t: 'Guadagna Lune 🌙', p: 'Ricevi 1 Luna al giorno per ogni scambio attivo, a patto di aprire l\'app. Con 20 Lune sblocchi un\'app in più. Il massimo è 30.' }
 ];
 let introI = 0;
@@ -567,7 +567,7 @@ function checkIntro() {
 }
 /* ---------- Novità: finestra mostrata una volta per aggiornamento. Per annunciare una novità cambia id e testi qui sotto. ---------- */
 const NEWS = {
-  id: '20261107a',
+  id: '20261107b',
   items: [
     '👋 Presentazione di benvenuto: ai nuovi iscritti spiega come funziona IronBlind. Puoi rivederla in Impostazioni.',
     '🔎 Prova di utilizzo: se hai un dubbio che un tester non usi la tua app, puoi chiedergli uno screenshot. Ha 24 ore per inviarlo.',
