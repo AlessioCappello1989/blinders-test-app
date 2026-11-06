@@ -5,6 +5,17 @@ let getLang = () => 'it';
 export function setLangGetter(f) { getLang = f; }
 
 const E = {
+  /* gruppo Google */
+  'Come accederanno i tester alla tua app?': 'How will testers access your app?', 'Lista email': 'Email list', 'Gruppo Google': 'Google group',
+  'Lista email: aggiungi le email dei tester in Play Console. Gruppo Google: colleghi il gruppo una volta sola e i tester entrano da soli.': 'Email list: add the testers\' emails in Play Console. Google group: you link the group once and testers join by themselves.',
+  'Link del gruppo Google': 'Google group link', 'Resta privato: lo vede solo chi accetta uno scambio con te. Se il gruppo richiede approvazione, accetta le richieste da Google Gruppi.': 'Stays private: only someone who accepts a swap with you can see it. If the group requires approval, accept the requests in Google Groups.',
+  'Accesso dei tester': 'Tester access', 'Apri il gruppo Google': 'Open the Google group', 'Il link del gruppo non è disponibile.': 'The group link is not available.',
+  'Entra nel gruppo con l\'account Google che usi su Play Store, poi conferma qui.': 'Join the group with the Google account you use on Play Store, then confirm here.',
+  'Sono entrato nel gruppo': 'I joined the group', '✓ Hai confermato di essere nel gruppo': '✓ You confirmed you are in the group',
+  'Per il gruppo Google serve il link (https://groups.google.com/...).': 'The Google group needs its link (https://groups.google.com/...).',
+  'Prima entra nel gruppo Google e confermalo.': 'First join the Google group and confirm it.', 'Confermato: ora puoi installare l\'app e avviare il test': 'Confirmed: you can now install the app and start the test',
+  'È entrato nel gruppo': 'Joined the group',
+  '👥 Gruppo Google: chi pubblica può scegliere se i tester entrano da un gruppo Google o dalla lista email. Lo trovi nel Profilo, nel campo "Come accederanno i tester".': '👥 Google group: when publishing you can choose whether testers join through a Google group or the email list. Find it in Profile, in the "How will testers access" field.',
   /* presentazione di benvenuto */
   'Benvenuto su IronBlind 👋': 'Welcome to IronBlind 👋', 'Per pubblicare su Google Play servono 12 tester per 14 giorni. Qui li trovi scambiandoti i test 1 a 1 con altri sviluppatori Android.': 'To publish on Google Play you need 12 testers for 14 days. Here you find them by swapping tests 1 to 1 with other Android developers.',
   'Crea il tuo profilo 🧩': 'Create your profile 🧩', 'Aggiungi la tua app e il link di test su Google Play. La tua email resta privata finché non decidi di condividerla.': 'Add your app and its Google Play test link. Your email stays private until you decide to share it.',
@@ -235,6 +246,12 @@ const E = {
 const plural = (n, one, many) => (Number(n) === 1 ? one : many);
 /* Modelli con parti variabili: {} = testo qualsiasi (viene tradotto a sua volta). */
 const P = [
+  [/^(.+) usa un gruppo Google per i tester\.$/, m => `${m[1]} uses a Google group for testers.`],
+  [/^✓ (.+) è entrato nel gruppo$/, m => `✓ ${m[1]} joined the group`],
+  [/^Aspetta che (.+) entri nel gruppo Google della tua app\. Se il gruppo richiede approvazione, accettalo da Google Gruppi\.$/, m => `Wait for ${m[1]} to join your app's Google group. If the group requires approval, accept them in Google Groups.`],
+  [/^Prima di installare entra nel gruppo Google di (.+) e confermalo nel passo 1: il pulsante di avvio si sblocca dopo la tua conferma\.$/, m => `Before installing, join ${m[1]}'s Google group and confirm it in step 1: the start button unlocks after you confirm.`],
+  [/^Aggiungi nel profilo il link del gruppo Google di (.+)\.$/, m => `Add the Google group link of ${m[1]} in your profile.`],
+  [/^(.+) è entrato nel gruppo Google della tua app$/, m => `${m[1]} joined your app's Google group`],
   [/^(\d+) tester su 12$/, m => `${m[1]} of 12 testers`],
   [/^di cui (\d+) estern[oi]$/, m => `${m[1]} external`],
   [/^Giorno (\d+) di 14$/, m => `Day ${m[1]} of 14`], [/^(\d+) tester attivi su 12$/, m => `${m[1]} of 12 testers active`], [/^(\d+) segnalazion[ei]$/, m => `${m[1]} ${plural(m[1], 'report', 'reports')}`],

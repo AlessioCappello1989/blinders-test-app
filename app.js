@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261107b';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261107c';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -77,6 +77,15 @@ function pairOpen(o, mA, oA) { return mine().find(s => members(s).indexOf(o) > -
 /* Scambio ancora aperto con quell'app dell'altro, qualunque sia la mia. */
 const swapForCard = (o, oA) => mine().find(s => members(s).indexOf(o) > -1 && aidOf(s, o) === oA && isOpenSwap(s));
 const openCount = aid => mine().filter(s => isOpenSwap(s) && aidOf(s, me) === aid).length;
+const groupFor = aid => aid === 'main' ? (S.priv.group || '') : ((S.priv.extraGroups || {})[aid] || '');
+const GROUP_RE = /^https:\/\/groups\.google\.com\//i;
+/* Cosa si scrive nel documento links dello scambio: il link di test e, se l'app usa un gruppo Google, anche il link del gruppo. */
+function accessDoc(aid) {
+  const ap = appOf(me, aid) || {}, lk = linkFor(aid);
+  if (!lk) return { err: 'Aggiungi nel profilo il link di adesione al test di ' + (ap.name || 'questa app') + '.' };
+  if (ap.acc === 'group') { const g = groupFor(aid); if (!g) return { err: 'Aggiungi nel profilo il link del gruppo Google di ' + (ap.name || 'questa app') + '.' }; return { doc: { link: lk, group: g } }; }
+  return { doc: { link: lk } };
+}
 const linkFor = aid => aid === 'main' ? (S.priv.link || '') : ((S.priv.extraLinks || {})[aid] || '');
 /* Inviti: un amico conta quando si è registrato con il tuo link, ha il profilo e ha pubblicato la sua app. Massimo 3 extra. */
 function validInvites() {
@@ -199,7 +208,7 @@ function getSeen() { try { return JSON.parse(localStorage.getItem(seenKey()) || 
 function markSeen(id) {
   if (!S.swaps.get(id)) return;
   const all = getSeen(); const lm = S.lastMsg.get(id);
-  all[id] = { msg: Math.max(lm ? lm.at : 0, Date.now()), start: true, fb: true, acc: true, ready: true };
+  all[id] = { msg: Math.max(lm ? lm.at : 0, Date.now()), start: true, fb: true, acc: true, ready: true, joined: true };
   try { localStorage.setItem(seenKey(), JSON.stringify(all)); } catch (e) { /* senza memoria locale gli avvisi restano finché non cambia lo stato */ }
 }
 function unreadInfo(s) {
@@ -208,6 +217,7 @@ function unreadInfo(s) {
   if (nMsg) out.push(nMsg === 1 ? 'Nuovo messaggio' : nMsg + ' nuovi messaggi');
   if (ms(s.start && s.start[o]) && !seen.start) out.push('Ha avviato il test');
   if (s.ready && s.ready[o] && !seen.ready && !ms(s.start && s.start[me])) out.push('Ti ha aggiunto ai tester');
+  if (s.joined && s.joined[o] && !seen.joined && !ms(s.start && s.start[o])) out.push('È entrato nel gruppo');
   if (s.fb && s.fb[o] && !seen.fb) out.push('Ha lasciato il feedback');
   if (s.a === me && s.status === 'active' && !seen.acc) out.push('Ha accettato lo scambio');
   return { labels: out, n: out.length + Math.max(0, nMsg - 1) };
@@ -414,6 +424,8 @@ function appFields(k, ap, title, bonus) {
     + '<label for="f-app-' + k + '">Nome dell\'app<input id="f-app-' + k + '" maxlength="50"' + dis + ' value="' + esc(ap.name || '') + '"><span class="field-note" id="c-f-app-' + k + '">' + (ap.name || '').length + '/50</span></label>'
     + '<div class="grid2"><label for="f-cat-' + k + '">Categoria<select id="f-cat-' + k + '"' + dis + '>' + opts + '</select></label>'
     + '<label for="f-link-' + k + '">Link di adesione al test<input id="f-link-' + k + '" type="url" inputmode="url"' + dis + ' value="' + esc(lk) + '" placeholder="https://play.google.com/apps/testing/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te.</span></label></div>'
+    + '<label for="f-acc-' + k + '">Come accederanno i tester alla tua app?<select id="f-acc-' + k + '"' + dis + '><option value="">Lista email</option><option value="group"' + (ap.acc === 'group' ? ' selected' : '') + '>Gruppo Google</option></select><span class="field-note">Lista email: aggiungi le email dei tester in Play Console. Gruppo Google: colleghi il gruppo una volta sola e i tester entrano da soli.</span></label>'
+    + '<div id="f-grpw-' + k + '"' + (ap.acc === 'group' ? '' : ' hidden') + '><label for="f-grp-' + k + '">Link del gruppo Google<input id="f-grp-' + k + '" type="url" inputmode="url" maxlength="300"' + dis + ' value="' + esc(groupFor(k)) + '" placeholder="https://groups.google.com/g/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te. Se il gruppo richiede approvazione, accetta le richieste da Google Gruppi.</span></label></div>'
     + '<label for="f-want-' + k + '">Tester che ti servono<select id="f-want-' + k + '"' + dis + '>' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
     + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>' + pubBox(k, ap) + clr + conclude + '</div>';
 }
@@ -567,8 +579,9 @@ function checkIntro() {
 }
 /* ---------- Novità: finestra mostrata una volta per aggiornamento. Per annunciare una novità cambia id e testi qui sotto. ---------- */
 const NEWS = {
-  id: '20261107b',
+  id: '20261107c',
   items: [
+    '👥 Gruppo Google: chi pubblica può scegliere se i tester entrano da un gruppo Google o dalla lista email. Lo trovi nel Profilo, nel campo "Come accederanno i tester".',
     '👋 Presentazione di benvenuto: ai nuovi iscritti spiega come funziona IronBlind. Puoi rivederla in Impostazioni.',
     '🔎 Prova di utilizzo: se hai un dubbio che un tester non usi la tua app, puoi chiedergli uno screenshot. Ha 24 ore per inviarlo.',
     '📦 Archivia: gli scambi completati si possono archiviare e ripristinare dalla pagina Scambi.',
@@ -851,14 +864,14 @@ function swapAppPicker(s, o) {
 async function changeSwapApp(sid, mA) {
   const s = S.swaps.get(sid); if (!s || s.status !== 'proposed' || s.a !== me || busy) return;
   const o = s.b, mineA = appOf(me, mA); if (!mineA) return;
-  const lk = linkFor(mA);
-  if (!lk) { toast('Aggiungi nel profilo il link di adesione al test di ' + mineA.name + '.'); render(true); return; }
+  const ac = accessDoc(mA);
+  if (ac.err) { toast(ac.err); render(true); return; }
   busy = true;
   try {
     const apps = Object.assign({}, s.apps); apps[me] = { name: mineA.name };
     const appIds = Object.assign({}, s.appIds || {}); appIds[me] = mA; appIds[o] = aidOf(s, o);
     await updateDoc(doc(db, 'swaps', sid), { apps, appIds });
-    await setDoc(doc(db, 'swaps', sid, 'links', me), { link: lk });
+    await setDoc(doc(db, 'swaps', sid, 'links', me), ac.doc);
     toast('App aggiornata');
   } catch (e) { toastErr(e); } finally { busy = false; render(true); }
 }
@@ -879,17 +892,32 @@ function swapView(id) {
   }
   const done = isDone(s);
   const mineE = S.myEmail, theirE = S.theirEmail;
-  let step1 = '<div class="step"><h3><span class="k">1</span>Scambio delle email</h3>';
-  if (mineE === undefined || (mineE && theirE === undefined)) {
-    step1 += '<p class="small muted">Caricamento…</p>';
-  } else if (mineE && theirE) {
-    step1 += '<div class="box"><div class="mail"><span class="small muted">La tua</span><code>' + esc(mineE) + '</code></div><div class="mail"><span class="small muted">La sua</span><code>' + esc(theirE) + '</code><button class="btn sm" data-act="copy" data-text="' + esc(theirE) + '">Copia</button></div></div><p class="small muted">Aggiungi la sua email tra i tester della tua app in Play Console e usa il suo link per entrare nel test.</p>';
-  } else {
-    step1 += '<p class="small muted">' + (mineE ? 'Hai condiviso la tua email. Aspetta che lo faccia anche ' + esc(nameOf(o)) + ' per vedere la sua.' : 'Le email si vedono solo quando le condividete entrambi. La sua si sblocca dopo che hai condiviso la tua.') + '</p>';
-    if (!mineE) step1 += S.priv.email ? '<div><button class="btn primary" data-act="shareEmail" data-id="' + esc(id) + '">Condividi la mia email</button></div>' : '<div><button class="btn" data-act="tab" data-tab="profile">Aggiungi la tua email nel profilo</button></div>';
+  const oGrp = !!S.theirGroup, mGrp = !!S.myGroup, needMail = !oGrp || !mGrp, gLoad = S.theirLink === undefined || S.myGroup === undefined;
+  let step1 = '<div class="step"><h3><span class="k">1</span>' + (oGrp || mGrp ? 'Accesso dei tester' : 'Scambio delle email') + '</h3>';
+  if (gLoad) step1 += '<p class="small muted">Caricamento…</p>';
+  else {
+  if (needMail) {
+    if (mineE === undefined || (mineE && theirE === undefined)) {
+      step1 += '<p class="small muted">Caricamento…</p>';
+    } else if (mineE && theirE) {
+      step1 += '<div class="box"><div class="mail"><span class="small muted">La tua</span><code>' + esc(mineE) + '</code></div><div class="mail"><span class="small muted">La sua</span><code>' + esc(theirE) + '</code><button class="btn sm" data-act="copy" data-text="' + esc(theirE) + '">Copia</button></div></div><p class="small muted">Aggiungi la sua email tra i tester della tua app in Play Console e usa il suo link per entrare nel test.</p>';
+    } else {
+      step1 += '<p class="small muted">' + (mineE ? 'Hai condiviso la tua email. Aspetta che lo faccia anche ' + esc(nameOf(o)) + ' per vedere la sua.' : 'Le email si vedono solo quando le condividete entrambi. La sua si sblocca dopo che hai condiviso la tua.') + '</p>';
+      if (!mineE) step1 += S.priv.email ? '<div><button class="btn primary" data-act="shareEmail" data-id="' + esc(id) + '">Condividi la mia email</button></div>' : '<div><button class="btn" data-act="tab" data-tab="profile">Aggiungi la tua email nel profilo</button></div>';
+    }
   }
-  if (!(s.ready && s.ready[me])) step1 += '<div class="box mini"><p class="small">Quando hai aggiunto la sua email tra i tester della tua app in Play Console, confermalo: solo allora ' + esc(nameOf(o)) + ' potrà installare e avviare il test.</p><div><button class="btn primary" data-act="ready" data-id="' + esc(id) + '">Ho aggiunto la sua email ai tester</button></div></div>';
-  else step1 += '<p class="small"><span class="pill ok">✓ Hai aggiunto ' + esc(nameOf(o)) + ' ai tester</span></p>';
+  if (oGrp) {
+    const jn = !!(s.joined && s.joined[me]);
+    step1 += '<div class="box mini"><p class="small"><b>' + esc(nameOf(o)) + ' usa un gruppo Google per i tester.</b> Entra nel gruppo con l\'account Google che usi su Play Store, poi conferma qui.</p>' + (GROUP_RE.test(S.theirGroup) ? '<a href="' + esc(S.theirGroup) + '" target="_blank" rel="noopener noreferrer">Apri il gruppo Google</a>' : '<span class="small muted">Il link del gruppo non è disponibile.</span>')
+      + (jn ? '<p class="small"><span class="pill ok">✓ Hai confermato di essere nel gruppo</span></p>' : '<div><button class="btn primary" data-act="joinGroup" data-id="' + esc(id) + '">Sono entrato nel gruppo</button></div>') + '</div>';
+  }
+  if (mGrp) step1 += (s.joined && s.joined[o]) ? '<p class="small"><span class="pill ok">✓ ' + esc(nameOf(o)) + ' è entrato nel gruppo</span></p>'
+    : '<p class="small muted">Aspetta che ' + esc(nameOf(o)) + ' entri nel gruppo Google della tua app. Se il gruppo richiede approvazione, accettalo da Google Gruppi.</p>';
+  else {
+    if (!(s.ready && s.ready[me])) step1 += '<div class="box mini"><p class="small">Quando hai aggiunto la sua email tra i tester della tua app in Play Console, confermalo: solo allora ' + esc(nameOf(o)) + ' potrà installare e avviare il test.</p><div><button class="btn primary" data-act="ready" data-id="' + esc(id) + '">Ho aggiunto la sua email ai tester</button></div></div>';
+    else step1 += '<p class="small"><span class="pill ok">✓ Hai aggiunto ' + esc(nameOf(o)) + ' ai tester</span></p>';
+  }
+  }
   step1 += '</div>';
   const el = elapsed(s, me), oel = elapsed(s, o);
   let step2 = '<div class="step"><h3><span class="k">2</span>Test di 14 giorni</h3>'
@@ -900,7 +928,7 @@ function swapView(id) {
     step2 += '<div class="row" style="gap:6px"><span class="small muted">' + moonLabel(mm) + ' in questo scambio</span>' + (lost > 0 ? '<span class="pill warn">' + lost + (lost === 1 ? ' giorno senza accesso' : ' giorni senza accesso') + '</span>' : '') + '</div>'
       + '<p class="small muted">Apri IronBlind ogni giorno: la Luna del giorno si ottiene solo se quel giorno accedi.</p>';
   }
-  const rdy = !!(s.ready && s.ready[o]);
+  const rdy = oGrp ? !!(s.joined && s.joined[me]) : !!(s.ready && s.ready[o]);
   const draft = S.draft && S.draft.id === id ? S.draft.img : null, saved = S.myProof && proofLive(S.myProof) ? S.myProof.img : null, shown = draft || saved;
   if (el === null) step2 += S.theirLink === undefined || S.myProof === undefined ? '<p class="small muted">Caricamento…</p>' : !S.theirLink
     ? '<p class="small muted">Potrai avviare il test quando avrai il link dell\'app da installare.</p>'
@@ -908,7 +936,7 @@ function swapView(id) {
         + (shown ? '<img class="proof" src="' + shown + '" alt="Anteprima dello screenshot">' : '')
         + '<label class="btn" style="text-align:center">' + (shown ? '📷 Cambia screenshot' : '📷 Allega screenshot') + '<input id="proofin" type="file" accept="image/*" hidden></label>'
         + (shown ? '<div><button class="btn primary" data-act="startTest" data-id="' + esc(id) + '">Ho installato l\'app, avvia i 14 giorni</button></div>' : '') + '</div>'
-      : '<p class="small muted">Prima di installare aspetta che ' + esc(nameOf(o)) + ' ti aggiunga ai tester di Play Console: il pulsante di avvio si sblocca dopo la sua conferma.</p>');
+      : (oGrp ? '<p class="small muted">Prima di installare entra nel gruppo Google di ' + esc(nameOf(o)) + ' e confermalo nel passo 1: il pulsante di avvio si sblocca dopo la tua conferma.</p>' : '<p class="small muted">Prima di installare aspetta che ' + esc(nameOf(o)) + ' ti aggiunga ai tester di Play Console: il pulsante di avvio si sblocca dopo la sua conferma.</p>'));
   if (S.myProof !== undefined && S.theirProof !== undefined) {
     // Tester: stato della conferma. Proprietario: screenshot da confermare.
     if (el === null) { /* non ho ancora avviato il mio test: niente da mostrare come tester */ }
@@ -1010,7 +1038,7 @@ function render(force) {
 }
 
 /* ---------- Sottoscrizioni dello scambio aperto (chat, email) ---------- */
-function stopSubs() { subUnsubs.forEach(u => u()); subUnsubs = []; subKey = ''; msgs = []; S.myEmail = undefined; S.theirEmail = undefined; S.theirLink = undefined; S.myProof = undefined; S.theirProof = undefined; S.myCheck = undefined; S.theirCheck = undefined; }
+function stopSubs() { subUnsubs.forEach(u => u()); subUnsubs = []; subKey = ''; msgs = []; S.myEmail = undefined; S.theirEmail = undefined; S.theirLink = undefined; S.theirGroup = undefined; S.myGroup = undefined; S.myProof = undefined; S.theirProof = undefined; S.myCheck = undefined; S.theirCheck = undefined; }
 /* ---------- Prova di installazione: screenshot piccolo salvato nello scambio, cancellato dopo la conferma del proprietario ---------- */
 const PROOF_DAYS = 10, PROOF_MAX = 400000; /* circa 300 KB di immagine (base64) */
 const proofLive = p => !!(p && p.img && Date.now() - (p.at || 0) < PROOF_DAYS * DAY);
@@ -1045,7 +1073,8 @@ function syncSubs() {
   stopSubs(); subKey = id;
   subUnsubs.push(onSnapshot(query(collection(db, 'swaps', id, 'messages'), orderBy('at', 'asc'), limit(200)), sn => { msgs = sn.docs.map(read); drawMsgs(); }, toastErr));
   // Il link di test dell'altro è leggibile solo a scambio accettato (regola di Firestore).
-  subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'links', o), sn => { S.theirLink = sn.exists() ? sn.data().link : null; render(); }, () => { S.theirLink = null; }));
+  subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'links', o), sn => { S.theirLink = sn.exists() ? sn.data().link : null; S.theirGroup = sn.exists() ? (sn.data().group || '') : ''; render(); }, () => { S.theirLink = null; S.theirGroup = ''; }));
+  subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'links', me), sn => { S.myGroup = sn.exists() ? (sn.data().group || '') : ''; render(); }, () => { S.myGroup = ''; }));
   const pOld = r => { if (r.exists() && Date.now() - (r.data().at || 0) >= PROOF_DAYS * DAY) deleteDoc(r.ref).catch(() => {}); };
   subUnsubs.push(onSnapshot(doc(db, 'swaps', id, 'proofs', o), sn => { pOld(sn); S.theirProof = sn.exists() ? sn.data() : null; render(); }, () => { S.theirProof = null; }));
   let pFirst = true;
@@ -1209,6 +1238,7 @@ document.addEventListener('click', async e => {
       await setDoc(doc(db, 'users', me), nu);
       const pv = { email: S.priv.email || '', link: k === 'main' ? '' : (S.priv.link || '') }; const el = Object.assign({}, S.priv.extraLinks || {}); delete el[k];
       if (Object.keys(el).length) pv.extraLinks = el;
+      if (k !== 'main' && S.priv.group) pv.group = S.priv.group; const eg = Object.assign({}, S.priv.extraGroups || {}); delete eg[k]; if (Object.keys(eg).length) pv.extraGroups = eg;
       await setDoc(doc(db, 'userPrivate', me), pv);
       S.confirmC = null; toast('Slot svuotato: puoi inserire una nuova app.');
     } else if (act === 'concludeApp') {
@@ -1223,6 +1253,7 @@ document.addEventListener('click', async e => {
       await setDoc(doc(db, 'users', me), nu);
       const pv = { email: S.priv.email || '', link: S.priv.link || '' }; const el = Object.assign({}, S.priv.extraLinks || {}); delete el[k];
       if (Object.keys(el).length) pv.extraLinks = el;
+      if (S.priv.group) pv.group = S.priv.group; const eg = Object.assign({}, S.priv.extraGroups || {}); delete eg[k]; if (Object.keys(eg).length) pv.extraGroups = eg;
       await setDoc(doc(db, 'userPrivate', me), pv);
       S.confirmK = null; toast('App conclusa. Lo slot si è azzerato: invita un altro amico per riaverlo.');
     } else if (act === 'propose') {
@@ -1234,21 +1265,21 @@ document.addEventListener('click', async e => {
       if (pairOpen(id, mA, oA)) { toast('Avete già uno scambio aperto con queste app.'); return; }
       if (!countryOf(me)) { toast('Scegli prima il tuo paese nel profilo.'); return; }
       if (!compat(me, mA, id, oA)) { toast('Scambio non compatibile con i paesi richiesti.'); return; }
-      const lk = linkFor(mA);
-      if (!lk) { toast('Aggiungi nel profilo il link di adesione al test di ' + mineA.name + '.'); return; }
+      const ac = accessDoc(mA);
+      if (ac.err) { toast(ac.err); return; }
       const apps = {}; apps[me] = { name: mineA.name }; apps[id] = { name: them.name };
       const appIds = {}; appIds[me] = mA; appIds[id] = oA;
       const ref = await addDoc(collection(db, 'swaps'), { a: me, b: id, members: [me, id], apps, appIds, status: 'proposed', createdAt: Date.now(), start: {}, fb: {} });
-      await setDoc(doc(db, 'swaps', ref.id, 'links', me), { link: lk });
+      await setDoc(doc(db, 'swaps', ref.id, 'links', me), ac.doc);
       toast('Richiesta inviata'); S.tab = 'swaps'; S.route = { t: 'swap', id: ref.id };
     } else if (act === 'accept') {
       const oo = s.a === me ? s.b : s.a; const mA = aidOf(s, me), oA = aidOf(s, oo);
       if (!appOf(me, mA)) { toast('L\'app di questo scambio non è più nel tuo profilo.'); return; }
       if (!compat(me, mA, oo, oA)) { toast('Scambio non compatibile con i paesi richiesti.'); return; }
-      const lk = linkFor(mA);
-      if (!lk) { toast('Aggiungi nel profilo il link di adesione al test della tua app, poi accetta.'); return; }
+      const ac = accessDoc(mA);
+      if (ac.err) { toast(ac.err); return; }
       const ab = writeBatch(db);
-      ab.set(doc(db, 'swaps', id, 'links', me), { link: lk });
+      ab.set(doc(db, 'swaps', id, 'links', me), ac.doc);
       ab.update(doc(db, 'swaps', id), { status: 'active', acceptedAt: Date.now() });
       await ab.commit(); toast('Scambio accettato');
     } else if (act === 'decline') { await updateDoc(doc(db, 'swaps', id), { status: 'declined' }); await dropProofs(id, s.a, s.b); S.route = null; S.confirm = null; toast(s.status === 'active' ? 'Scambio chiuso' : (s.a === me ? 'Richiesta annullata' : 'Richiesta rifiutata')); }
@@ -1277,9 +1308,12 @@ document.addEventListener('click', async e => {
       await setDoc(doc(db, 'swaps', id, 'proofs', me), { img: S.draft.img, at: Date.now(), exp: new Date(Date.now() + PROOF_DAYS * DAY), st: 'pending' }); S.draft = null; toast('Screenshot inviato');
     } else if (act === 'ready') {
       await updateDoc(doc(db, 'swaps', id), { ['ready.' + me]: true }); toast('Confermato: ora può installare e avviare il test');
+    } else if (act === 'joinGroup') {
+      await updateDoc(doc(db, 'swaps', id), { ['joined.' + me]: true }); toast('Confermato: ora puoi installare l\'app e avviare il test');
     } else if (act === 'startTest') {
       if (!S.theirLink) { toast('Prima ti serve il link dell\'app da installare.'); return; }
-      if (!(s.ready && s.ready[s.a === me ? s.b : s.a])) { toast('Aspetta che ti aggiunga ai tester.'); return; }
+      if (S.theirGroup) { if (!(s.joined && s.joined[me])) { toast('Prima entra nel gruppo Google e confermalo.'); return; } }
+      else if (!(s.ready && s.ready[s.a === me ? s.b : s.a])) { toast('Aspetta che ti aggiunga ai tester.'); return; }
       const dr = S.draft && S.draft.id === id ? S.draft.img : null;
       if (!dr && !(S.myProof && proofLive(S.myProof))) { toast('Allega lo screenshot dell\'installazione.'); return; }
       if (dr) { await setDoc(doc(db, 'swaps', id, 'proofs', me), { img: dr, at: Date.now(), exp: new Date(Date.now() + PROOF_DAYS * DAY), st: 'pending' }); S.draft = null; }
@@ -1300,6 +1334,7 @@ document.addEventListener('input', e => {
   if (e.target.id === 'q') { S.q = e.target.value; const l = $('#list'); if (l) l.innerHTML = exploreItems(); }
   const c = e.target.id && $('#c-' + e.target.id); if (c) c.textContent = e.target.value.length + '/' + e.target.maxLength;
 });
+document.addEventListener('change', e => { const t = e.target; if (t && t.id && t.id.indexOf('f-acc-') === 0) { const w = $('#f-grpw-' + t.id.slice(6)); if (w) w.hidden = t.value !== 'group'; } });
 document.addEventListener('change', e => { const t = e.target; if (t && t.id === 'fc') { S.fc = t.value; const l = $('#list'); if (l) l.innerHTML = exploreItems(); } if (t && t.id === 'swapapp') changeSwapApp(t.dataset.sid, t.value); if (t && t.classList && t.classList.contains('pick')) S.pick[t.dataset.key] = t.value; });
 document.addEventListener('submit', async e => {
   e.preventDefault();
@@ -1331,6 +1366,10 @@ document.addEventListener('submit', async e => {
     const ks = ['main'].concat(slotsShown(old));
     for (const k of ks) { const l = ($('#f-link-' + k).value || '').trim(); if (l && !/^https:\/\//i.test(l)) { toast('Il link deve iniziare con https://'); return; } }
     for (const k of ks) {
+      const ac = $('#f-acc-' + k); if (!ac || ac.value !== 'group') continue; const g = ($('#f-grp-' + k).value || '').trim(), nm = ($('#f-app-' + k).value || '').trim();
+      if (nm && !GROUP_RE.test(g)) { toast('Per il gruppo Google serve il link (https://groups.google.com/...).'); return; }
+    }
+    for (const k of ks) {
       const en = $('#f-extn-' + k); if (!en) continue; const n = en.value === '' ? 0 : Number(en.value), ds = $('#f-exts-' + k).value;
       if (!Number.isInteger(n) || n < 0 || n > 50) { toast('I tester esterni vanno da 0 a 50.'); return; }
       if (n > 0 && !ds) { toast('Indica la data di inizio del test esterno.'); return; }
@@ -1339,7 +1378,7 @@ document.addEventListener('submit', async e => {
     for (const k of ks) { const pc = $('#f-pub-' + k), sl = $('#f-store-' + k); if (pc && pc.checked && !PLAY.test((sl && sl.value || '').trim())) { toast('Per la vetrina serve il link di Google Play (https://play.google.com/...)'); return; } }
     busy = true;
     try {
-      const extra = {}, extraLinks = {}; let mainApp = null, mainLink = '';
+      const extra = {}, extraLinks = {}, extraGroups = {}; let mainApp = null, mainLink = '', mainGroup = '';
       for (const k of ks) {
         const prev = Object.assign({}, k === 'main' ? (old.app || {}) : ((old.extra || {})[k] || {})); delete prev.link;
         // Con scambi aperti su quell'app non si cambia: si riscrive quella già salvata.
@@ -1351,7 +1390,10 @@ document.addEventListener('submit', async e => {
         if (en) { const n = en.value === '' ? 0 : Number(en.value), ds = $('#f-exts-' + k).value; if (n > 0 && ds) app.ext = { n, start: new Date(ds + 'T00:00:00').getTime() }; else delete app.ext; }
         if (prev.prog) app.prog = prev.prog;
         const lk = locked ? linkFor(k) : $('#f-link-' + k).value.trim();
-        if (k === 'main') { mainApp = app; mainLink = lk; } else if (app.name) { extra[k] = app; extraLinks[k] = lk; }
+        const ac = $('#f-acc-' + k); let gl = '';
+        if (locked) { gl = groupFor(k); if (prev.acc === 'group') app.acc = 'group'; }
+        else if (ac && ac.value === 'group') { gl = ($('#f-grp-' + k).value || '').trim(); if (gl) app.acc = 'group'; }
+        if (k === 'main') { mainApp = app; mainLink = lk; mainGroup = gl; } else if (app.name) { extra[k] = app; extraLinks[k] = lk; if (gl) extraGroups[k] = gl; }
       }
       const data = { nick, country, bio: $('#f-bio').value.trim().slice(0, 200), app: mainApp, createdAt: old.createdAt || Date.now(), updatedAt: Date.now() };
       if (Object.keys(extra).length) data.extra = extra;
@@ -1364,7 +1406,7 @@ document.addEventListener('submit', async e => {
       if (old.testing) data.testing = old.testing;
       if (old.moonsSpent) data.moonsSpent = old.moonsSpent;
       await setDoc(doc(db, 'users', me), data);
-      const priv = { email, link: mainLink }; if (Object.keys(extraLinks).length) priv.extraLinks = extraLinks;
+      const priv = { email, link: mainLink }; if (mainGroup) priv.group = mainGroup; if (Object.keys(extraLinks).length) priv.extraLinks = extraLinks; if (Object.keys(extraGroups).length) priv.extraGroups = extraGroups;
       await setDoc(doc(db, 'userPrivate', me), priv);
       const counted = await recordInvite(old, !!mainApp.name);
       toast(counted ? 'Profilo salvato. Il tuo invito è stato registrato: grazie!' : (mainApp.name ? 'Profilo salvato' : 'Profilo salvato. Aggiungi la tua app per comparire in Esplora.'));
@@ -1387,6 +1429,7 @@ function startData() {
         if (old.status === 'proposed' && s.status === 'active' && s.a === me) notify(nameOf(o) + ' ha accettato lo scambio', id);
         if (!ms(old.start && old.start[o]) && ms(s.start && s.start[o])) notify(nameOf(o) + ' ha avviato il test', id);
         if (!(old.ready && old.ready[o]) && s.ready && s.ready[o]) notify(nameOf(o) + ' ti ha aggiunto ai tester: ora puoi installare e avviare il test', id);
+        if (!(old.joined && old.joined[o]) && s.joined && s.joined[o]) notify(nameOf(o) + ' è entrato nel gruppo Google della tua app', id);
         if (!(old.fb && old.fb[o]) && s.fb && s.fb[o]) notify(nameOf(o) + ' ha lasciato il feedback', id);
       });
     }
