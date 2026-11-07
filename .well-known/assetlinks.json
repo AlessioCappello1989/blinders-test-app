@@ -1,8 +1,1 @@
-[{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "it.ironblind.twa",
-    "sha256_cert_fingerprints": ["FB:3A:15:44:A5:7C:2D:CB:2F:25:6E:70:28:6E:5A:EF:7A:A7:BE:35:C2:E7:DA:F2:A9:0C:71:BB:A8:70:AD:BB"]
-  }
-}]
+[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"it.ironblind.twa","sha256_cert_fingerprints":["FB:3A:15:44:A5:7C:2D:CB:2F:25:6E:70:28:6E:5A:EF:7A:A7:BE:35:C2:E7:DA:F2:A9:0C:71:BB:A8:70:AD:BB","F1:6F:D5:37:16:49:2A:02:BD:AD:69:49:9A:4D:94:04:1E:3E:F3:44:9E:8E:D8:B0:39:0B:E8:04:C2:71:DB:9C"]}}]
