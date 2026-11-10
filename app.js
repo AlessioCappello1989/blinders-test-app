@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261107c';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261110a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -26,7 +26,7 @@ function clearInvite() { pendingInvite = null; try { localStorage.removeItem(INV
 const loaded = { users: false, swaps: false, fb: false, priv: false };
 let app, auth, db, me = null, busy = false, dirty = false, firstRoute = false;
 let dataUnsubs = [], subUnsubs = [], subKey = '', msgs = [], tt;
-const msgWatch = new Map();
+const msgWatch = new Map(), msgFirst = new Set();
 S.lastMsg = new Map();
 
 function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => { t.hidden = true; }, 3600); }
@@ -232,7 +232,7 @@ function syncWatch() {
       if (d) S.lastMsg.set(id, { at: d.at || 0, from: d.from, list: list.map(m => ({ at: m.at || 0, from: m.from })) });
       const open = S.route && S.route.t === 'swap' && S.route.id === id;
       if (!first && d && d.from !== me) { if (!open) toast('Nuovo messaggio da ' + nameOf(d.from)); sysNotify('Nuovo messaggio da ' + nameOf(d.from), String(d.text || '').slice(0, 100), id); }
-      first = false;
+      first = false; msgFirst.add(id);
       if (open) markSeen(id);
       render();
     }, () => { /* senza permesso non c'è nulla da segnalare */ }));
@@ -600,6 +600,45 @@ function checkNews() {
     if (!seenId && u.createdAt && Date.now() - u.createdAt < 2 * DAY) return; /* chi si è appena iscritto non ha bisogno delle novità */
     openModal('Novità di IronBlind', '<p>Abbiamo aggiornato l\'app:</p><ul class="guide">' + NEWS.items.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul><div><button type="button" class="btn primary" data-act="aboutClose">Ho capito</button></div>');
   } catch (e) { /* le novità non devono bloccare l'app */ }
+}
+/* ---------- Novità all'apertura: un riepilogo di ciò che è successo ad app chiusa (una volta per apertura) ---------- */
+let digestDone = false, digestTimer = 0;
+const digestKey = () => 'ironblind-digest-' + me;
+const DG_TXT = { 'Nuovo messaggio': ['💬', 'ti ha scritto'], 'Ha avviato il test': ['▶️', 'ha avviato il test'], 'Ti ha aggiunto ai tester': ['✅', 'ti ha aggiunto ai tester'], 'È entrato nel gruppo': ['👥', 'è entrato nel gruppo'], 'Ha lasciato il feedback': ['⭐', 'ha lasciato il feedback'], 'Ha accettato lo scambio': ['🤝', 'ha accettato lo scambio'] };
+function digestItems() {
+  let shown = []; try { shown = JSON.parse(localStorage.getItem(digestKey()) || '[]'); } catch (e) { shown = []; }
+  const items = [], keys = [];
+  mine().forEach(s => {
+    if (s.status === 'declined') return;
+    const o = s.a === me ? s.b : s.a, who = nameOf(o);
+    if (s.status === 'proposed') {
+      if (s.b === me && shown.indexOf('prop:' + s.id) < 0) { items.push({ id: s.id, ico: '🤝', who, txt: 'ti ha proposto uno scambio' }); keys.push('prop:' + s.id); }
+      return;
+    }
+    unreadOf(s).forEach(l => { const d = DG_TXT[/^\d+ nuovi messaggi$/.test(l) ? 'Nuovo messaggio' : l]; if (d) items.push({ id: s.id, ico: d[0], who, txt: d[1] }); });
+  });
+  return { items, keys, shown };
+}
+function closeDigest() { clearTimeout(digestTimer); const b = $('#digest'); if (b) b.remove(); }
+function checkDigest(tries) {
+  try {
+    if (digestDone || !me) return;
+    const u = S.users.get(me); if (!u || !u.nick) return;
+    if ($('#intro') || $('#about') || $('#ms') || $('#slotm')) { if ((tries || 0) < 12) setTimeout(() => checkDigest((tries || 0) + 1), 1500); return; }
+    const need = mine().filter(s => s.status === 'active'); /* aspetto i messaggi di ogni scambio attivo, al massimo qualche secondo */
+    if (need.some(s => !msgFirst.has(s.id)) && (tries || 0) < 8) { setTimeout(() => checkDigest((tries || 0) + 1), 700); return; }
+    digestDone = true;
+    const d = digestItems(); if (!d.items.length) return;
+    try { localStorage.setItem(digestKey(), JSON.stringify(d.shown.concat(d.keys).slice(-200))); } catch (e) { /* senza memoria locale le proposte si ripresentano */ }
+    const max = 4, list = d.items.slice(0, max), more = d.items.length - list.length;
+    const bn = document.createElement('div'); bn.id = 'digest'; bn.setAttribute('role', 'status');
+    bn.innerHTML = '<div class="dg-h"><b>' + (d.items.length === 1 ? '1 novità' : d.items.length + ' novità') + '</b><button type="button" class="dg-x" data-act="dgClose">Chiudi</button></div><ul>'
+      + list.map(i => '<li><button type="button" data-act="dgGo" data-id="' + esc(i.id) + '"><span aria-hidden="true">' + i.ico + '</span><span><b>' + esc(i.who) + '</b> <span>' + i.txt + '</span></span></button></li>').join('')
+      + (more > 0 ? '<li class="dg-more"><button type="button" data-act="dgGo" data-id="">Vedi tutte in Scambi</button></li>' : '') + '</ul>';
+    closeDigest(); document.body.appendChild(bn); applyDom(bn);
+    requestAnimationFrame(() => bn.classList.add('in'));
+    digestTimer = setTimeout(closeDigest, 10000);
+  } catch (e) { /* il riepilogo non deve bloccare l'app */ }
 }
 function checkMilestones() {
   try {
@@ -1020,7 +1059,7 @@ function render(force) {
   if (!(loaded.users && loaded.swaps && loaded.fb && loaded.priv)) return;
   if (!firstRoute) { firstRoute = true; if (!S.users.get(me)) S.tab = 'profile'; }
   if (S.route && S.route.t === 'swap') markSeen(S.route.id);
-  syncWatch(); syncMoons(); setTimeout(checkIntro, 200); setTimeout(checkMilestones, 400); setTimeout(checkNews, 1200);
+  syncWatch(); syncMoons(); setTimeout(checkIntro, 200); setTimeout(checkMilestones, 400); setTimeout(checkNews, 1200); setTimeout(checkDigest, 2200);
   if (!pingOn) { pingOn = true; setInterval(() => { if (me && !document.hidden) syncMoons(); }, 10 * 60 * 1000); document.addEventListener('visibilitychange', () => { if (me && !document.hidden) syncMoons(); }); }
   const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
   document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App';
@@ -1149,6 +1188,8 @@ document.addEventListener('click', async e => {
     }
     if (act === 'tab') { S.tab = b.dataset.tab; S.route = null; render(true); window.scrollTo(0, 0); return; }
     if (act === 'user') { S.route = { t: 'user', id }; render(true); window.scrollTo(0, 0); return; }
+    if (act === 'dgClose') { closeDigest(); return; }
+    if (act === 'dgGo') { closeDigest(); if (id) { S.tab = 'swaps'; S.route = { t: 'swap', id }; } else { S.tab = 'swaps'; S.route = null; } render(true); window.scrollTo(0, 0); return; }
     if (act === 'swap') { S.route = { t: 'swap', id }; render(true); window.scrollTo(0, 0); return; }
     if (act === 'back') { S.route = null; S.confirm = null; render(true); return; }
     if (act === 'askClose') { S.confirm = id; render(true); return; }
@@ -1450,7 +1491,7 @@ function startData() {
   dataUnsubs.push(onSnapshot(query(collection(db, 'refs'), where('by', '==', me)), sn => { S.refs = new Map(sn.docs.map(d => [d.id, read(d)])); render(); }, () => { /* senza inviti non c'è nulla da mostrare */ }));
   dataUnsubs.push(onSnapshot(doc(db, 'userPrivate', me), sn => { S.priv = sn.exists() ? sn.data() : { email: '' }; loaded.priv = true; render(); }, toastErr));
 }
-function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; S.hidden = new Set(); S.reports = new Map(); msgWatch.forEach(u => u()); msgWatch.clear(); S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; S.refs = new Map(); S.myRef = undefined; S.paid = 0; S.slotReq = undefined; S.reqs = new Map(); closeSlot(); Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; S.delOpen = false; }
+function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; S.hidden = new Set(); S.reports = new Map(); msgWatch.forEach(u => u()); msgWatch.clear(); msgFirst.clear(); digestDone = false; S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; S.refs = new Map(); S.myRef = undefined; S.paid = 0; S.slotReq = undefined; S.reqs = new Map(); closeSlot(); Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; S.delOpen = false; }
 
 if (!firebaseConfig.apiKey || /INCOLLA/.test(firebaseConfig.apiKey)) {
   gate('Manca la configurazione di Firebase', 'Apri il file firebase-config.js e incolla i valori del tuo progetto Firebase. I passaggi sono nel README.');

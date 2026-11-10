@@ -176,6 +176,8 @@ const E = {
   'Account eliminato.': 'Account deleted.', 'Scrivi ELIMINA per confermare.': 'Type ELIMINA to confirm.', 'Scrivi la tua password per confermare.': 'Enter your password to confirm.',
   'Questo browser non supporta le notifiche.': 'This browser does not support notifications.', 'Permesso negato. Puoi attivarlo dalle impostazioni del sito nel browser.': 'Permission denied. You can enable it in the site settings of your browser.',
   'Notifiche attivate.': 'Notifications turned on.', 'Non sono riuscito ad attivare le notifiche.': 'I could not turn on notifications.', 'Notifiche disattivate.': 'Notifications turned off.',
+  'ti ha scritto': 'wrote to you', 'ha avviato il test': 'started the test', 'ti ha aggiunto ai tester': 'added you as a tester', 'è entrato nel gruppo': 'joined the group', 'ha lasciato il feedback': 'left feedback', 'ha accettato lo scambio': 'accepted the swap', 'ti ha proposto uno scambio': 'proposed a swap to you',
+  '1 novità': '1 update', 'Vedi tutte in Scambi': 'See all in Swaps',
   'Notifiche attive': 'Notifications on', "Ti avviso di nuovi messaggi e richieste finché l'app resta aperta.": 'I will let you know about new messages and requests while the app stays open.',
   "Se hai ricevuto un pagamento ma non c'è la richiesta, incolla qui il codice scritto nel messaggio di PayPal.": 'If you received a payment but there is no request, paste here the code written in the PayPal message.', 'Incolla il codice': 'Paste the code',
   "profilo, nome dell'app, email e link di test, messaggi che hai inviato e testo dei feedback che hai scritto.": 'profile, app name, email and test links, messages you sent and the text of the feedback you wrote.',
