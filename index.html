@@ -123,6 +123,26 @@ textarea{min-height:84px;resize:vertical}
 .aic .aph{font:700 20px var(--f-display);color:var(--muted);text-transform:uppercase}.aic.sm .aph{font-size:14px}.aic.lg .aph{font-size:28px}
 .lab-ic{display:flex;flex-direction:column;gap:6px}.lab-t{font-weight:600;font-size:14px}.icrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.icbtns{display:flex;gap:8px;flex-wrap:wrap}
 .ico-in{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.tb-r{display:flex;align-items:center;gap:6px}
+.bell{all:unset;box-sizing:border-box;position:relative;cursor:pointer;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#fff}
+.bell[hidden]{display:none}
+.bell:hover,.bell:focus-visible{background:#ffffff26}.bell:focus-visible{outline:2px solid #fff}
+.bell svg{width:26px;height:26px}
+.bd{display:none;position:absolute;top:-1px;right:-2px;min-width:19px;height:19px;border-radius:10px;background:#e5382f;color:#fff;font:700 11px/15px var(--f-body);text-align:center;padding:0 4px;border:2px solid #000;box-sizing:border-box}
+.bd.on{display:block}
+@media (prefers-reduced-motion:no-preference){.bell.ring svg{animation:bring 1.1s ease 1}}
+@keyframes bring{0%,100%{transform:rotate(0)}15%{transform:rotate(14deg)}30%{transform:rotate(-12deg)}45%{transform:rotate(8deg)}60%{transform:rotate(-6deg)}}
+#bellpn{position:fixed;left:50%;transform:translateX(-50%);width:calc(100% - 20px);max-width:440px;z-index:30;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px #0004;display:flex;flex-direction:column;max-height:min(430px,calc(100vh - 160px));overflow:hidden}
+#bellpn .bph{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+#bellpn .bph b{font-size:15px}
+#bellpn .bl{all:unset;cursor:pointer;color:var(--accent);font-size:13px;font-weight:600;padding:6px 8px;border-radius:6px}
+#bellpn .bl:hover,#bellpn .bl:focus-visible{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+#bellpn .bls{list-style:none;margin:0;padding:6px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+#bellpn .bls button{all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:10px;min-height:48px}
+#bellpn .bls button:hover,#bellpn .bls button:focus-visible{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+#bellpn .em{font-size:20px;line-height:1.2;flex:none}#bellpn .tx{font-size:14px;line-height:1.35;min-width:0}
+#bellpn .bempty{padding:26px 16px;text-align:center;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:4px}
+#bellpn .bempty b{color:var(--ink);font-size:15px}
 #digest{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translate(-50%,-140%);width:calc(100% - 20px);max-width:440px;z-index:30;background:var(--ink);color:var(--bg);border-radius:12px;padding:10px 12px;box-shadow:0 8px 24px #0005;opacity:0}
 #digest.in{transform:translate(-50%,0);opacity:1}
 @media (prefers-reduced-motion:no-preference){#digest{transition:transform .45s cubic-bezier(.2,.8,.2,1),opacity .3s}}
@@ -246,7 +266,8 @@ label.check{flex-direction:row;align-items:center;gap:10px}label.check input{wid
 <div class="app">
   <header class="topbar">
     <h1 class="logo-wrap"><img class="logo-wide" src="logo-wide.jpg" width="900" height="267" alt="IronBlind Test App"><span class="tm" aria-hidden="true">™</span></h1>
-    <button id="out" class="btn ghost sm" data-act="logout" hidden>Esci</button>
+    <div class="tb-r"><button id="bell" type="button" class="bell" data-act="bellToggle" aria-label="Notifiche" aria-expanded="false" hidden><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span id="bd" class="bd"></span></button>
+    <button id="out" class="btn ghost sm" data-act="logout" hidden>Esci</button></div>
   </header>
   <main id="view" class="stack" aria-live="polite"><div class="empty"><h3>Caricamento</h3><p class="muted">Sto aprendo i profili e gli scambi.</p></div></main>
   <footer class="foot">
@@ -282,6 +303,6 @@ try{
   }
 }catch(e){}
 </script>
-<script type="module" src="./app.js?v=20261111c"></script>
+<script type="module" src="./app.js?v=20261111d"></script>
 </body>
 </html>

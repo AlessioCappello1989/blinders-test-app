@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261111c';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261111d';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -688,6 +688,43 @@ function checkDigest(tries) {
     digestTimer = setTimeout(closeDigest, 10000);
   } catch (e) { /* il riepilogo non deve bloccare l'app */ }
 }
+/* ---------- Campanello: novità ancora da vedere (calcolate dai dati già letti, senza storico) ---------- */
+const bellKey = () => 'ironblind-bell-' + me;
+const bellDismissed = () => { try { return JSON.parse(localStorage.getItem(bellKey()) || '[]'); } catch (e) { return []; } };
+const bellDismiss = ids => { try { localStorage.setItem(bellKey(), JSON.stringify(bellDismissed().concat(ids).slice(-200))); } catch (e) { /* senza memoria locale le proposte restano in elenco */ } };
+function notifItems() {
+  const dis = bellDismissed(), items = [];
+  mine().forEach(s => {
+    if (s.status === 'declined') return;
+    const o = s.a === me ? s.b : s.a, who = nameOf(o);
+    if (s.status === 'proposed') { if (s.b === me && dis.indexOf(s.id) < 0) items.push({ id: s.id, ico: '🤝', who, txt: 'ti ha proposto uno scambio' }); return; }
+    unreadOf(s).forEach(l => { const d = DG_TXT[/^\d+ nuovi messaggi$/.test(l) ? 'Nuovo messaggio' : l]; if (d) items.push({ id: s.id, ico: d[0], who, txt: d[1] }); });
+  });
+  return items;
+}
+let bellPrev = null;
+function bellRows(items) {
+  return items.length ? items.map(i => '<li><button type="button" data-act="bellGo" data-id="' + esc(i.id) + '"><span class="em" aria-hidden="true">' + i.ico + '</span><span class="tx"><span><b>' + esc(i.who) + '</b> <span>' + i.txt + '</span></span></span></button></li>').join('')
+    : '<li class="bempty"><b>Tutto letto</b><span>Quando arriva una novità, la trovi qui.</span></li>';
+}
+function updateBell() {
+  const bt = $('#bell'); if (!bt) return;
+  bt.hidden = !me; if (!me) { closeBell(); bellPrev = null; return; }
+  const items = notifItems(), n = items.length, bd = $('#bd');
+  bd.textContent = n > 9 ? '9+' : String(n); bd.classList.toggle('on', n > 0);
+  bt.setAttribute('aria-label', n ? 'Notifiche, ' + n + ' da vedere' : 'Notifiche');
+  if (bellPrev !== null && n > bellPrev) { bt.classList.remove('ring'); void bt.offsetWidth; bt.classList.add('ring'); }
+  bellPrev = n;
+  const ls = $('#bellls'); if (ls) { ls.innerHTML = bellRows(items); applyDom(ls); }
+}
+function closeBell() { const p = $('#bellpn'); if (p) p.remove(); const bt = $('#bell'); if (bt) bt.setAttribute('aria-expanded', 'false'); }
+function openBell() {
+  closeDigest(); closeBell();
+  const p = document.createElement('div'); p.id = 'bellpn'; p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'Notifiche');
+  p.innerHTML = '<div class="bph"><b>Notifiche</b><button type="button" class="bl" data-act="bellAll">Segna tutto come letto</button></div><ul class="bls" id="bellls">' + bellRows(notifItems()) + '</ul>';
+  document.body.appendChild(p); applyDom(p);
+  const bt = $('#bell'); if (bt) { bt.setAttribute('aria-expanded', 'true'); const r = bt.getBoundingClientRect(); p.style.top = Math.round(r.bottom + 8) + 'px'; }
+}
 function checkMilestones() {
   try {
     if (!me || !S.users.get(me) || $('#ms') || $('#intro')) return;
@@ -1110,7 +1147,7 @@ function render(force) {
   syncWatch(); syncMoons(); setTimeout(checkIntro, 200); setTimeout(checkMilestones, 400); setTimeout(checkNews, 1200); setTimeout(checkDigest, 2200);
   if (!pingOn) { pingOn = true; setInterval(() => { if (me && !document.hidden) syncMoons(); }, 10 * 60 * 1000); document.addEventListener('visibilitychange', () => { if (me && !document.hidden) syncMoons(); }); }
   const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
-  document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App';
+  document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App'; updateBell();
   $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['reviews', 'Recensioni'], ['profile', 'Profilo'], ['settings', 'Impostazioni']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '"><span class="ni" aria-hidden="true">' + NAV_ICO[t[0]] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</span><span class="nl">' + t[1] + '</span></button>').join('');
   $('#nav').hidden = false; $('#out').hidden = true;
   let h = '';
@@ -1203,6 +1240,8 @@ function drawMsgs() {
 }
 
 /* ---------- Azioni ---------- */
+document.addEventListener('click', e => { if ($('#bellpn') && !e.target.closest('#bellpn') && !e.target.closest('#bell')) closeBell(); }, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBell(); });
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b || busy) return;
   const act = b.dataset.act, id = b.dataset.id;
@@ -1238,6 +1277,9 @@ document.addEventListener('click', async e => {
     if (act === 'tab') { S.tab = b.dataset.tab; S.route = null; render(true); window.scrollTo(0, 0); return; }
     if (act === 'user') { S.route = { t: 'user', id }; render(true); window.scrollTo(0, 0); return; }
     if (act === 'icoRm') { const k = b.dataset.k; S.ico = S.ico || {}; S.ico[k] = ''; const nm = $('#f-app-' + k), pv = $('#ico-pv-' + k); if (pv) pv.innerHTML = appIc({ name: nm ? nm.value : '', icon: '' }, 'lg'); b.hidden = true; const n = $('#ico-n-' + k); if (n) n.textContent = 'Icona tolta. Premi «Salva profilo» per applicare.'; return; }
+    if (act === 'bellToggle') { if ($('#bellpn')) closeBell(); else openBell(); return; }
+    if (act === 'bellAll') { mine().forEach(s => { if (s.status !== 'declined' && s.status !== 'proposed' && unreadOf(s).length) markSeen(s.id); }); bellDismiss(mine().filter(s => s.status === 'proposed' && s.b === me).map(s => s.id)); updateBell(); render(true); return; }
+    if (act === 'bellGo') { closeBell(); const s = S.swaps.get(id); if (s && s.status === 'proposed') bellDismiss([id]); S.tab = 'swaps'; S.route = { t: 'swap', id }; render(true); window.scrollTo(0, 0); return; }
     if (act === 'dgClose') { closeDigest(); return; }
     if (act === 'dgGo') { closeDigest(); if (id) { S.tab = 'swaps'; S.route = { t: 'swap', id }; } else { S.tab = 'swaps'; S.route = null; } render(true); window.scrollTo(0, 0); return; }
     if (act === 'swap') { S.route = { t: 'swap', id }; render(true); window.scrollTo(0, 0); return; }
