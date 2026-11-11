@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261110a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261111a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -43,6 +43,9 @@ const read = d => d.data({ serverTimestamps: 'estimate' });
 /* ---------- Helpers di dominio ---------- */
 const nameOf = id => (S.users.get(id) && S.users.get(id).nick) || 'Sviluppatore';
 const av = id => '<span class="av ph">' + esc(nameOf(id)[0] || '?') + '</span>';
+/* Icona dell'app: solo immagini PNG/JPEG/WebP in base64 (mai SVG); senza icona resta il quadrato con l'iniziale. */
+const ICO_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/, ICO_MAX = 7000;
+const appIc = (a, cls) => '<span class="aic ' + (cls || '') + '">' + (a && typeof a.icon === 'string' && a.icon.length <= ICO_MAX && ICO_RE.test(a.icon) ? '<img alt="" src="' + a.icon + '">' : '<span class="aph" aria-hidden="true">' + esc(((a && a.name) || '?').trim()[0] || '?') + '</span>') + '</span>';
 const members = s => s.members || [s.a, s.b];
 const isDone = s => !!(s.fb && s.fb[s.a] && s.fb[s.b]);
 const countryOf = id => (S.users.get(id) && S.users.get(id).country) || '';
@@ -327,7 +330,7 @@ function exploreItems() {
         + (x.own ? '' : '<div><button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button></div>');
     }
     return '<article class="card app' + xcls(x.a.id) + '"><div class="row between"><button class="who" data-act="user" data-id="' + esc(x.id) + '">' + av(x.id) + '<span class="n">' + esc(nameOf(x.id)) + '</span></button>' + rate(x.st) + '</div>'
-      + '<div><div class="row" style="margin-bottom:4px"><span class="small muted mono">' + (isExtra(x.a.id) ? '' : '📱 ') + 'APP DA TESTARE</span>' + xtag(x.a.id) + (x.own ? '<span class="pill">La tua app</span>' : '') + state + '</div><h3 class="appname">' + esc(x.a.name) + '</h3><div class="row" style="margin-top:4px"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="chip">' + esc(x.u.country || 'Paese n.d.') + '</span><span class="chip">Cerca: ' + esc(x.a.want || 'tutti i paesi') + '</span><span class="small muted">' + x.st.done + ' tester completati</span></div></div>'
+      + '<div><div class="row" style="margin-bottom:4px"><span class="small muted mono">' + (isExtra(x.a.id) ? '' : '📱 ') + 'APP DA TESTARE</span>' + xtag(x.a.id) + (x.own ? '<span class="pill">La tua app</span>' : '') + state + '</div><div class="aprow">' + appIc(x.a) + '<h3 class="appname">' + esc(x.a.name) + '</h3></div><div class="row" style="margin-top:4px"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="chip">' + esc(x.u.country || 'Paese n.d.') + '</span><span class="chip">Cerca: ' + esc(x.a.want || 'tutti i paesi') + '</span><span class="small muted">' + x.st.done + ' tester completati</span></div></div>'
       + (x.a.desc ? '<p class="desc">' + esc(x.a.desc) + '</p>' : '')
       + extra + pickH + (act ? '<div>' + act + '</div>' : '') + '</article>';
   }).join('') + note;
@@ -422,6 +425,7 @@ function appFields(k, ap, title, bonus) {
     : '<div><button type="button" class="btn ghost sm" data-act="askClear" data-k="' + k + '">Svuota i campi dello slot</button></div>';
   return '<div class="slot' + (k === 'main' ? ' main' : '') + '"><div class="row between"><h3>' + title + '</h3>' + pill + '</div>' + note
     + '<label for="f-app-' + k + '">Nome dell\'app<input id="f-app-' + k + '" maxlength="50"' + dis + ' value="' + esc(ap.name || '') + '"><span class="field-note" id="c-f-app-' + k + '">' + (ap.name || '').length + '/50</span></label>'
+    + '<div class="lab-ic"><span class="lab-t">Icona dell\'app</span><div class="icrow">' + icoPv(k, ap) + '<div class="icbtns"><label class="btn ghost sm" for="f-ico-' + k + '">Scegli immagine</label><button type="button" class="btn ghost sm" id="ico-rm-' + k + '" data-act="icoRm" data-k="' + k + '"' + (icoVal(k, ap) ? '' : ' hidden') + '>Rimuovi</button></div></div><input type="file" id="f-ico-' + k + '" class="ico-in" accept="image/png,image/jpeg,image/webp"><span class="field-note" id="ico-n-' + k + '">PNG, JPG o WebP. Meglio un quadrato, come l\'icona che hai su Play Store. Viene ridotta e compressa sul tuo telefono.</span></div>'
     + '<div class="grid2"><label for="f-cat-' + k + '">Categoria<select id="f-cat-' + k + '"' + dis + '>' + opts + '</select></label>'
     + '<label for="f-link-' + k + '">Link di adesione al test<input id="f-link-' + k + '" type="url" inputmode="url"' + dis + ' value="' + esc(lk) + '" placeholder="https://play.google.com/apps/testing/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te.</span></label></div>'
     + '<label for="f-acc-' + k + '">Come accederanno i tester alla tua app?<select id="f-acc-' + k + '"' + dis + '><option value="">Lista email</option><option value="group"' + (ap.acc === 'group' ? ' selected' : '') + '>Gruppo Google</option></select><span class="field-note">Lista email: aggiungi le email dei tester in Play Console. Gruppo Google: colleghi il gruppo una volta sola e i tester entrano da soli.</span></label>'
@@ -430,6 +434,25 @@ function appFields(k, ap, title, bonus) {
     + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>' + pubBox(k, ap) + clr + conclude + '</div>';
 }
 const dateVal = t => { if (!t) return ''; const d = new Date(t), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
+const icoVal = (k, ap) => (S.ico && k in S.ico) ? S.ico[k] : ((ap && ap.icon) || '');
+const icoPv = (k, ap) => '<span id="ico-pv-' + k + '">' + appIc(Object.assign({}, ap, { icon: icoVal(k, ap) }), 'lg') + '</span>';
+/* Riduce l'immagine scelta a 96x96 e la comprime fino a stare sotto il limite. */
+function icoPrepare(file) {
+  return new Promise((res, rej) => {
+    if (!file || !/^image\/(png|jpeg|webp)$/.test(file.type)) return rej(new Error('type'));
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = c.height = 96; const x = c.getContext('2d'), m = Math.min(img.width, img.height);
+        x.drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, 96, 96); URL.revokeObjectURL(url);
+        for (const q of [0.8, 0.65, 0.5, 0.35]) { let d = c.toDataURL('image/webp', q); if (d.indexOf('data:image/webp') !== 0) d = c.toDataURL('image/jpeg', q); if (d.length <= ICO_MAX && ICO_RE.test(d)) return res(d); }
+        rej(new Error('size'));
+      } catch (e) { rej(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('read')); };
+    img.src = url;
+  });
+}
 function extBox(k, ap) {
   const e = ap.ext || {};
   return '<div class="box"><b>Hai già un test attivo fuori da IronBlind?</b>'
@@ -448,7 +471,7 @@ function profileView(uid, edit) {
     const list = appsOf(uid);
     return '<button class="btn ghost sm back" data-act="back">← Indietro</button>'
       + '<div class="card"><div class="row">' + av(uid) + '<div><h2>' + esc(nameOf(uid)) + '</h2><span class="chip">' + esc(u.country || 'Paese n.d.') + '</span></div></div>' + (u.bio ? '<p class="desc">' + esc(u.bio) + '</p>' : '') + '</div>'
-      + list.map(a => '<div class="card"><span class="small muted mono">APP DA TESTARE</span><h3 class="appname">' + esc(a.name) + '</h3><div class="row"><span class="chip">' + esc(a.cat || 'Altro') + '</span><span class="chip">Cerca: ' + esc(a.want || 'tutti i paesi') + '</span></div>' + (a.desc ? '<p class="desc">' + esc(a.desc) + '</p>' : '') + '</div>').join('')
+      + list.map(a => '<div class="card"><span class="small muted mono">APP DA TESTARE</span><div class="aprow">' + appIc(a) + '<h3 class="appname">' + esc(a.name) + '</h3></div><div class="row"><span class="chip">' + esc(a.cat || 'Altro') + '</span><span class="chip">Cerca: ' + esc(a.want || 'tutti i paesi') + '</span></div>' + (a.desc ? '<p class="desc">' + esc(a.desc) + '</p>' : '') + '</div>').join('')
       + (list.length ? list.map(a => statBlock(uid, a, list.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>';
   }
   const copts = (u.country ? '' : '<option value="">Scegli il tuo paese</option>') + COUNTRIES.map(c => '<option value="' + c + '"' + (u.country === c ? ' selected' : '') + '>' + c + '</option>').join('');
@@ -922,9 +945,9 @@ function swapView(id) {
   const oApp = (s.apps && s.apps[o]) || {}, mApp = (s.apps && s.apps[me]) || {};
   let h = back + '<div class="card"><div class="row between"><button class="who" data-act="user" data-id="' + esc(o) + '">' + av(o) + '<span class="n">' + esc(nameOf(o)) + '</span></button>' + statusPill(s) + '</div>'
     + (s.status === 'active' ? (() => { const ls = lastSeen(o); return '<div class="row" style="gap:6px"><span class="small muted">🕒 Ultimo accesso:</span><span class="pill ' + (ls.old ? 'warn' : 'ok') + '">' + ls.t + '</span></div>'; })() : '')
-    + '<div class="box mini' + xcls(aidOf(s, o)) + '"><div class="row between"><span class="small muted mono">TU TESTI</span>' + xtag(aidOf(s, o)) + '</div><b>' + esc(oApp.name || 'App') + '</b>'
+    + '<div class="box mini' + xcls(aidOf(s, o)) + '"><div class="row between"><span class="small muted mono">TU TESTI</span>' + xtag(aidOf(s, o)) + '</div><div class="aprow sm">' + appIc(oApp, 'sm') + '<b>' + esc(oApp.name || 'App') + '</b></div>'
     + (s.status === 'active' ? (S.theirLink === undefined ? '<span class="small muted">Caricamento…</span>' : (S.theirLink ? link(S.theirLink) : '<span class="small muted">Il link di test non è disponibile.</span>')) : '<span class="small muted">Il link di test si sblocca quando lo scambio viene accettato.</span>') + '</div>'
-    + '<div class="box mini' + xcls(aidOf(s, me)) + '"><div class="row between"><span class="small muted mono">LUI TESTA</span>' + xtag(aidOf(s, me)) + '</div><b>' + esc(mApp.name || 'La tua app') + '</b>' + swapAppPicker(s, o) + '</div></div>';
+    + '<div class="box mini' + xcls(aidOf(s, me)) + '"><div class="row between"><span class="small muted mono">LUI TESTA</span>' + xtag(aidOf(s, me)) + '</div><div class="aprow sm">' + appIc(mApp, 'sm') + '<b>' + esc(mApp.name || 'La tua app') + '</b></div>' + swapAppPicker(s, o) + '</div></div>';
   if (s.status === 'proposed') {
     if (s.b === me) return h + '<div class="card"><p>' + esc(nameOf(o)) + ' propone di testarsi a vicenda.</p><div class="row"><button class="btn primary" data-act="accept" data-id="' + esc(id) + '">Accetta</button><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Rifiuta</button></div></div>';
     return h + '<div class="card"><p>Richiesta inviata. Quando ' + esc(nameOf(o)) + ' accetta si apre la chat.</p><div><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Annulla richiesta</button></div></div>';
@@ -1188,6 +1211,7 @@ document.addEventListener('click', async e => {
     }
     if (act === 'tab') { S.tab = b.dataset.tab; S.route = null; render(true); window.scrollTo(0, 0); return; }
     if (act === 'user') { S.route = { t: 'user', id }; render(true); window.scrollTo(0, 0); return; }
+    if (act === 'icoRm') { const k = b.dataset.k; S.ico = S.ico || {}; S.ico[k] = ''; const nm = $('#f-app-' + k), pv = $('#ico-pv-' + k); if (pv) pv.innerHTML = appIc({ name: nm ? nm.value : '', icon: '' }, 'lg'); b.hidden = true; const n = $('#ico-n-' + k); if (n) n.textContent = 'Icona tolta. Premi «Salva profilo» per applicare.'; return; }
     if (act === 'dgClose') { closeDigest(); return; }
     if (act === 'dgGo') { closeDigest(); if (id) { S.tab = 'swaps'; S.route = { t: 'swap', id }; } else { S.tab = 'swaps'; S.route = null; } render(true); window.scrollTo(0, 0); return; }
     if (act === 'swap') { S.route = { t: 'swap', id }; render(true); window.scrollTo(0, 0); return; }
@@ -1281,7 +1305,7 @@ document.addEventListener('click', async e => {
       if (Object.keys(el).length) pv.extraLinks = el;
       if (k !== 'main' && S.priv.group) pv.group = S.priv.group; const eg = Object.assign({}, S.priv.extraGroups || {}); delete eg[k]; if (Object.keys(eg).length) pv.extraGroups = eg;
       await setDoc(doc(db, 'userPrivate', me), pv);
-      S.confirmC = null; toast('Slot svuotato: puoi inserire una nuova app.');
+      S.confirmC = null; if (S.ico) delete S.ico[k]; toast('Slot svuotato: puoi inserire una nuova app.');
     } else if (act === 'concludeApp') {
       const k = b.dataset.k, u = S.users.get(me);
       if (!u || !hasExtra(u, k)) { S.confirmK = null; return; }
@@ -1371,6 +1395,18 @@ document.addEventListener('click', async e => {
   } catch (err) { toastErr(err); }
   finally { busy = false; if (me) render(true); }
 });
+document.addEventListener('change', async e => {
+  const t = e.target; if (!t || !t.id || t.id.indexOf('f-ico-') !== 0) return;
+  const k = t.id.slice(6), n = $('#ico-n-' + k), f = t.files && t.files[0]; if (!f) return;
+  try {
+    const d = await icoPrepare(f); S.ico = S.ico || {}; S.ico[k] = d;
+    const u = S.users.get(me) || {}, ap = k === 'main' ? (u.app || {}) : ((u.extra || {})[k] || {});
+    const pv = $('#ico-pv-' + k), nm = $('#f-app-' + k); if (pv) pv.innerHTML = appIc({ name: (nm && nm.value) || ap.name, icon: d }, 'lg');
+    const rm = $('#ico-rm-' + k); if (rm) rm.hidden = false;
+    if (n) n.textContent = 'Icona pronta (' + (Math.round(d.length / 100) / 10) + ' KB). Premi «Salva profilo» per applicarla.';
+  } catch (er) { toast(er && er.message === 'type' ? 'Usa un\'immagine PNG, JPG o WebP.' : 'Non riesco a usare questa immagine: provane un\'altra.'); }
+  t.value = '';
+});
 document.addEventListener('input', e => {
   if (e.target.id === 'q') { S.q = e.target.value; const l = $('#list'); if (l) l.innerHTML = exploreItems(); }
   const c = e.target.id && $('#c-' + e.target.id); if (c) c.textContent = e.target.value.length + '/' + e.target.maxLength;
@@ -1430,6 +1466,7 @@ document.addEventListener('submit', async e => {
         const en = $('#f-extn-' + k);
         if (en) { const n = en.value === '' ? 0 : Number(en.value), ds = $('#f-exts-' + k).value; if (n > 0 && ds) app.ext = { n, start: new Date(ds + 'T00:00:00').getTime() }; else delete app.ext; }
         if (prev.prog) app.prog = prev.prog;
+        { const ic = (S.ico && k in S.ico) ? S.ico[k] : prev.icon; if (ic && ICO_RE.test(ic) && ic.length <= ICO_MAX) app.icon = ic; else delete app.icon; }
         const lk = locked ? linkFor(k) : $('#f-link-' + k).value.trim();
         const ac = $('#f-acc-' + k); let gl = '';
         if (locked) { gl = groupFor(k); if (prev.acc === 'group') app.acc = 'group'; }
@@ -1450,6 +1487,7 @@ document.addEventListener('submit', async e => {
       const priv = { email, link: mainLink }; if (mainGroup) priv.group = mainGroup; if (Object.keys(extraLinks).length) priv.extraLinks = extraLinks; if (Object.keys(extraGroups).length) priv.extraGroups = extraGroups;
       await setDoc(doc(db, 'userPrivate', me), priv);
       const counted = await recordInvite(old, !!mainApp.name);
+      S.ico = {};
       toast(counted ? 'Profilo salvato. Il tuo invito è stato registrato: grazie!' : (mainApp.name ? 'Profilo salvato' : 'Profilo salvato. Aggiungi la tua app per comparire in Esplora.'));
     } catch (err) { toastErr(err); } finally { busy = false; render(true); }
   }
