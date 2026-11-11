@@ -190,6 +190,7 @@ const E = {
   '▶ Apri su Google Play': '▶ Open on Google Play',
   'Notifiche': 'Notifications',
   'Segna tutto come letto': 'Mark all as read', 'Tutto letto': 'All caught up', 'Quando arriva una novità, la trovi qui.': 'When something new arrives, you will find it here.',
+  'Termini': 'Terms',
   'Notifiche attive': 'Notifications on', "Ti avviso di nuovi messaggi e richieste finché l'app resta aperta.": 'I will let you know about new messages and requests while the app stays open.',
   "Se hai ricevuto un pagamento ma non c'è la richiesta, incolla qui il codice scritto nel messaggio di PayPal.": 'If you received a payment but there is no request, paste here the code written in the PayPal message.', 'Incolla il codice': 'Paste the code',
   "profilo, nome dell'app, email e link di test, messaggi che hai inviato e testo dei feedback che hai scritto.": 'profile, app name, email and test links, messages you sent and the text of the feedback you wrote.',
