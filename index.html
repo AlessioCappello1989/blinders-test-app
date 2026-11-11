@@ -109,11 +109,11 @@ textarea{min-height:84px;resize:vertical}
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:20px 16px;display:flex;flex-direction:column;gap:6px}
 .banner{border:1px solid var(--warn);border-radius:8px;padding:10px 12px;font-size:14px;background:color-mix(in srgb,var(--warn) 10%,transparent)}
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--surface);border-top:1px solid var(--line);display:flex;justify-content:center;
-  padding:6px max(16px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
-.nav-in{display:flex;gap:4px;width:100%;max-width:640px}
+  padding:6px max(6px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px))}
+.nav-in{display:flex;gap:2px;width:100%;max-width:640px}
 .navb{flex:1;background:none;border:0;border-radius:8px;padding:10px 6px;font:600 14px var(--f-body);color:var(--muted);cursor:pointer;position:relative}
 .rnote{border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.5;background:color-mix(in srgb,var(--accent) 9%,var(--surface))}
-.navb{min-width:0}@media (max-width:480px){.navb{font-size:11.5px;padding:10px 2px}}
+.navb{min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px 7px}.navb .ni{position:relative;display:inline-flex;line-height:0}.navb .ni svg{width:24px;height:24px}.navb .nl{font-size:10.5px;font-weight:600;letter-spacing:-.15px;line-height:1.2;white-space:nowrap}@media (min-width:420px){.navb .nl{font-size:12px;letter-spacing:0}}.navb .ni .dot{position:absolute;top:-6px;left:60%;margin:0;min-width:16px;height:16px;font-size:10px;line-height:16px;padding:0 4px}
 .navb.on{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .dot{display:inline-block;min-width:18px;height:18px;border-radius:9px;background:var(--accent);color:var(--accent-ink);font:600 11px/18px var(--f-body);text-align:center;margin-left:4px;padding:0 5px}
 .aprow{display:flex;align-items:center;gap:10px;min-width:0}.aprow .appname{margin:0;min-width:0;overflow-wrap:anywhere}.aprow.sm{gap:8px}
@@ -282,6 +282,6 @@ try{
   }
 }catch(e){}
 </script>
-<script type="module" src="./app.js?v=20261111b"></script>
+<script type="module" src="./app.js?v=20261111c"></script>
 </body>
 </html>

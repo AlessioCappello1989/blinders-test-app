@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261111b';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261111c';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -46,6 +46,13 @@ const av = id => '<span class="av ph">' + esc(nameOf(id)[0] || '?') + '</span>';
 /* Icona dell'app: solo immagini PNG/JPEG/WebP in base64 (mai SVG); senza icona resta il quadrato con l'iniziale. */
 const ICO_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/, ICO_MAX = 7000;
 const appIc = (a, cls) => '<span class="aic ' + (cls || '') + '">' + (a && typeof a.icon === 'string' && a.icon.length <= ICO_MAX && ICO_RE.test(a.icon) ? '<img alt="" src="' + a.icon + '">' : '<span class="aph" aria-hidden="true">' + esc(((a && a.name) || '?').trim()[0] || '?') + '</span>') + '</span>';
+/* Icone della barra in basso: tratto semplice che segue il colore del testo. */
+const NAV_ICO = (() => { const w = d => '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">' + d + '</svg>'; return {
+  explore: w('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M8.5 11h5M11 8.5v5" opacity=".6"/>'),
+  swaps: w('<path d="M4 8h14M14 4l4 4-4 4"/><path d="M20 16H6M10 12l-4 4 4 4"/>'),
+  reviews: w('<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>'),
+  profile: w('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'),
+  settings: w('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>') }; })();
 const members = s => s.members || [s.a, s.b];
 const isDone = s => !!(s.fb && s.fb[s.a] && s.fb[s.b]);
 const countryOf = id => (S.users.get(id) && S.users.get(id).country) || '';
@@ -1104,7 +1111,7 @@ function render(force) {
   if (!pingOn) { pingOn = true; setInterval(() => { if (me && !document.hidden) syncMoons(); }, 10 * 60 * 1000); document.addEventListener('visibilitychange', () => { if (me && !document.hidden) syncMoons(); }); }
   const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
   document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App';
-  $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['reviews', 'Recensioni'], ['profile', 'Profilo'], ['settings', 'Impostazioni']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '">' + t[1] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</button>').join('');
+  $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['reviews', 'Recensioni'], ['profile', 'Profilo'], ['settings', 'Impostazioni']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '"><span class="ni" aria-hidden="true">' + NAV_ICO[t[0]] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</span><span class="nl">' + t[1] + '</span></button>').join('');
   $('#nav').hidden = false; $('#out').hidden = true;
   let h = '';
   if (S.route && S.route.t === 'user') h += S.route.id === me ? profileView(me, true) : profileView(S.route.id, false);
