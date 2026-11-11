@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261111a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261111b';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -354,6 +354,24 @@ function statsBanner() {
   return '<div class="stats" role="group" aria-label="' + fmtN(devs) + ' sviluppatori iscritti, ' + fmtN(tests) + ' test in corso, ' + fmtN(apps) + ' app pubblicate"><img src="contatore2.jpg" alt="" width="1600" height="888" decoding="async">'
     + c(46.3, devs, 'Sviluppatori<br>Iscritti') + c(67.4, tests, 'Test in<br>Corso') + c(88.5, apps, 'App<br>Pubblicate') + '</div>';
 }
+/* Recensioni: le app già in produzione su Google Play. Nessuna ricompensa legata alle recensioni; si scrive sullo store. */
+function reviewItems() {
+  const q = (S.rq || '').trim().toLowerCase(), arr = [];
+  S.users.forEach((u, id) => { if (!u || !u.nick) return; appsOf(id).forEach(a => {
+    if (!isPubApp(id, a)) return;
+    if (q && (a.name + ' ' + u.nick + ' ' + (a.cat || '')).toLowerCase().indexOf(q) < 0) return;
+    arr.push({ id, u, a, own: id === me });
+  }); });
+  arr.sort((x, y) => (y.u.updatedAt || y.u.createdAt || 0) - (x.u.updatedAt || x.u.createdAt || 0));
+  if (!arr.length) return '<div class="empty"><h3>' + (q ? 'Nessuna app trovata' : 'Ancora nessuna app in produzione') + '</h3><p class="muted">' + (q ? 'Prova con un altro nome, categoria o sviluppatore.' : 'Quando uno sviluppatore spunta «già pubblicata» e aggiunge il link di Google Play, la sua app compare qui.') + '</p></div>';
+  return arr.map(x => '<article class="card app"><div class="aprow">' + appIc(x.a) + '<div style="min-width:0"><h3 class="appname">' + esc(x.a.name) + '</h3><span class="small muted"><span>di</span> ' + esc(x.u.nick) + (x.u.country ? ' · ' + esc(x.u.country) : '') + '</span></div></div>'
+    + '<div class="row"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="pill ok">✅ Online su Google Play</span>' + (x.own ? '<span class="pill">La tua app</span>' : '') + '</div>'
+    + (x.a.desc ? '<p class="desc">' + esc(x.a.desc) + '</p>' : '')
+    + '<div class="row"><a class="btn' + (x.own ? '' : ' primary') + '" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(x.a.store) + '">' + (x.own ? '▶ Vedi su Google Play' : '▶ Apri su Google Play') + '</a>'
+    + (x.own ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div></article>').join('');
+}
+const reviewsView = () => '<section class="card"><h2>Recensioni</h2><div class="rnote"><b>Dai una mano a chi sviluppa.</b> Recensire un\'app della community aiuta e supporta chi l\'ha creata. Non offriamo ricompense: per noi la recensione è un diritto di chi usa l\'app e deve essere il più sincera possibile. Scrivi solo ciò che pensi davvero.</div></section>'
+  + '<div class="grid2"><label for="rq">Cerca un\'app<input id="rq" type="search" value="' + esc(S.rq || '') + '" placeholder="Nome, categoria o sviluppatore"></label></div><div id="rlist">' + reviewItems() + '</div>';
 const exploreView = () => statsBanner() + xtabs() + '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
 
 /* Archivio personale: scambi completati nascosti dall'elenco (salvati nel tuo profilo, l'altro non se ne accorge). */
@@ -1086,13 +1104,14 @@ function render(force) {
   if (!pingOn) { pingOn = true; setInterval(() => { if (me && !document.hidden) syncMoons(); }, 10 * 60 * 1000); document.addEventListener('visibilitychange', () => { if (me && !document.hidden) syncMoons(); }); }
   const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
   document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App';
-  $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['profile', 'Profilo'], ['settings', 'Impostazioni']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '">' + t[1] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</button>').join('');
+  $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['reviews', 'Recensioni'], ['profile', 'Profilo'], ['settings', 'Impostazioni']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '">' + t[1] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</button>').join('');
   $('#nav').hidden = false; $('#out').hidden = true;
   let h = '';
   if (S.route && S.route.t === 'user') h += S.route.id === me ? profileView(me, true) : profileView(S.route.id, false);
   else if (S.route && S.route.t === 'swap') h += swapView(S.route.id);
   else if (S.tab === 'explore') h += exploreView();
   else if (S.tab === 'swaps') h += swapsView();
+  else if (S.tab === 'reviews') h += reviewsView();
   else if (S.tab === 'settings') h += settingsView();
   else h += profileView(me, true);
   view.innerHTML = h;
@@ -1408,6 +1427,7 @@ document.addEventListener('change', async e => {
   t.value = '';
 });
 document.addEventListener('input', e => {
+  if (e.target.id === 'rq') { S.rq = e.target.value; const l = $('#rlist'); if (l) l.innerHTML = reviewItems(); return; }
   if (e.target.id === 'q') { S.q = e.target.value; const l = $('#list'); if (l) l.innerHTML = exploreItems(); }
   const c = e.target.id && $('#c-' + e.target.id); if (c) c.textContent = e.target.value.length + '/' + e.target.maxLength;
 });
