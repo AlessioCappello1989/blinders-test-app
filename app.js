@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261111e';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261113b';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -133,7 +133,27 @@ function lastSeen(uid) {
 const WELCOME_N = 100, WELCOME_MOONS = 20;
 const bonusOf = u => Math.min(WELCOME_MOONS, Math.max(0, Math.floor(+(u && u.bonus) || 0)));
 const moonBase = u => Math.max((u && u.moons) || 0, moonsEarned());
-const moonTotal = u => moonBase(u) + bonusOf(u);
+/* Ricompensa in Lune: chi pubblica un'app promette N Lune a ogni tester che completa i 14 giorni e lascia il feedback.
+   Le Lune guadagnate (rwIn) e pagate (rwOut) si calcolano dagli scambi e si salvano come numeri che non diminuiscono; quelle promesse e non ancora pagate sono bloccate. */
+const REWARD_MAX = 1000, TESTERS_N = 12;
+const rwOf = (sw, owner) => sw.status === 'declined' ? 0 : Math.max(0, Math.min(REWARD_MAX, Math.floor(+((sw.rw || {})[owner]) || 0)));
+function rwTotals() {
+  let inn = 0, out = 0, lock = 0;
+  mine().forEach(sw => {
+    const o = sw.a === me ? sw.b : sw.a;
+    if (sw.fb && sw.fb[me]) inn += rwOf(sw, o);
+    const p = rwOf(sw, me); if (p) { if (sw.fb && sw.fb[o]) out += p; else lock += p; }
+  });
+  return { inn, out, lock };
+}
+const rwReward = a => Math.max(0, Math.min(REWARD_MAX, Math.floor(+(a && a.reward) || 0)));
+const rwCount = aid => mine().filter(sw => sw.status !== 'declined' && aidOf(sw, me) === aid).length;
+const rwMissing = aid => Math.max(1, TESTERS_N - rwCount(aid));
+/* Lune che ho già promesso a tester futuri di tutte le mie app (tranne, se indicata, una sola). */
+function rwFuture(exceptAid) { let n = 0; appsOf(me).forEach(a => { if (a.id !== exceptAid) n += rwReward(a) * rwMissing(a.id); }); return n; }
+const moonsRwOf = u => Math.max(Math.floor(+(u && u.moonsRw) || 0), rwTotals().inn);
+const moonsOutOf = u => Math.max(Math.floor(+(u && u.moonsOut) || 0), rwTotals().out);
+const moonTotal = u => moonBase(u) + bonusOf(u) + moonsRwOf(u);
 /* Posizione di iscrizione: quante persone con il profilo creato prima di me, più me. */
 function joinRank(id) {
   const u = S.users.get(id), t = (u && u.createdAt) || 0; let n = 1;
@@ -141,16 +161,18 @@ function joinRank(id) {
   return n;
 }
 const welcomeKey = () => 'ironblind-welcome-' + me;
-/* Tetto: si possono tenere al massimo 30 Lune; quelle in più si perdono (moonsLost non diminuisce mai, così il tetto non si aggira spendendo). */
-const MOON_MAX = 30;
-const moonLost = u => Math.max(0, Math.floor(+(u && u.moonsLost) || 0));
-const moonBalance = u => Math.max(0, Math.min(MOON_MAX, moonTotal(u) - ((u && u.moonsSpent) || 0) - moonLost(u)));
+/* Nessun tetto alle Lune. moonHeld = Lune che possiedi; moonBalance = quelle libere, cioè senza le Lune promesse come ricompensa. */
+const moonHeld = u => Math.max(0, moonTotal(u) - ((u && u.moonsSpent) || 0) - moonsOutOf(u));
+const moonBalance = u => Math.max(0, moonHeld(u) - rwTotals().lock - rwFuture());
 const moonSlots = u => Math.floor(((u && u.moonsSpent) || 0) / MOON_COST);
 const markers = u => ((u && u.spent) || []).filter(x => x === '#').length;
 /* Slot extra = inviti non usati + slot ottenuti con le Lune o pagati, meno quelli già consumati (massimo 3 app extra). */
 const otherCredits = u => Math.max(0, moonSlots(u) + paidSlots() - markers(u));
 const creditsTotal = u => Math.min(MAX_EXTRA, validInvites().length + otherCredits(u));
 const freeSlots = u => Math.max(0, creditsTotal(u) - extraCount(u));
+const rwOver = () => moonHeld(S.users.get(me)) - rwTotals().lock - rwFuture() < 0;
+const rwCanPromise = aid => { const r = rwReward(appOf(me, aid)); return !r || rwCount(aid) < TESTERS_N || moonBalance(S.users.get(me)) >= r; };
+const rwBadge = a => rwReward(a) ? '<span class="rwb">Guadagna +' + rwReward(a) + ' 🌙</span>' : '';
 const moonLabel = n => '🌕 ' + n + (n === 1 ? ' Luna' : ' Lune');
 let moonWrite = false, pingOn = false;
 /* Test in corso di una persona: scambi attivi in cui ha avviato il test e non ha ancora lasciato il feedback. */
@@ -184,7 +206,7 @@ function progOf(aid) {
 function syncMoons() {
   const u = S.users.get(me); if (!u || moonWrite || busy) return;
   const patch = {}; const t = moonsEarned(); if (t > (u.moons || 0)) patch.moons = t;
-  const ex = moonTotal(u) - ((u.moonsSpent || 0)) - moonLost(u) - MOON_MAX; if (ex > 0) patch.moonsLost = moonLost(u) + ex;
+  const rt = rwTotals(); if (rt.inn > Math.floor(+u.moonsRw || 0)) patch.moonsRw = rt.inn; if (rt.out > Math.floor(+u.moonsOut || 0)) patch.moonsOut = rt.out;
   let welcome = false;
   if (loaded.users && u.nick && !u.bonus && joinRank(me) <= WELCOME_N) { patch.bonus = WELCOME_MOONS; welcome = true; }
   if (loaded.users && u.nick) {
@@ -299,7 +321,7 @@ function exploreItems() {
       arr.push({ id, u, a, ex, own, st: stats(id, a) });
     });
   });
-  arr.sort((x, y) => y.st.done - x.st.done || (y.u.createdAt || 0) - (x.u.createdAt || 0));
+  arr.sort((x, y) => rwReward(y.a) - rwReward(x.a) || y.st.done - x.st.done || (y.u.createdAt || 0) - (x.u.createdAt || 0));
   const note = hidden ? '<p class="small muted">' + hidden + (hidden === 1 ? ' app nascosta perché non è' : ' app nascoste perché non sono') + ' compatibili con i paesi richiesti da te o da loro.</p>' : '';
   if (!arr.length) {
     if (tab === 'build') return '<div class="empty"><h3>Nessun progetto nel Cantiere</h3><p class="muted">Quando uno sviluppatore avvia i 14 giorni di test, la sua app compare qui con la barra di avanzamento.</p></div>' + note;
@@ -336,10 +358,11 @@ function exploreItems() {
         + (bi.ext ? '<p class="small muted">di cui ' + bi.ext + (bi.ext === 1 ? ' esterno' : ' esterni') + '</p>' : '')
         + (x.own ? '' : '<div><button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button></div>');
     }
-    return '<article class="card app' + xcls(x.a.id) + '"><div class="row between"><button class="who" data-act="user" data-id="' + esc(x.id) + '">' + av(x.id) + '<span class="n">' + esc(nameOf(x.id)) + '</span></button>' + rate(x.st) + '</div>'
+    const budget = x.own ? '<div><button type="button" class="btn ghost sm" data-act="budget" data-a="' + esc(x.a.id) + '">🌙 <span>Gestione Budget</span></button></div>' : '';
+    return '<article class="card app' + xcls(x.a.id) + '">' + rwBadge(x.a) + '<div class="row between"><button class="who" data-act="user" data-id="' + esc(x.id) + '">' + av(x.id) + '<span class="n">' + esc(nameOf(x.id)) + '</span></button>' + rate(x.st) + '</div>'
       + '<div><div class="row" style="margin-bottom:4px"><span class="small muted mono">' + (isExtra(x.a.id) ? '' : '📱 ') + 'APP DA TESTARE</span>' + xtag(x.a.id) + (x.own ? '<span class="pill">La tua app</span>' : '') + state + '</div><div class="aprow">' + appIc(x.a) + '<h3 class="appname">' + esc(x.a.name) + '</h3></div><div class="row" style="margin-top:4px"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="chip">' + esc(x.u.country || 'Paese n.d.') + '</span><span class="chip">Cerca: ' + esc(x.a.want || 'tutti i paesi') + '</span><span class="small muted">' + x.st.done + ' tester completati</span></div></div>'
       + (x.a.desc ? '<p class="desc">' + esc(x.a.desc) + '</p>' : '')
-      + extra + pickH + (act ? '<div>' + act + '</div>' : '') + '</article>';
+      + extra + pickH + (act ? '<div>' + act + '</div>' : '') + budget + '</article>';
   }).join('') + note;
 }
 const countryOk2 = () => !!countryOf(me);
@@ -379,7 +402,13 @@ function reviewItems() {
 }
 const reviewsView = () => '<section class="card"><h2>Recensioni</h2><div class="rnote"><b>Dai una mano a chi sviluppa.</b> Recensire un\'app della community aiuta e supporta chi l\'ha creata. Non offriamo ricompense: per noi la recensione è un diritto di chi usa l\'app e deve essere il più sincera possibile. Scrivi solo ciò che pensi davvero.</div></section>'
   + '<div class="grid2"><label for="rq">Cerca un\'app<input id="rq" type="search" value="' + esc(S.rq || '') + '" placeholder="Nome, categoria o sviluppatore"></label></div><div id="rlist">' + reviewItems() + '</div>';
-const exploreView = () => statsBanner() + xtabs() + '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
+/* Le mie app con la ricompensa attuale e l'accesso alla Gestione Budget. */
+function ownRw() {
+  const l = appsOf(me); if (!l.length) return '';
+  return '<section class="card rwcard"><h3>🌙 <span>Ricompensa per i tuoi tester</span></h3><p class="small muted">Offri Lune a chi completa i 14 giorni di test: le app con la ricompensa più alta compaiono in cima a Esplora.</p>'
+    + l.map(a => '<div class="rwrow"><span class="small"><b>' + esc(a.name) + '</b> ' + (rwReward(a) ? '<span class="rwb in">Guadagna +' + rwReward(a) + ' 🌙</span>' : '<span class="muted">Nessuna ricompensa</span>') + '</span><button type="button" class="btn ghost sm" data-act="budget" data-a="' + esc(a.id) + '"><span>Gestione Budget</span></button></div>').join('') + '</section>';
+}
+const exploreView = () => statsBanner() + ownRw() + xtabs() + '<div class="grid2"><label for="q">Cerca un\'app<input id="q" type="search" value="' + esc(S.q) + '" placeholder="Nome, categoria o sviluppatore"></label>' + countryFilter() + '</div><div id="list" class="stack">' + exploreItems() + '</div>' + inviteBox(true);
 
 /* Archivio personale: scambi completati nascosti dall'elenco (salvati nel tuo profilo, l'altro non se ne accorge). */
 const archSet = () => new Set(((S.users.get(me) || {}).arch) || []);
@@ -448,7 +477,8 @@ function appFields(k, ap, title, bonus) {
   const clr = !free ? '' : S.confirmC === k
     ? '<div class="box"><p class="small"><b>Svuotare questo slot?</b> Nome, link, descrizione e tester esterni dell\'app vengono cancellati e l\'app non compare più nei contatori. Lo slot resta tuo. Gli scambi già completati e i feedback restano.</p><div class="row"><button type="button" class="btn primary sm" data-act="clearApp" data-k="' + k + '">Sì, svuota</button><button type="button" class="btn ghost sm" data-act="noClear">Annulla</button></div></div>'
     : '<div><button type="button" class="btn ghost sm" data-act="askClear" data-k="' + k + '">Svuota i campi dello slot</button></div>';
-  return '<div class="slot' + (k === 'main' ? ' main' : '') + '"><div class="row between"><h3>' + title + '</h3>' + pill + '</div>' + note
+  const rwb = ap.name ? '<div class="rwrow"><span class="small">🌙 <span>Ricompensa per tester:</span> <b>' + (rwReward(ap) ? rwReward(ap) + ' 🌙' : '—') + '</b></span><button type="button" class="btn ghost sm" data-act="budget" data-a="' + k + '"><span>Gestione Budget</span></button></div>' : '';
+  return '<div class="slot' + (k === 'main' ? ' main' : '') + '"><div class="row between"><h3>' + title + '</h3>' + pill + '</div>' + note + rwb
     + '<label for="f-app-' + k + '">Nome dell\'app<input id="f-app-' + k + '" maxlength="50"' + dis + ' value="' + esc(ap.name || '') + '"><span class="field-note" id="c-f-app-' + k + '">' + (ap.name || '').length + '/50</span></label>'
     + '<div class="lab-ic"><span class="lab-t">Icona dell\'app</span><div class="icrow">' + icoPv(k, ap) + '<div class="icbtns"><label class="btn ghost sm" for="f-ico-' + k + '">Scegli immagine</label><button type="button" class="btn ghost sm" id="ico-rm-' + k + '" data-act="icoRm" data-k="' + k + '"' + (icoVal(k, ap) ? '' : ' hidden') + '>Rimuovi</button></div></div><input type="file" id="f-ico-' + k + '" class="ico-in" accept="image/png,image/jpeg,image/webp"><span class="field-note" id="ico-n-' + k + '">PNG, JPG o WebP. Meglio un quadrato, come l\'icona che hai su Play Store. Viene ridotta e compressa sul tuo telefono.</span></div>'
     + '<div class="grid2"><label for="f-cat-' + k + '">Categoria<select id="f-cat-' + k + '"' + dis + '>' + opts + '</select></label>'
@@ -627,16 +657,11 @@ function checkIntro() {
 }
 /* ---------- Novità: finestra mostrata una volta per aggiornamento. Per annunciare una novità cambia id e testi qui sotto. ---------- */
 const NEWS = {
-  id: '20261107c',
+  id: '20261113b',
   items: [
-    '👥 Gruppo Google: chi pubblica può scegliere se i tester entrano da un gruppo Google o dalla lista email. Lo trovi nel Profilo, nel campo "Come accederanno i tester".',
-    '👋 Presentazione di benvenuto: ai nuovi iscritti spiega come funziona IronBlind. Puoi rivederla in Impostazioni.',
-    '🔎 Prova di utilizzo: se hai un dubbio che un tester non usi la tua app, puoi chiedergli uno screenshot. Ha 24 ore per inviarlo.',
-    '📦 Archivia: gli scambi completati si possono archiviare e ripristinare dalla pagina Scambi.',
-    '🔍 Filtro per app: se hai più app, in Scambi puoi filtrare per nome.',
-    '🧩 Slot libero: un\'app senza scambi aperti si può svuotare per riusare lo slot.',
-    '🧪 Tester esterni: ora compaiono anche nella card "Tester completati" del Profilo.',
-    '𝕏 Ci trovi anche su X: il link è in Impostazioni.'
+    '🌙 Ricompensa in Lune: chi pubblica un\'app può offrire Lune a chi completa i 14 giorni di test. Imposta la ricompensa da «Gestione Budget», nella scheda della tua app in Esplora o nel Profilo.',
+    '🚀 Più Lune offri, più in alto compari in Esplora: ogni app mostra «Guadagna +N 🌙».',
+    '♾️ Niente più limite di 30 Lune: puoi accumularne quante vuoi, ma puoi offrire solo quelle che hai.'
   ]
 };
 function checkNews() {
@@ -852,15 +877,45 @@ function openInstall() {
     + '<li><b>iPhone/iPad (Safari):</b> Tasto Condividi (quadrato con freccia in alto) ➔ "Aggiungi alla schermata Home".</li></ul>'
     + (isInstalled() ? '<p class="small muted">Stai già usando l\'app installata: non devi fare nulla.</p>' : '') + '</div>');
 }
+/* Gestione Budget: quante Lune offri a ogni tester che completa i 14 giorni di una tua app. Si possono offrire solo Lune che si hanno. */
+function rwLimits(aid) {
+  const u = S.users.get(me) || {}, t = rwTotals(), miss = rwMissing(aid);
+  const freeX = Math.max(0, moonHeld(u) - t.lock - rwFuture(aid));
+  return { miss, freeX, max: Math.min(REWARD_MAX, Math.floor(freeX / miss)), held: moonHeld(u), bal: moonBalance(u) };
+}
+function rwCalc(aid, v) {
+  const L = rwLimits(aid), r = Math.max(0, Math.floor(+v) || 0), lock = r * L.miss;
+  const bad = v === '' || isNaN(+v) || +v < 0 || r > L.max;
+  return { L, r, lock, left: Math.max(0, L.freeX - lock), bad, msg: (v === '' || isNaN(+v) || +v < 0) ? 'Inserisci un numero da 0 in su.' : r > L.max ? (L.max >= REWARD_MAX ? 'La ricompensa massima è ' + REWARD_MAX + ' Lune per tester.' : 'Non hai abbastanza Lune: al massimo ' + L.max + ' per tester.') : '' };
+}
+function budgetView(aid) {
+  const back = '<button class="btn ghost sm back" data-act="back">← Indietro</button>';
+  const ap = appOf(me, aid); if (!ap) return back + '<div class="empty"><h3>App non trovata</h3></div>';
+  const cur = rwReward(ap), c = rwCalc(aid, S.rwv !== undefined && S.rwv.aid === aid ? S.rwv.v : String(cur));
+  const ts = rwTotals(), paid = ts.out;
+  return back + '<div class="bgt"><div class="bgt-top"><img src="avatar-bot.png" alt="" width="56" height="56"><div><h2>' + esc(ap.name) + '</h2><span class="small"><span>Gestione Budget</span></span></div></div>'
+    + '<div class="bgt-st"><div><small>Saldo libero</small><b>' + c.L.bal + ' 🌙</b></div><div class="hi"><small>Ricompensa per tester</small><b>' + cur + ' 🌙</b></div></div>'
+    + '<p class="small">Offri Lune a chi completa i 14 giorni di test sulla tua app. Più Lune offri, più in alto compari in Esplora. Puoi offrire solo le Lune che hai già.</p>'
+    + (c.L.held > c.L.bal ? '<p class="small"><span>Lune che possiedi in tutto:</span> <b>' + c.L.held + ' 🌙</b> · <span>già promesse:</span> <b>' + (c.L.held - c.L.bal) + ' 🌙</b></p>' : '')
+    + '<div class="bgt-box"><h3>🚀 <span>Inietta Lune nella ricompensa</span></h3>'
+    + '<label for="rw-in">Lune per ogni tester<input id="rw-in" type="number" min="0" max="' + REWARD_MAX + '" step="1" inputmode="numeric" value="' + esc(S.rwv !== undefined && S.rwv.aid === aid ? S.rwv.v : String(cur)) + '"></label>'
+    + '<div class="bgt-bar" aria-hidden="true"><i id="rw-bar" style="width:' + (c.L.freeX ? Math.min(100, c.lock / c.L.freeX * 100) : 0) + '%"></i></div>'
+    + '<div class="bgt-calc"><div><span>Tester che mancano</span><b>' + c.L.miss + '</b></div><div><span>Lune che verranno bloccate</span><b id="rw-lock">' + c.lock + '</b></div><div><span>Ti restano libere</span><b id="rw-left">' + c.left + '</b></div><div><span>Massimo per tester</span><b>' + c.L.max + '</b></div></div>'
+    + '<div class="bgt-msg" id="rw-msg" role="status">' + esc(c.msg) + '</div>'
+    + '<div class="row"><button type="button" class="btn primary" id="rw-go" data-act="rwSet" data-a="' + esc(aid) + '"' + (c.bad ? ' disabled' : '') + '><span>Inietta</span> 🌙</button><button type="button" class="btn ghost" data-act="rwOff" data-a="' + esc(aid) + '"' + (cur ? '' : ' disabled') + '><span>Togli ricompensa</span></button></div></div>'
+    + '<p class="small"><span>Pagate finora ai tester:</span> <b>' + paid + ' 🌙</b></p>'
+    + '<p class="small muted">Il tester riceve le Lune quando completa i 14 giorni e lascia il feedback. La ricompensa promessa a chi ha già uno scambio con te non cambia se poi la modifichi.</p>'
+    + '<p class="small muted">Le Lune sono un riconoscimento interno di IronBlind: non hanno valore in denaro.</p></div>';
+}
 function moonCard(u) {
   if (!S.users.get(me)) return '';
-  const bal = moonBalance(u), pct = Math.min(100, Math.round(bal / MOON_COST * 100));
+  const bal = moonBalance(u), held = moonHeld(u), pct = Math.min(100, Math.round(bal / MOON_COST * 100));
   const can = bal >= MOON_COST && creditsTotal(u) < MAX_EXTRA;
   return '<div class="card"><div class="row between"><h2>Le tue Lune</h2><span class="pill ok" aria-label="' + bal + ' Lune">' + moonLabel(bal) + '</span></div>'
     + '<div class="bar" role="img" aria-label="' + bal + ' su ' + MOON_COST + ' Lune"><i style="width:' + pct + '%"></i></div>'
     + '<p class="small muted">Ogni giorno di test completato in cui accedi a IronBlind ti dà +1 Luna (massimo 14 per scambio). Con ' + MOON_COST + ' Lune sblocchi uno slot extra.</p>'
-    + '<p class="small muted">Il massimo che puoi tenere è ' + MOON_MAX + ': oltre, le nuove Lune si perdono.</p><p class="small mono muted">' + bal + '/' + MOON_MAX + '</p>'
-    + (can && bal >= MOON_MAX - 5 ? '<p class="small"><b>' + (bal >= MOON_MAX ? 'Sei al massimo: le nuove Lune si perdono finché non ne usi.' : 'Sei vicino al massimo: usa le Lune prima di perderle.') + '</b></p>' : '')
+    + '<p class="small muted">Non c\'è un limite alle Lune che puoi tenere. Puoi usarle anche per offrire una ricompensa ai tester della tua app, dalla scheda dell\'app.</p>'
+    + (held > bal ? '<p class="small muted"><span>Lune promesse come ricompensa:</span> <b>' + (held - bal) + '</b></p>' : '')
     + (can ? '<div><button type="button" class="btn primary" data-act="moonRedeem">Usa ' + MOON_COST + ' Lune per sbloccare uno Slot Extra</button></div>'
       : (bal >= MOON_COST ? '<p class="small muted">Hai già il massimo di slot extra.</p>' : '')) + '</div>';
 }
@@ -999,6 +1054,11 @@ async function changeSwapApp(sid, mA) {
     toast('App aggiornata');
   } catch (e) { toastErr(e); } finally { busy = false; render(true); }
 }
+function rwInfo(s, o) {
+  const g = rwOf(s, o), p = rwOf(s, me); if (!g && !p) return '';
+  const row = (t, n, done) => '<div class="rwrow"><span class="small">🌙 <span>' + t + '</span> <b>+' + n + ' 🌙</b></span><span class="pill ' + (done ? 'ok' : '') + '">' + (done ? 'Pagata' : 'Al completamento') + '</span></div>';
+  return (g ? row('Ricompensa per il tuo test:', g, !!(s.fb && s.fb[me])) : '') + (p ? row('Ricompensa che offri a ' + nameOf(o) + ':', p, !!(s.fb && s.fb[o])) : '');
+}
 function swapView(id) {
   const s = S.swaps.get(id) && Object.assign({ id }, S.swaps.get(id));
   const back = '<button class="btn ghost sm back" data-act="back">← Indietro</button>';
@@ -1006,10 +1066,11 @@ function swapView(id) {
   const o = s.a === me ? s.b : s.a;
   const oApp = (s.apps && s.apps[o]) || {}, mApp = (s.apps && s.apps[me]) || {};
   let h = back + '<div class="card"><div class="row between"><button class="who" data-act="user" data-id="' + esc(o) + '">' + av(o) + '<span class="n">' + esc(nameOf(o)) + '</span></button>' + statusPill(s) + '</div>'
+    + rwInfo(s, o)
     + (s.status === 'active' ? (() => { const ls = lastSeen(o); return '<div class="row" style="gap:6px"><span class="small muted">🕒 Ultimo accesso:</span><span class="pill ' + (ls.old ? 'warn' : 'ok') + '">' + ls.t + '</span></div>'; })() : '')
-    + '<div class="box mini' + xcls(aidOf(s, o)) + '"><div class="row between"><span class="small muted mono">TU TESTI</span>' + xtag(aidOf(s, o)) + '</div><div class="aprow sm">' + appIc(oApp, 'sm') + '<b>' + esc(oApp.name || 'App') + '</b></div>'
+    + '<div class="box mini' + xcls(aidOf(s, o)) + '"><div class="row between"><span class="small muted mono">TU TESTI</span>' + xtag(aidOf(s, o)) + '</div><div class="aprow sm">' + appIc(oApp, 'sm') + '<b>' + esc(oApp.name || 'App') + '</b></div>' + (rwOf(s, o) ? '<div class="small"><span class="rwb in">Guadagna +' + rwOf(s, o) + ' 🌙</span> <span class="muted">' + (s.fb && s.fb[me] ? 'ricevute' : 'dopo i 14 giorni e il feedback') + '</span></div>' : '')
     + (s.status === 'active' ? (S.theirLink === undefined ? '<span class="small muted">Caricamento…</span>' : (S.theirLink ? link(S.theirLink) : '<span class="small muted">Il link di test non è disponibile.</span>')) : '<span class="small muted">Il link di test si sblocca quando lo scambio viene accettato.</span>') + '</div>'
-    + '<div class="box mini' + xcls(aidOf(s, me)) + '"><div class="row between"><span class="small muted mono">LUI TESTA</span>' + xtag(aidOf(s, me)) + '</div><div class="aprow sm">' + appIc(mApp, 'sm') + '<b>' + esc(mApp.name || 'La tua app') + '</b></div>' + swapAppPicker(s, o) + '</div></div>';
+    + '<div class="box mini' + xcls(aidOf(s, me)) + '"><div class="row between"><span class="small muted mono">LUI TESTA</span>' + xtag(aidOf(s, me)) + '</div><div class="aprow sm">' + appIc(mApp, 'sm') + '<b>' + esc(mApp.name || 'La tua app') + '</b></div>' + (rwOf(s, me) ? '<div class="small"><span class="muted">Tu offri</span> <span class="rwb in">+' + rwOf(s, me) + ' 🌙</span> <span class="muted">' + (s.fb && s.fb[o] ? 'pagate' : 'bloccate fino al suo feedback') + '</span></div>' : '') + swapAppPicker(s, o) + '</div></div>';
   if (s.status === 'proposed') {
     if (s.b === me) return h + '<div class="card"><p>' + esc(nameOf(o)) + ' propone di testarsi a vicenda.</p><div class="row"><button class="btn primary" data-act="accept" data-id="' + esc(id) + '">Accetta</button><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Rifiuta</button></div></div>';
     return h + '<div class="card"><p>Richiesta inviata. Quando ' + esc(nameOf(o)) + ' accetta si apre la chat.</p><div><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Annulla richiesta</button></div></div>';
@@ -1151,7 +1212,8 @@ function render(force) {
   $('#navin').innerHTML = [['explore', 'Esplora'], ['swaps', 'Scambi'], ['reviews', 'Recensioni'], ['profile', 'Profilo'], ['settings', 'Impostazioni']].map(t => '<button class="navb' + (S.tab === t[0] && !S.route ? ' on' : '') + '" data-act="tab" data-tab="' + t[0] + '"><span class="ni" aria-hidden="true">' + NAV_ICO[t[0]] + (t[0] === 'swaps' && rec ? '<span class="dot">' + rec + '</span>' : '') + '</span><span class="nl">' + t[1] + '</span></button>').join('');
   $('#nav').hidden = false; $('#out').hidden = true;
   let h = '';
-  if (S.route && S.route.t === 'user') h += S.route.id === me ? profileView(me, true) : profileView(S.route.id, false);
+  if (S.route && S.route.t === 'budget') h += budgetView(S.route.aid);
+  else if (S.route && S.route.t === 'user') h += S.route.id === me ? profileView(me, true) : profileView(S.route.id, false);
   else if (S.route && S.route.t === 'swap') h += swapView(S.route.id);
   else if (S.tab === 'explore') h += exploreView();
   else if (S.tab === 'swaps') h += swapsView();
@@ -1296,6 +1358,15 @@ document.addEventListener('click', async e => {
     if (act === 'copy') { try { await navigator.clipboard.writeText(b.dataset.text); toast(b.dataset.msg || 'Email copiata'); } catch (x) { toast('Copia non disponibile: seleziona il testo a mano'); } return; }
     busy = true; b.disabled = true;
     const s = S.swaps.get(id);
+    if (act === 'budget') { S.route = { t: 'budget', aid: b.dataset.a || 'main' }; S.rwv = undefined; render(true); window.scrollTo(0, 0); return; }
+    if (act === 'rwSet' || act === 'rwOff') {
+      const aid = b.dataset.a || 'main', ap = appOf(me, aid); if (!ap) return;
+      const inp = $('#rw-in'), c = rwCalc(aid, act === 'rwOff' ? '0' : (inp ? inp.value : '0'));
+      if (c.bad) { toast(c.msg || 'Valore non valido.'); return; }
+      const path = (aid === 'main' ? 'app' : 'extra.' + aid) + '.reward';
+      await updateDoc(doc(db, 'users', me), { [path]: c.r });
+      S.rwv = undefined; toast(c.r ? 'Ricompensa impostata: ' + c.r + ' Lune per tester' : 'Ricompensa tolta'); render(true); return;
+    }
     if (act === 'moonRedeem') {
       const u = S.users.get(me);
       if (!u || moonBalance(u) < MOON_COST) { toast('Non hai abbastanza Lune.'); return; }
@@ -1402,13 +1473,18 @@ document.addEventListener('click', async e => {
       if (ac.err) { toast(ac.err); return; }
       const apps = {}; apps[me] = { name: mineA.name }; apps[id] = { name: them.name };
       const appIds = {}; appIds[me] = mA; appIds[id] = oA;
-      const ref = await addDoc(collection(db, 'swaps'), { a: me, b: id, members: [me, id], apps, appIds, status: 'proposed', createdAt: Date.now(), start: {}, fb: {} });
+      if (!rwCanPromise(mA)) { toast('Non hai abbastanza Lune libere per la ricompensa della tua app. Abbassala da Gestione Budget.'); return; }
+      const rw = {}; if (rwReward(mineA)) rw[me] = rwReward(mineA); if (rwReward(them)) rw[id] = rwReward(them);
+      const sdoc = { a: me, b: id, members: [me, id], apps, appIds, status: 'proposed', createdAt: Date.now(), start: {}, fb: {} };
+      if (Object.keys(rw).length) sdoc.rw = rw;
+      const ref = await addDoc(collection(db, 'swaps'), sdoc);
       await setDoc(doc(db, 'swaps', ref.id, 'links', me), ac.doc);
       toast('Richiesta inviata'); S.tab = 'swaps'; S.route = { t: 'swap', id: ref.id };
     } else if (act === 'accept') {
       const oo = s.a === me ? s.b : s.a; const mA = aidOf(s, me), oA = aidOf(s, oo);
       if (!appOf(me, mA)) { toast('L\'app di questo scambio non è più nel tuo profilo.'); return; }
       if (!compat(me, mA, oo, oA)) { toast('Scambio non compatibile con i paesi richiesti.'); return; }
+      if (rwOf(s, me) && rwOver()) { toast('Non hai abbastanza Lune libere per la ricompensa promessa in questo scambio.'); return; }
       const ac = accessDoc(mA);
       if (ac.err) { toast(ac.err); return; }
       const ab = writeBatch(db);
@@ -1476,6 +1552,13 @@ document.addEventListener('change', async e => {
   t.value = '';
 });
 document.addEventListener('input', e => {
+  if (e.target.id === 'rw-in' && S.route && S.route.t === 'budget') {
+    const aid = S.route.aid, c = rwCalc(aid, e.target.value); S.rwv = { aid, v: e.target.value };
+    const g = id => document.getElementById(id);
+    if (g('rw-lock')) g('rw-lock').textContent = c.lock; if (g('rw-left')) g('rw-left').textContent = c.left;
+    if (g('rw-bar')) g('rw-bar').style.width = (c.L.freeX ? Math.min(100, c.lock / c.L.freeX * 100) : 0) + '%';
+    if (g('rw-msg')) g('rw-msg').textContent = c.msg; if (g('rw-go')) g('rw-go').disabled = c.bad; return;
+  }
   if (e.target.id === 'rq') { S.rq = e.target.value; const l = $('#rlist'); if (l) l.innerHTML = reviewItems(); return; }
   if (e.target.id === 'q') { S.q = e.target.value; const l = $('#list'); if (l) l.innerHTML = exploreItems(); }
   const c = e.target.id && $('#c-' + e.target.id); if (c) c.textContent = e.target.value.length + '/' + e.target.maxLength;
@@ -1535,6 +1618,7 @@ document.addEventListener('submit', async e => {
         const en = $('#f-extn-' + k);
         if (en) { const n = en.value === '' ? 0 : Number(en.value), ds = $('#f-exts-' + k).value; if (n > 0 && ds) app.ext = { n, start: new Date(ds + 'T00:00:00').getTime() }; else delete app.ext; }
         if (prev.prog) app.prog = prev.prog;
+        if (prev.reward) app.reward = prev.reward;
         { const ic = (S.ico && k in S.ico) ? S.ico[k] : prev.icon; if (ic && ICO_RE.test(ic) && ic.length <= ICO_MAX) app.icon = ic; else delete app.icon; }
         const lk = locked ? linkFor(k) : $('#f-link-' + k).value.trim();
         const ac = $('#f-acc-' + k); let gl = '';
@@ -1547,7 +1631,8 @@ document.addEventListener('submit', async e => {
       if (old.spent && old.spent.length) data.spent = old.spent;
       if (old.moons) data.moons = old.moons;
       if (old.bonus) data.bonus = old.bonus;
-      if (old.moonsLost) data.moonsLost = old.moonsLost;
+      if (old.moonsRw) data.moonsRw = old.moonsRw;
+      if (old.moonsOut) data.moonsOut = old.moonsOut;
       if (old.seen) data.seen = old.seen;
       if (old.arch) data.arch = old.arch;
       if (old.testing) data.testing = old.testing;
