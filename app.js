@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261113c';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261113d';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -156,7 +156,7 @@ const moonsOutOf = u => Math.max(Math.floor(+(u && u.moonsOut) || 0), rwTotals()
 /* Apri applicazione: una volta al giorno, durante i 14 giorni di test, il pulsante registra il test di oggi e dà OPEN_MOONS Lune (massimo 14 giorni per scambio). */
 const OPEN_MOONS = 5;
 const isAndroid = () => /Android/i.test(navigator.userAgent || '');
-const pkgOf = l => { const m = /play\.google\.com\/apps\/testing\/([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)/i.exec(l || ''); return m ? m[1] : ''; };
+const pkgOf = l => { const m = /play\.google\.com\/(?:apps\/testing\/|store\/apps\/details\?(?:[^#\s]*&)?id=)([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)/i.exec(l || ''); return m ? m[1] : ''; };
 const openUrl = (pkg, link) => 'intent://#Intent;package=' + pkg + ';action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;S.browser_fallback_url=' + encodeURIComponent(link) + ';end';
 const opensOf = (u, sid) => (u && u.opens && Array.isArray(u.opens[sid])) ? u.opens[sid] : [];
 const openMoons = u => Math.max(0, Math.floor(+(u && u.moonsOpen) || 0));
@@ -681,7 +681,7 @@ function checkIntro() {
 }
 /* ---------- Novità: finestra mostrata una volta per aggiornamento. Per annunciare una novità cambia id e testi qui sotto. ---------- */
 const NEWS = {
-  id: '20261113c',
+  id: '20261113d',
   items: [
     '🌙 Ricompensa in Lune: chi pubblica un\'app può offrire Lune a chi completa i 14 giorni di test. Imposta la ricompensa da «Gestione Budget», nella scheda della tua app in Esplora o nel Profilo.',
     '🚀 Più Lune offri, più in alto compari in Esplora: ogni app mostra «Guadagna +N 🌙».',
