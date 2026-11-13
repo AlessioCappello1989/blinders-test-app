@@ -5,6 +5,14 @@ let getLang = () => 'it';
 export function setLangGetter(f) { getLang = f; }
 
 const E = {
+  /* apri applicazione */
+  '▶️ Apri applicazione: su Android, dallo scambio apri l\'app che stai testando. Una volta al giorno il test fatto ti dà +5 🌙.': '▶️ Open app: on Android, open the app you are testing from the swap. Once a day, the test you did gives you +5 🌙.',
+  'Apri applicazione': 'Open app', 'Una volta al giorno ricevi +5 🌙 per il test di oggi.': 'Once a day you get +5 🌙 for today\'s test.',
+  '✅ Test di oggi fatto: attendi la prossima giornata per la ricompensa.': '✅ Today\'s test is done: wait for the next day for the reward.',
+  'Hai già raccolto le Lune di tutti i giorni di questo test.': 'You have already collected the Moons for every day of this test.',
+  'Avvia il test per guadagnare Lune aprendo l\'app.': 'Start the test to earn Moons by opening the app.',
+  'Test di oggi fatto: attendi la prossima giornata per la ricompensa.': 'Today\'s test is done: wait for the next day for the reward.',
+  '+5 Lune: test di oggi registrato': '+5 Moons: today\'s test recorded',
   /* ricompensa in Lune */
   '🌙 Ricompensa in Lune: chi pubblica un\'app può offrire Lune a chi completa i 14 giorni di test. Imposta la ricompensa da «Gestione Budget», nella scheda della tua app in Esplora o nel Profilo.': '🌙 Moon reward: whoever publishes an app can offer Moons to those who complete the 14 days of testing. Set the reward from “Budget”, on your app card in Explore or in Profile.',
   '🚀 Più Lune offri, più in alto compari in Esplora: ogni app mostra «Guadagna +N 🌙».': '🚀 The more Moons you offer, the higher you appear in Explore: each app shows “Earn +N 🌙”.',

@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261113b';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261113c';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -153,7 +153,31 @@ const rwMissing = aid => Math.max(1, TESTERS_N - rwCount(aid));
 function rwFuture(exceptAid) { let n = 0; appsOf(me).forEach(a => { if (a.id !== exceptAid) n += rwReward(a) * rwMissing(a.id); }); return n; }
 const moonsRwOf = u => Math.max(Math.floor(+(u && u.moonsRw) || 0), rwTotals().inn);
 const moonsOutOf = u => Math.max(Math.floor(+(u && u.moonsOut) || 0), rwTotals().out);
-const moonTotal = u => moonBase(u) + bonusOf(u) + moonsRwOf(u);
+/* Apri applicazione: una volta al giorno, durante i 14 giorni di test, il pulsante registra il test di oggi e dà OPEN_MOONS Lune (massimo 14 giorni per scambio). */
+const OPEN_MOONS = 5;
+const isAndroid = () => /Android/i.test(navigator.userAgent || '');
+const pkgOf = l => { const m = /play\.google\.com\/apps\/testing\/([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)/i.exec(l || ''); return m ? m[1] : ''; };
+const openUrl = (pkg, link) => 'intent://#Intent;package=' + pkg + ';action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;S.browser_fallback_url=' + encodeURIComponent(link) + ';end';
+const opensOf = (u, sid) => (u && u.opens && Array.isArray(u.opens[sid])) ? u.opens[sid] : [];
+const openMoons = u => Math.max(0, Math.floor(+(u && u.moonsOpen) || 0));
+/* 'no' = test non avviato o finito, 'todo' = oggi ancora da registrare, 'done' = oggi già registrato, 'full' = tutti i 14 giorni raccolti */
+function openState(s) {
+  const el = elapsed(s, me); if (s.status !== 'active' || el === null || el > 14 || (s.fb && s.fb[me])) return 'no';
+  const l = opensOf(S.users.get(me), s.id);
+  if (l.indexOf(dkey(Date.now())) > -1) return 'done';
+  return l.length >= 14 ? 'full' : 'todo';
+}
+function openBox(s) {
+  if (s.status !== 'active' || !isAndroid() || !S.theirLink) return '';
+  const pkg = pkgOf(S.theirLink); if (!pkg) return '';
+  const st = openState(s);
+  const msg = st === 'todo' ? 'Una volta al giorno ricevi +' + OPEN_MOONS + ' 🌙 per il test di oggi.'
+    : st === 'done' ? '✅ Test di oggi fatto: attendi la prossima giornata per la ricompensa.'
+    : st === 'full' ? 'Hai già raccolto le Lune di tutti i giorni di questo test.'
+    : (elapsed(s, me) === null ? 'Avvia il test per guadagnare Lune aprendo l\'app.' : '');
+  return '<div><button type="button" class="btn primary" data-act="openApp" data-id="' + esc(s.id) + '">▶ <span>Apri applicazione</span></button></div>' + (msg ? '<p class="small muted openmsg">' + msg.replace(/^✅ /, '✅ ') + '</p>' : '');
+}
+const moonTotal = u => moonBase(u) + bonusOf(u) + moonsRwOf(u) + openMoons(u);
 /* Posizione di iscrizione: quante persone con il profilo creato prima di me, più me. */
 function joinRank(id) {
   const u = S.users.get(id), t = (u && u.createdAt) || 0; let n = 1;
@@ -657,10 +681,11 @@ function checkIntro() {
 }
 /* ---------- Novità: finestra mostrata una volta per aggiornamento. Per annunciare una novità cambia id e testi qui sotto. ---------- */
 const NEWS = {
-  id: '20261113b',
+  id: '20261113c',
   items: [
     '🌙 Ricompensa in Lune: chi pubblica un\'app può offrire Lune a chi completa i 14 giorni di test. Imposta la ricompensa da «Gestione Budget», nella scheda della tua app in Esplora o nel Profilo.',
     '🚀 Più Lune offri, più in alto compari in Esplora: ogni app mostra «Guadagna +N 🌙».',
+    '▶️ Apri applicazione: su Android, dallo scambio apri l\'app che stai testando. Una volta al giorno il test fatto ti dà +5 🌙.',
     '♾️ Niente più limite di 30 Lune: puoi accumularne quante vuoi, ma puoi offrire solo quelle che hai.'
   ]
 };
@@ -1069,7 +1094,7 @@ function swapView(id) {
     + rwInfo(s, o)
     + (s.status === 'active' ? (() => { const ls = lastSeen(o); return '<div class="row" style="gap:6px"><span class="small muted">🕒 Ultimo accesso:</span><span class="pill ' + (ls.old ? 'warn' : 'ok') + '">' + ls.t + '</span></div>'; })() : '')
     + '<div class="box mini' + xcls(aidOf(s, o)) + '"><div class="row between"><span class="small muted mono">TU TESTI</span>' + xtag(aidOf(s, o)) + '</div><div class="aprow sm">' + appIc(oApp, 'sm') + '<b>' + esc(oApp.name || 'App') + '</b></div>' + (rwOf(s, o) ? '<div class="small"><span class="rwb in">Guadagna +' + rwOf(s, o) + ' 🌙</span> <span class="muted">' + (s.fb && s.fb[me] ? 'ricevute' : 'dopo i 14 giorni e il feedback') + '</span></div>' : '')
-    + (s.status === 'active' ? (S.theirLink === undefined ? '<span class="small muted">Caricamento…</span>' : (S.theirLink ? link(S.theirLink) : '<span class="small muted">Il link di test non è disponibile.</span>')) : '<span class="small muted">Il link di test si sblocca quando lo scambio viene accettato.</span>') + '</div>'
+    + (s.status === 'active' ? (S.theirLink === undefined ? '<span class="small muted">Caricamento…</span>' : (S.theirLink ? link(S.theirLink) + openBox(s) : '<span class="small muted">Il link di test non è disponibile.</span>')) : '<span class="small muted">Il link di test si sblocca quando lo scambio viene accettato.</span>') + '</div>'
     + '<div class="box mini' + xcls(aidOf(s, me)) + '"><div class="row between"><span class="small muted mono">LUI TESTA</span>' + xtag(aidOf(s, me)) + '</div><div class="aprow sm">' + appIc(mApp, 'sm') + '<b>' + esc(mApp.name || 'La tua app') + '</b></div>' + (rwOf(s, me) ? '<div class="small"><span class="muted">Tu offri</span> <span class="rwb in">+' + rwOf(s, me) + ' 🌙</span> <span class="muted">' + (s.fb && s.fb[o] ? 'pagate' : 'bloccate fino al suo feedback') + '</span></div>' : '') + swapAppPicker(s, o) + '</div></div>';
   if (s.status === 'proposed') {
     if (s.b === me) return h + '<div class="card"><p>' + esc(nameOf(o)) + ' propone di testarsi a vicenda.</p><div class="row"><button class="btn primary" data-act="accept" data-id="' + esc(id) + '">Accetta</button><button class="btn ghost" data-act="decline" data-id="' + esc(id) + '">Rifiuta</button></div></div>';
@@ -1358,6 +1383,20 @@ document.addEventListener('click', async e => {
     if (act === 'copy') { try { await navigator.clipboard.writeText(b.dataset.text); toast(b.dataset.msg || 'Email copiata'); } catch (x) { toast('Copia non disponibile: seleziona il testo a mano'); } return; }
     busy = true; b.disabled = true;
     const s = S.swaps.get(id);
+    if (act === 'openApp') {
+      const sw = S.swaps.get(id); if (!sw) return; const s0 = Object.assign({ id }, sw), pkg = pkgOf(S.theirLink); if (!pkg) return;
+      const st = openState(s0), u = S.users.get(me) || {}; let wr = null;
+      if (st === 'todo') {
+        const opens = {}; Object.keys(u.opens || {}).forEach(k => { if (S.swaps.has(k)) opens[k] = u.opens[k]; });
+        opens[id] = opensOf(u, id).concat(dkey(Date.now())).slice(-14);
+        wr = updateDoc(doc(db, 'users', me), { opens, moonsOpen: openMoons(u) + OPEN_MOONS });
+        toast('+' + OPEN_MOONS + ' Lune: test di oggi registrato');
+      } else if (st === 'done') toast('Test di oggi fatto: attendi la prossima giornata per la ricompensa.');
+      else if (st === 'full') toast('Hai già raccolto le Lune di tutti i giorni di questo test.');
+      location.href = openUrl(pkg, S.theirLink);
+      if (wr) await wr;
+      return;
+    }
     if (act === 'budget') { S.route = { t: 'budget', aid: b.dataset.a || 'main' }; S.rwv = undefined; render(true); window.scrollTo(0, 0); return; }
     if (act === 'rwSet' || act === 'rwOff') {
       const aid = b.dataset.a || 'main', ap = appOf(me, aid); if (!ap) return;
@@ -1632,6 +1671,8 @@ document.addEventListener('submit', async e => {
       if (old.moons) data.moons = old.moons;
       if (old.bonus) data.bonus = old.bonus;
       if (old.moonsRw) data.moonsRw = old.moonsRw;
+      if (old.moonsOpen) data.moonsOpen = old.moonsOpen;
+      if (old.opens) data.opens = old.opens;
       if (old.moonsOut) data.moonsOut = old.moonsOut;
       if (old.seen) data.seen = old.seen;
       if (old.arch) data.arch = old.arch;
