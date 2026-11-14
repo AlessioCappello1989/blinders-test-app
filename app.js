@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261113d';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261113e';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -759,7 +759,9 @@ function bellRows(items) {
 }
 function updateBell() {
   const bt = $('#bell'); if (!bt) return;
-  bt.hidden = !me; if (!me) { closeBell(); bellPrev = null; return; }
+  bt.hidden = !me; if (!me) { closeBell(); bellPrev = null; const m0 = $('#mbal'); if (m0) m0.hidden = true; return; }
+  const mb = $('#mbal'), mu = S.users.get(me);
+  if (mb) { mb.hidden = !(mu && mu.nick); if (!mb.hidden) { const hv = moonHeld(mu), tx = '🌙 ' + (hv >= 100000 ? Math.round(hv / 1000) + 'k' : fmtN(hv)); if (mb.textContent !== tx) mb.textContent = tx; } }
   const items = notifItems(), n = items.length, bd = $('#bd');
   bd.textContent = n > 9 ? '9+' : String(n); bd.classList.toggle('on', n > 0);
   bt.setAttribute('aria-label', n ? 'Notifiche, ' + n + ' da vedere' : 'Notifiche');
