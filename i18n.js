@@ -14,6 +14,7 @@ const E = {
   'Test di oggi fatto: attendi la prossima giornata per la ricompensa.': 'Today\'s test is done: wait for the next day for the reward.',
   '+5 Lune: test di oggi registrato': '+5 Moons: today\'s test recorded',
   /* ricompensa in Lune */
+  'Lune libere': 'Free Moons', 'Lune bloccate per ogni nuovo tester': 'Moons locked for each new tester', 'Dopo il primo tester ti restano': 'After the first tester you keep',
   '🌙 Ricompensa in Lune: chi pubblica un\'app può offrire Lune a chi completa i 14 giorni di test. Imposta la ricompensa da «Gestione Budget», nella scheda della tua app in Esplora o nel Profilo.': '🌙 Moon reward: whoever publishes an app can offer Moons to those who complete the 14 days of testing. Set the reward from “Budget”, on your app card in Explore or in Profile.',
   '🚀 Più Lune offri, più in alto compari in Esplora: ogni app mostra «Guadagna +N 🌙».': '🚀 The more Moons you offer, the higher you appear in Explore: each app shows “Earn +N 🌙”.',
   '♾️ Niente più limite di 30 Lune: puoi accumularne quante vuoi, ma puoi offrire solo quelle che hai.': '♾️ No more 30-Moon limit: collect as many as you like, but you can only offer the ones you have.',
