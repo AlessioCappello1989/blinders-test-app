@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261114c';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261114d';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -148,12 +148,15 @@ function rwTotals() {
 }
 const rwReward = a => Math.max(0, Math.min(REWARD_MAX, Math.floor(+(a && a.reward) || 0)));
 const rwCount = aid => mine().filter(sw => sw.status !== 'declined' && aidOf(sw, me) === aid).length;
-const rwMissing = aid => Math.max(1, TESTERS_N - rwCount(aid));
-/* Lune riservate alla ricompensa: per ogni app con una ricompensa si riserva almeno quella di un tester, oppure di più se ci sono già scambi
-   con la ricompensa promessa e non ancora pagata. Se indicata, exceptAid conta solo le Lune già promesse a scambi veri di quell'app. */
+/* Tester che ti servono ancora = 12, meno gli esterni dichiarati, meno gli scambi già presi su IronBlind. */
+const rwNeed = a => a ? Math.max(0, TESTERS_N - buildInfo(a).ext - rwCount(a.id)) : 0;
+/* La ricompensa si vede in Esplora (e fa salire in classifica) solo se manca ancora qualche tester. */
+const rwShown = a => rwReward(a) > 0 && buildInfo(a).n < TESTERS_N;
+/* Lune riservate alla ricompensa: quelle già promesse a scambi veri più, per ogni app, ricompensa × tester che ancora ti servono.
+   Se indicata, exceptAid conta di quell'app solo le Lune già promesse a scambi veri. */
 function rwReserve(exceptAid) {
   const t = rwTotals(), ids = {}; let n = 0;
-  appsOf(me).forEach(a => { ids[a.id] = 1; const l = t.lockBy[a.id] || 0; n += a.id === exceptAid ? l : Math.max(rwReward(a), l); });
+  appsOf(me).forEach(a => { ids[a.id] = 1; n += (t.lockBy[a.id] || 0) + (a.id === exceptAid ? 0 : rwReward(a) * rwNeed(a)); });
   Object.keys(t.lockBy).forEach(k => { if (!ids[k]) n += t.lockBy[k]; });
   return n;
 }
@@ -201,8 +204,8 @@ const otherCredits = u => Math.max(0, moonSlots(u) + paidSlots() - markers(u));
 const creditsTotal = u => Math.min(MAX_EXTRA, validInvites().length + otherCredits(u));
 const freeSlots = u => Math.max(0, creditsTotal(u) - extraCount(u));
 const rwOver = () => moonHeld(S.users.get(me)) - rwReserve() < 0;
-const rwCanPromise = aid => { const r = rwReward(appOf(me, aid)); return !r || moonBalance(S.users.get(me)) >= Math.min(r, rwTotals().lockBy[aid] || 0); };
-const rwBadge = a => rwReward(a) ? '<span class="rwb">Guadagna +' + rwReward(a) + ' 🌙</span>' : '';
+const rwCanPromise = aid => { const ap = appOf(me, aid), r = rwReward(ap); return !r || rwNeed(ap) > 0 || moonBalance(S.users.get(me)) >= r; };
+const rwBadge = a => rwShown(a) ?'<span class="rwb">Guadagna +' + rwReward(a) + ' 🌙</span>' : '';
 const moonLabel = n => '🌕 ' + n + (n === 1 ? ' Luna' : ' Lune');
 let moonWrite = false, pingOn = false;
 /* Test in corso di una persona: scambi attivi in cui ha avviato il test e non ha ancora lasciato il feedback. */
@@ -351,7 +354,7 @@ function exploreItems() {
       arr.push({ id, u, a, ex, own, st: stats(id, a) });
     });
   });
-  arr.sort((x, y) => rwReward(y.a) - rwReward(x.a) || y.st.done - x.st.done || (y.u.createdAt || 0) - (x.u.createdAt || 0));
+  arr.sort((x, y) => (rwShown(y.a) ? rwReward(y.a) : 0) - (rwShown(x.a) ? rwReward(x.a) : 0) ||y.st.done - x.st.done || (y.u.createdAt || 0) - (x.u.createdAt || 0));
   const note = hidden ? '<p class="small muted">' + hidden + (hidden === 1 ? ' app nascosta perché non è' : ' app nascoste perché non sono') + ' compatibili con i paesi richiesti da te o da loro.</p>' : '';
   if (!arr.length) {
     if (tab === 'build') return '<div class="empty"><h3>Nessun progetto nel Cantiere</h3><p class="muted">Quando uno sviluppatore avvia i 14 giorni di test, la sua app compare qui con la barra di avanzamento.</p></div>' + note;
@@ -912,14 +915,15 @@ function openInstall() {
 }
 /* Gestione Budget: quante Lune offri a ogni tester che completa i 14 giorni di una tua app. Si possono offrire solo Lune che si hanno. */
 function rwLimits(aid) {
-  const u = S.users.get(me) || {}, t = rwTotals();
+  const u = S.users.get(me) || {}, need = rwNeed(appOf(me, aid));
   const freeX = Math.max(0, moonHeld(u) - rwReserve(aid));
-  return { freeX, lock: rwReserve(), max: Math.min(REWARD_MAX, freeX), held: moonHeld(u), bal: moonBalance(u) };
+  return { freeX, need, lock: rwReserve(), max: need > 0 ? Math.min(REWARD_MAX, Math.floor(freeX / need)) : 0, held: moonHeld(u), bal: moonBalance(u) };
 }
 function rwCalc(aid, v) {
-  const L = rwLimits(aid), r = Math.max(0, Math.floor(+v) || 0), lock = r;
-  const bad = v === '' || isNaN(+v) || +v < 0 || r > L.max;
-  return { L, r, lock, left: Math.max(0, L.freeX - lock), bad, msg: (v === '' || isNaN(+v) || +v < 0) ? 'Inserisci un numero da 0 in su.' : r > L.max ? (L.max >= REWARD_MAX ? 'La ricompensa massima è ' + REWARD_MAX + ' Lune per tester.' : 'Non hai abbastanza Lune: al massimo ' + L.max + ' per tester.') : '' };
+  const L = rwLimits(aid), r = Math.max(0, Math.floor(+v) || 0), lock = r * L.need;
+  const empty = v === '' || isNaN(+v) || +v < 0;
+  const bad = empty || r > L.max;
+  return { L, r, lock, left: Math.max(0, L.freeX - lock), bad, msg: empty ? 'Inserisci un numero da 0 in su.' : r > L.max ? (L.need === 0 ? 'Non ti servono altri tester: non c\'è nulla da offrire.' : L.max >= REWARD_MAX ? 'La ricompensa massima è ' + REWARD_MAX + ' Lune per tester.' : 'Non hai abbastanza Lune: al massimo ' + L.max + ' per tester.') : '' };
 }
 function budgetView(aid) {
   const back = '<button class="btn ghost sm back" data-act="back">← Indietro</button>';
@@ -933,10 +937,11 @@ function budgetView(aid) {
     + '<div class="bgt-box"><h3>🚀 <span>Inietta Lune nella ricompensa</span></h3>'
     + '<label for="rw-in">Lune per ogni tester<input id="rw-in" type="number" min="0" max="' + REWARD_MAX + '" step="1" inputmode="numeric" value="' + esc(S.rwv !== undefined && S.rwv.aid === aid ? S.rwv.v : String(cur)) + '"></label>'
     + '<div class="bgt-bar" aria-hidden="true"><i id="rw-bar" style="width:' + (c.L.freeX ? Math.min(100, c.lock / c.L.freeX * 100) : 0) + '%"></i></div>'
-    + '<div class="bgt-calc"><div><span>Lune libere</span><b>' + c.L.freeX + '</b></div><div><span>Lune bloccate per ogni nuovo tester</span><b id="rw-lock">' + c.lock + '</b></div><div><span>Dopo il primo tester ti restano</span><b id="rw-left">' + c.left + '</b></div><div><span>Massimo per tester</span><b>' + c.L.max + '</b></div></div>'
+    + '<div class="bgt-calc"><div><span>Tester che ti servono</span><b>' + c.L.need + '</b></div><div><span>Lune libere</span><b>' + c.L.freeX + '</b></div><div><span>Lune che verranno bloccate</span><b id="rw-lock">' + c.lock + '</b></div><div><span>Ti restano libere</span><b id="rw-left">' + c.left + '</b></div><div><span>Massimo per tester</span><b>' + c.L.max + '</b></div></div>'
     + '<div class="bgt-msg" id="rw-msg" role="status">' + esc(c.msg) + '</div>'
     + '<div class="row"><button type="button" class="btn primary" id="rw-go" data-act="rwSet" data-a="' + esc(aid) + '"' + (c.bad ? ' disabled' : '') + '><span>Inietta</span> 🌙</button><button type="button" class="btn ghost" data-act="rwOff" data-a="' + esc(aid) + '"' + (cur ? '' : ' disabled') + '><span>Togli ricompensa</span></button></div></div>'
     + '<p class="small"><span>Pagate finora ai tester:</span> <b>' + paid + ' 🌙</b></p>'
+    + '<p class="small muted">I tester che ti servono sono 12, meno gli esterni che hai dichiarato e meno gli scambi già presi. Il massimo per tester è le tue Lune libere diviso questo numero.</p>'
     + '<p class="small muted">Il tester riceve le Lune quando completa i 14 giorni e lascia il feedback. La ricompensa promessa a chi ha già uno scambio con te non cambia se poi la modifichi.</p>'
     + '<p class="small muted">Le Lune sono un riconoscimento interno di IronBlind: non hanno valore in denaro.</p></div>';
 }
