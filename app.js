@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261114b';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261114c';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -138,20 +138,25 @@ const moonBase = u => Math.max((u && u.moons) || 0, moonsEarned());
 const REWARD_MAX = 1000, TESTERS_N = 12;
 const rwOf = (sw, owner) => sw.status === 'declined' ? 0 : Math.max(0, Math.min(REWARD_MAX, Math.floor(+((sw.rw || {})[owner]) || 0)));
 function rwTotals() {
-  let inn = 0, out = 0, lock = 0;
+  let inn = 0, out = 0, lock = 0; const lockBy = {};
   mine().forEach(sw => {
     const o = sw.a === me ? sw.b : sw.a;
     if (sw.fb && sw.fb[me]) inn += rwOf(sw, o);
-    const p = rwOf(sw, me); if (p) { if (sw.fb && sw.fb[o]) out += p; else lock += p; }
+    const p = rwOf(sw, me); if (p) { if (sw.fb && sw.fb[o]) out += p; else { lock += p; const k = aidOf(sw, me) || 'main'; lockBy[k] = (lockBy[k] || 0) + p; } }
   });
-  return { inn, out, lock };
+  return { inn, out, lock, lockBy };
 }
 const rwReward = a => Math.max(0, Math.min(REWARD_MAX, Math.floor(+(a && a.reward) || 0)));
 const rwCount = aid => mine().filter(sw => sw.status !== 'declined' && aidOf(sw, me) === aid).length;
 const rwMissing = aid => Math.max(1, TESTERS_N - rwCount(aid));
-/* Lune che ho già promesso a tester futuri di tutte le mie app (tranne, se indicata, una sola). */
-/* Si bloccano solo le Lune già promesse a scambi veri (rwTotals().lock): niente riserva per tester futuri. */
-function rwFuture() { return 0; }
+/* Lune riservate alla ricompensa: per ogni app con una ricompensa si riserva almeno quella di un tester, oppure di più se ci sono già scambi
+   con la ricompensa promessa e non ancora pagata. Se indicata, exceptAid conta solo le Lune già promesse a scambi veri di quell'app. */
+function rwReserve(exceptAid) {
+  const t = rwTotals(), ids = {}; let n = 0;
+  appsOf(me).forEach(a => { ids[a.id] = 1; const l = t.lockBy[a.id] || 0; n += a.id === exceptAid ? l : Math.max(rwReward(a), l); });
+  Object.keys(t.lockBy).forEach(k => { if (!ids[k]) n += t.lockBy[k]; });
+  return n;
+}
 const moonsRwOf = u => Math.max(Math.floor(+(u && u.moonsRw) || 0), rwTotals().inn);
 const moonsOutOf = u => Math.max(Math.floor(+(u && u.moonsOut) || 0), rwTotals().out);
 /* Apri applicazione: una volta al giorno, durante i 14 giorni di test, il pulsante registra il test di oggi e dà OPEN_MOONS Lune (massimo 14 giorni per scambio). */
@@ -188,15 +193,15 @@ function joinRank(id) {
 const welcomeKey = () => 'ironblind-welcome-' + me;
 /* Nessun tetto alle Lune. moonHeld = Lune che possiedi; moonBalance = quelle libere, cioè senza le Lune promesse come ricompensa. */
 const moonHeld = u => Math.max(0, moonTotal(u) - ((u && u.moonsSpent) || 0) - moonsOutOf(u));
-const moonBalance = u => Math.max(0, moonHeld(u) - rwTotals().lock - rwFuture());
+const moonBalance = u => Math.max(0, moonHeld(u) - rwReserve());
 const moonSlots = u => Math.floor(((u && u.moonsSpent) || 0) / MOON_COST);
 const markers = u => ((u && u.spent) || []).filter(x => x === '#').length;
 /* Slot extra = inviti non usati + slot ottenuti con le Lune o pagati, meno quelli già consumati (massimo 3 app extra). */
 const otherCredits = u => Math.max(0, moonSlots(u) + paidSlots() - markers(u));
 const creditsTotal = u => Math.min(MAX_EXTRA, validInvites().length + otherCredits(u));
 const freeSlots = u => Math.max(0, creditsTotal(u) - extraCount(u));
-const rwOver = () => moonHeld(S.users.get(me)) - rwTotals().lock - rwFuture() < 0;
-const rwCanPromise = aid => { const r = rwReward(appOf(me, aid)); return !r || moonBalance(S.users.get(me)) >= r; };
+const rwOver = () => moonHeld(S.users.get(me)) - rwReserve() < 0;
+const rwCanPromise = aid => { const r = rwReward(appOf(me, aid)); return !r || moonBalance(S.users.get(me)) >= Math.min(r, rwTotals().lockBy[aid] || 0); };
 const rwBadge = a => rwReward(a) ? '<span class="rwb">Guadagna +' + rwReward(a) + ' 🌙</span>' : '';
 const moonLabel = n => '🌕 ' + n + (n === 1 ? ' Luna' : ' Lune');
 let moonWrite = false, pingOn = false;
@@ -908,8 +913,8 @@ function openInstall() {
 /* Gestione Budget: quante Lune offri a ogni tester che completa i 14 giorni di una tua app. Si possono offrire solo Lune che si hanno. */
 function rwLimits(aid) {
   const u = S.users.get(me) || {}, t = rwTotals();
-  const freeX = Math.max(0, moonHeld(u) - t.lock);
-  return { freeX, lock: t.lock, max: Math.min(REWARD_MAX, freeX), held: moonHeld(u), bal: moonBalance(u) };
+  const freeX = Math.max(0, moonHeld(u) - rwReserve(aid));
+  return { freeX, lock: rwReserve(), max: Math.min(REWARD_MAX, freeX), held: moonHeld(u), bal: moonBalance(u) };
 }
 function rwCalc(aid, v) {
   const L = rwLimits(aid), r = Math.max(0, Math.floor(+v) || 0), lock = r;
@@ -943,7 +948,7 @@ function moonCard(u) {
     + '<div class="bar" role="img" aria-label="' + bal + ' su ' + MOON_COST + ' Lune"><i style="width:' + pct + '%"></i></div>'
     + '<p class="small muted">Ogni giorno di test completato in cui accedi a IronBlind ti dà +1 Luna (massimo 14 per scambio). Con ' + MOON_COST + ' Lune sblocchi uno slot extra.</p>'
     + '<p class="small muted">Non c\'è un limite alle Lune che puoi tenere. Puoi usarle anche per offrire una ricompensa ai tester della tua app, dalla scheda dell\'app.</p>'
-    + (rwTotals().lock > 0 ? '<p class="small muted"><span>Lune promesse come ricompensa:</span> <b>' + rwTotals().lock + '</b></p>' : '')
+    + (rwReserve() > 0 ? '<p class="small muted"><span>Lune promesse come ricompensa:</span> <b>' + rwReserve() + '</b></p>' : '')
     + (can ? '<div><button type="button" class="btn primary" data-act="moonRedeem">Usa ' + MOON_COST + ' Lune per sbloccare uno Slot Extra</button></div>'
       : (bal >= MOON_COST ? '<p class="small muted">Hai già il massimo di slot extra.</p>' : '')) + '</div>';
 }
