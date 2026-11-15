@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261114d';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261115a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -97,11 +97,11 @@ function accessDoc(aid) {
   return { doc: { link: lk } };
 }
 const linkFor = aid => aid === 'main' ? (S.priv.link || '') : ((S.priv.extraLinks || {})[aid] || '');
-/* Inviti: un amico conta quando si è registrato con il tuo link, ha il profilo e ha pubblicato la sua app. Massimo 3 extra. */
+/* Inviti: un amico conta quando si è registrato con il tuo link, ha il profilo e ha pubblicato la sua prima app. Ogni amico vale 100 Lune (massimo 3 amici). */
+const INVITE_MOONS = 100, INVITE_MAX = 3;
 function validInvites() {
-  const u = S.users.get(me); const spent = (u && u.spent) || [];
-  const out = []; S.refs.forEach((r, inv) => { const f = S.users.get(inv); if (f && f.app && f.app.name && spent.indexOf(inv) < 0) out.push([inv, (r && r.at) || 0]); });
-  return out.sort((x, y) => x[1] - y[1]).map(x => x[0]).slice(0, MAX_EXTRA);
+  const out = []; S.refs.forEach((r, inv) => { const f = S.users.get(inv); if (f && f.app && f.app.name) out.push([inv, (r && r.at) || 0]); });
+  return out.sort((x, y) => x[1] - y[1]).map(x => x[0]).slice(0, INVITE_MAX);
 }
 const inviteLink = () => location.origin + location.pathname + '?invito=' + encodeURIComponent(me);
 const hasExtra = (u, k) => !!(u && u.extra && u.extra[k] && u.extra[k].name);
@@ -186,7 +186,8 @@ function openBox(s) {
     : (elapsed(s, me) === null ? 'Avvia il test per guadagnare Lune aprendo l\'app.' : '');
   return '<div><button type="button" class="btn primary" data-act="openApp" data-id="' + esc(s.id) + '">▶ <span>Apri applicazione</span></button></div>' + (msg ? '<p class="small muted openmsg">' + msg.replace(/^✅ /, '✅ ') + '</p>' : '');
 }
-const moonTotal = u => moonBase(u) + bonusOf(u) + moonsRwOf(u) + openMoons(u);
+const invMoons = u => Math.max(Math.min(INVITE_MAX * INVITE_MOONS, Math.floor(+(u && u.moonsInv) || 0)), validInvites().length * INVITE_MOONS);
+const moonTotal = u => moonBase(u) + bonusOf(u) + moonsRwOf(u) + openMoons(u) + invMoons(u);
 /* Posizione di iscrizione: quante persone con il profilo creato prima di me, più me. */
 function joinRank(id) {
   const u = S.users.get(id), t = (u && u.createdAt) || 0; let n = 1;
@@ -201,7 +202,7 @@ const moonSlots = u => Math.floor(((u && u.moonsSpent) || 0) / MOON_COST);
 const markers = u => ((u && u.spent) || []).filter(x => x === '#').length;
 /* Slot extra = inviti non usati + slot ottenuti con le Lune o pagati, meno quelli già consumati (massimo 3 app extra). */
 const otherCredits = u => Math.max(0, moonSlots(u) + paidSlots() - markers(u));
-const creditsTotal = u => Math.min(MAX_EXTRA, validInvites().length + otherCredits(u));
+const creditsTotal = u => Math.min(MAX_EXTRA, otherCredits(u));
 const freeSlots = u => Math.max(0, creditsTotal(u) - extraCount(u));
 const rwOver = () => moonHeld(S.users.get(me)) - rwReserve() < 0;
 const rwCanPromise = aid => { const ap = appOf(me, aid), r = rwReward(ap); return !r || rwNeed(ap) > 0 || moonBalance(S.users.get(me)) >= r; };
@@ -240,6 +241,7 @@ function syncMoons() {
   const u = S.users.get(me); if (!u || moonWrite || busy) return;
   const patch = {}; const t = moonsEarned(); if (t > (u.moons || 0)) patch.moons = t;
   const rt = rwTotals(); if (rt.inn > Math.floor(+u.moonsRw || 0)) patch.moonsRw = rt.inn; if (rt.out > Math.floor(+u.moonsOut || 0)) patch.moonsOut = rt.out;
+  const im = validInvites().length * INVITE_MOONS; if (loaded.users && im > Math.floor(+u.moonsInv || 0)) patch.moonsInv = im;
   let welcome = false;
   if (loaded.users && u.nick && !u.bonus && joinRank(me) <= WELCOME_N) { patch.bonus = WELCOME_MOONS; welcome = true; }
   if (loaded.users && u.nick) {
@@ -329,12 +331,12 @@ const stars = n => '★'.repeat(n || 0) + '☆'.repeat(5 - (n || 0));
 function inviteBox(short) {
   if (!S.users.get(me)) return '';
   const n = validInvites().length;
-  const prog = '<span class="pill ' + (n ? 'ok' : '') + '">' + n + '/' + MAX_EXTRA + ' amici</span>';
-  if (short) return '<div class="card"><div class="row between"><b>Vuoi far testare un\'altra app?</b>' + prog + '</div><p class="small muted">Invita un amico: quando si registra e pubblica la sua app sblocchi un\'app extra, anche se la precedente è in fase di test.</p><div><button class="btn" data-act="invite">Invita un amico</button></div></div>';
+  const prog = '<span class="pill ' + (n ? 'ok' : '') + '">' + n + '/' + INVITE_MAX + ' amici</span>';
+  if (short) return '<div class="card"><div class="row between"><b>Invita un amico e guadagna Lune</b>' + prog + '</div><p class="small muted">Quando un amico si registra e pubblica la sua prima app ricevi ' + INVITE_MOONS + ' 🌙.</p><div><button class="btn" data-act="invite">Invita un amico</button></div></div>';
   return '<div class="card"><div class="row between"><h2>Invita un amico</h2>' + prog + '</div>'
-    + '<p class="small muted">Ogni amico che si registra con il tuo link e pubblica la sua app ti sblocca uno spazio per un\'app extra da far testare, anche se la precedente è in fase di test. Massimo ' + MAX_EXTRA + ' app extra.</p>'
+    + '<p class="small muted">Ogni amico che si registra con il tuo link e pubblica la sua prima app ti regala ' + INVITE_MOONS + ' 🌙. Massimo ' + INVITE_MAX + ' amici.</p>'
     + '<div class="row"><button class="btn primary" data-act="invite">Invita un amico</button><button class="btn" data-act="copy" data-text="' + esc(inviteLink()) + '" data-msg="Link copiato!">Copia link</button></div>'
-    + '<p class="small muted">Inviti disponibili: ' + n + '. Gli amici contano quando hanno pubblicato la loro app. Quando concludi un\'app extra lo slot si azzera e per riaverlo serve invitare un altro amico.</p></div>';
+    + '<p class="small muted">Lune guadagnate con gli inviti: ' + (n * INVITE_MOONS) + '. Gli amici contano quando hanno pubblicato la loro app.</p></div>';
 }
 function exploreItems() {
   const q = S.q.trim().toLowerCase(), tab = S.xt;
@@ -494,13 +496,13 @@ function appFields(k, ap, title, bonus) {
   const n = openCount(k), lock = n > 0 && !!ap.name, dis = lock ? ' disabled' : '';
   const wopts = '<option value="">Qualsiasi paese</option>' + COUNTRIES.map(c => '<option value="' + c + '"' + (ap.want === c ? ' selected' : '') + '>Solo ' + c + '</option>').join('');
   const opts = CATS.map(c => '<option value="' + c + '"' + ((ap.cat || 'Altro') === c ? ' selected' : '') + '>' + c + '</option>').join('');
-  const note = lock ? '<div class="banner">App bloccata: hai ' + n + (n === 1 ? ' scambio aperto' : ' scambi aperti') + '. Puoi cambiarla quando tutti gli scambi di questa app sono completati, rifiutati o chiusi. Li trovi in <b>Scambi</b>.' + (k === 'main' && bonus < MAX_EXTRA ? ' Vuoi far testare un\'altra app subito? Usa le Lune o invita un amico qui sopra.' : '') + '</div>'
+  const note = lock ? '<div class="banner">App bloccata: hai ' + n + (n === 1 ? ' scambio aperto' : ' scambi aperti') + '. Puoi cambiarla quando tutti gli scambi di questa app sono completati, rifiutati o chiusi. Li trovi in <b>Scambi</b>.' + (k === 'main' && bonus < MAX_EXTRA ? ' Vuoi far testare un\'altra app subito? Usa le Lune qui sopra.' : '') + '</div>'
     : (k !== 'main' && !ap.name ? '<p class="small muted">Spazio sbloccato. Lascialo vuoto se non ti serve.</p>' : '');
   const lk = linkFor(k);
   let conclude = '';
   if (k !== 'main' && ap.name && !lock) {
     conclude = S.confirmK === k
-      ? '<div class="box"><p class="small"><b>Concludere questa app?</b> Viene tolta dal profilo e lo slot si azzera. Per usarlo di nuovo dovrai invitare un altro amico. Gli scambi già completati restano.</p><div class="row"><button type="button" class="btn primary sm" data-act="concludeApp" data-k="' + k + '">Sì, concludi</button><button type="button" class="btn ghost sm" data-act="noConclude">Annulla</button></div></div>'
+      ? '<div class="box"><p class="small"><b>Concludere questa app?</b> Viene tolta dal profilo e lo slot si azzera. Per usarlo di nuovo serviranno altre Lune. Gli scambi già completati restano.</p><div class="row"><button type="button" class="btn primary sm" data-act="concludeApp" data-k="' + k + '">Sì, concludi</button><button type="button" class="btn ghost sm" data-act="noConclude">Annulla</button></div></div>'
       : '<div><button type="button" class="btn ghost sm" data-act="askConclude" data-k="' + k + '">Concludi app e libera lo slot</button></div>';
   }
   const free = !lock && !!ap.name;
@@ -576,7 +578,7 @@ function profileView(uid, edit) {
     + appFields('main', ap, '📱 La tua app', bonus)
     + shown.map((k, i) => appFields(k, (u.extra && u.extra[k]) || {}, '🧩 Slot App Extra #' + (i + 1), bonus)).join('')
     + (S.users.get(me) && ap.name && freeSlots(u) === 0 && extraCount(u) < MAX_EXTRA
-      ? '<div class="box"><b>Vuoi far testare un\'altra app?</b><p class="small muted">Hai usato lo slot gratuito. Sblocca uno slot con le Lune, invitando un amico o subito per ' + SLOT_PRICE + '.</p>' + (S.slotReq ? '<p class="small"><b>Pagamento in verifica:</b> lo slot si sblocca appena confermato.</p>' : '') + '<div><button type="button" class="btn" data-act="slotOpen">+ Aggiungi un\'altra app</button></div></div>' : '')
+      ? '<div class="box"><b>Vuoi far testare un\'altra app?</b><p class="small muted">Hai usato lo slot gratuito. Sblocca uno slot con le Lune o subito per ' + SLOT_PRICE + '.</p>' + (S.slotReq ? '<p class="small"><b>Pagamento in verifica:</b> lo slot si sblocca appena confermato.</p>' : '') + '<div><button type="button" class="btn" data-act="slotOpen">+ Aggiungi un\'altra app</button></div></div>' : '')
     + '<div><button class="btn primary" type="submit">Salva profilo</button></div></form>'
     + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + (isAdminUser() ? '' : '');
 }
@@ -966,7 +968,7 @@ function openSlot() {
   const optA = '<div class="step"><h3>🌕 Con le Lune (gratis)</h3><p class="small muted">Ogni giorno di test completato in cui accedi a IronBlind = +1 Luna. Hai ' + moonLabel(bal) + ': servono ' + MOON_COST + '.</p>'
     + (bal >= MOON_COST ? '<div><button type="button" class="btn primary" data-act="moonRedeem">Usa ' + MOON_COST + ' Lune per sbloccare uno Slot Extra</button></div>'
       : '<div class="bar"><i style="width:' + Math.round(bal / MOON_COST * 100) + '%"></i></div><p class="small muted">Te ne mancano ' + (MOON_COST - bal) + '.</p>') + '</div>';
-  const optI = '<div class="step"><h3>👥 Invita un amico (gratis)</h3><p class="small muted">Quando si registra con il tuo link e pubblica la sua app, ottieni uno slot extra.</p><div><button type="button" class="btn" data-act="invite">Invita un amico</button></div></div>';
+  const optI = '<div class="step"><h3>👥 Invita un amico (gratis)</h3><p class="small muted">Quando si registra con il tuo link e pubblica la sua prima app, ricevi ' + INVITE_MOONS + ' 🌙: bastano per uno slot extra.</p><div><button type="button" class="btn" data-act="invite">Invita un amico</button></div></div>';
   const optB = !PAYPAL_ME ? '' : '<div class="step"><h3>⚡ Subito: ' + SLOT_PRICE + '</h3>'
     + '<p class="small muted">Paga con PayPal e scrivi nella nota il tuo codice. Dopo la verifica, di solito entro 24 ore, lo slot si sblocca da solo.</p>'
     + '<div class="box"><span class="small muted">Il tuo codice</span><code class="small" style="overflow-wrap:anywhere">' + code + '</code><div><button type="button" class="btn sm" data-act="copy" data-text="' + code + '" data-msg="Codice copiato">Copia codice</button></div></div>'
@@ -1239,7 +1241,7 @@ function gate(t, p, extra) { view.innerHTML = '<div class="empty login"><h3>' + 
 function render(force) {
   if (!force) { const a = document.activeElement; if (a && view.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) { dirty = true; return; } }
   dirty = false;
-  if (!me) return gate('Accedi per iniziare', (pendingInvite ? 'Sei stato invitato da un amico: registrati e pubblica la tua app per sbloccargli un\'app extra. ' : '') + 'Crei il profilo, proponi scambi e chatti con gli altri sviluppatori. Se è la prima volta con email e password, tocca Registrati.', loginForm);
+  if (!me) return gate('Accedi per iniziare', (pendingInvite ? 'Sei stato invitato da un amico: registrati e pubblica la tua prima app e il tuo amico riceve 100 🌙. ' : '') + 'Crei il profilo, proponi scambi e chatti con gli altri sviluppatori. Se è la prima volta con email e password, tocca Registrati.', loginForm);
   if (!(loaded.users && loaded.swaps && loaded.fb && loaded.priv)) return;
   if (!firstRoute) { firstRoute = true; if (!S.users.get(me)) S.tab = 'profile'; }
   if (S.route && S.route.t === 'swap') markSeen(S.route.id);
@@ -1503,15 +1505,14 @@ document.addEventListener('click', async e => {
       if (openCount(k) > 0) { toast('Questa app ha ancora scambi aperti.'); return; }
       const nu = Object.assign({}, u); nu.extra = Object.assign({}, u.extra); delete nu.extra[k];
       if (!Object.keys(nu.extra).length) delete nu.extra;
-      const inv = validInvites()[0];
-      if (inv) nu.spent = (u.spent || []).concat(inv); else if (otherCredits(u) > 0) nu.spent = (u.spent || []).concat('#');
+      if (otherCredits(u) > 0) nu.spent = (u.spent || []).concat('#');
       nu.updatedAt = Date.now();
       await setDoc(doc(db, 'users', me), nu);
       const pv = { email: S.priv.email || '', link: S.priv.link || '' }; const el = Object.assign({}, S.priv.extraLinks || {}); delete el[k];
       if (Object.keys(el).length) pv.extraLinks = el;
       if (S.priv.group) pv.group = S.priv.group; const eg = Object.assign({}, S.priv.extraGroups || {}); delete eg[k]; if (Object.keys(eg).length) pv.extraGroups = eg;
       await setDoc(doc(db, 'userPrivate', me), pv);
-      S.confirmK = null; toast('App conclusa. Lo slot si è azzerato: invita un altro amico per riaverlo.');
+      S.confirmK = null; toast('App conclusa. Lo slot si è azzerato: per riaverlo servono altre Lune.');
     } else if (act === 'propose') {
       const oA = b.dataset.oa || 'main'; const them = appOf(id, oA);
       const sel = document.getElementById('pick-' + id + '-' + oA);
@@ -1687,6 +1688,7 @@ document.addEventListener('submit', async e => {
       if (old.moonsOpen) data.moonsOpen = old.moonsOpen;
       if (old.opens) data.opens = old.opens;
       if (old.moonsOut) data.moonsOut = old.moonsOut;
+      if (old.moonsInv) data.moonsInv = old.moonsInv;
       if (old.seen) data.seen = old.seen;
       if (old.arch) data.arch = old.arch;
       if (old.testing) data.testing = old.testing;
