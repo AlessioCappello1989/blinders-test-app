@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261116b';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261116c';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -176,6 +176,10 @@ function openState(s) {
   if (l.indexOf(dkey(Date.now())) > -1) return 'done';
   return l.length >= 14 ? 'full' : 'todo';
 }
+/* Testato oggi = oggi hai già registrato il test con «Apri applicazione» (o hai raccolto tutti i 14 giorni). */
+const testedToday = s => { const st = openState(s); return st === 'done' || st === 'full'; };
+const TF_KEY = 'ironblind-tf';
+const getTf = () => { try { return localStorage.getItem(TF_KEY) || ''; } catch (e) { return ''; } };
 function openBox(s) {
   if (s.status !== 'active' || !isAndroid() || !S.theirLink) return '';
   const pkg = pkgOf(S.theirLink); if (!pkg) return '';
@@ -454,7 +458,7 @@ function swapCard(s, arch) {
     + '<div class="mini' + xcls(aidOf(s, o)) + '"><span class="small muted mono">TU TESTI</span><div class="row between"><b>' + esc(oa) + '</b>' + xtag(aidOf(s, o)) + '</div></div>'
     + '<div class="mini' + xcls(aidOf(s, me)) + '"><span class="small muted mono">LUI TESTA</span><div class="row between"><b>' + esc(ma) + '</b>' + xtag(aidOf(s, me)) + '</div></div>'
     + (unreadOf(s).length ? '<div class="row">' + unreadOf(s).map(l => '<span class="pill warn">' + l + '</span>').join('') + '</div>' : '');
-  if (s.status === 'active' && !isDone(s)) h += tracker(el) + '<p class="small muted mono">' + esc(dayLabel(el)) + '</p>';
+  if (s.status === 'active' && !isDone(s)) h += tracker(el) + '<p class="small muted mono">' + esc(dayLabel(el)) + '</p>' + (testedToday(s) ? '<div><span class="pill ok">✅ Testato oggi</span></div>' : '');
   if (s.status === 'proposed' && s.b === me) h += '<div class="row"><button class="btn primary" data-act="accept" data-id="' + esc(s.id) + '">Accetta</button><button class="btn ghost" data-act="decline" data-id="' + esc(s.id) + '">Rifiuta</button></div>';
   else h += '<div class="row"><button class="btn" data-act="swap" data-id="' + esc(s.id) + '">Apri</button>'
     + (isDone(s) ? '<button class="btn ghost" data-act="' + (arch ? 'unarchive' : 'archive') + '" data-id="' + esc(s.id) + '">' + (arch ? 'Ripristina' : 'Archivia') + '</button>' : '') + '</div>';
@@ -469,8 +473,15 @@ function swapsView() {
   const filt = names.length > 1 ? '<div class="seg" role="tablist" aria-label="Filtra per app">' + [''].concat(names).map(n => '<button type="button" role="tab" aria-selected="' + (S.swapApp === n) + '" class="' + (S.swapApp === n ? 'on' : '') + '" data-act="swapapp" data-n="' + esc(n) + '">' + (n ? esc(n) : 'Tutte le mie app') + ' <span class="cnt">' + base.filter(s => !n || mineName(s) === n).length + '</span></button>').join('') + '</div>' : '';
   if (!every.length) return '<div class="empty"><h3>Nessuno scambio</h3><p class="muted">Scegli un\'app in Esplora e proponi uno scambio: tu testi la sua, lui testa la tua.</p><div><button class="btn primary" data-act="tab" data-tab="explore">Vai a Esplora</button></div></div>';
   const sec = (t, l) => l.length ? '<section class="stack"><h2>' + t + '</h2>' + l.map(x => swapCard(x)).join('') + '</section>' : '';
+  /* In corso: filtro per il test di oggi (registrato con «Apri applicazione»). Si azzera da solo a ogni nuova giornata. */
+  const prog = all.filter(s => s.status === 'active' && !isDone(s));
+  if (S.swapTf === undefined) S.swapTf = getTf();
+  const tf = S.swapTf === 'todo' || S.swapTf === 'done' ? S.swapTf : '';
+  const nDone = prog.filter(testedToday).length, shown = tf === 'todo' ? prog.filter(s => !testedToday(s)) : tf === 'done' ? prog.filter(testedToday) : prog;
+  const tfBar = prog.length ? '<div class="seg" role="tablist" aria-label="Filtra per test di oggi">' + [['', 'Tutti', prog.length], ['todo', 'Da testare', prog.length - nDone], ['done', 'Testati', nDone]].map(x => '<button type="button" role="tab" aria-selected="' + (tf === x[0]) + '" class="' + (tf === x[0] ? 'on' : '') + '" data-act="swaptf" data-v="' + x[0] + '">' + x[1] + ' <span class="cnt">' + x[2] + '</span></button>').join('') + '</div>' : '';
+  const inCorso = prog.length ? '<section class="stack"><h2>In corso</h2>' + tfBar + (shown.length ? shown.map(x => swapCard(x)).join('') : '<p class="muted">' + (tf === 'todo' ? 'Hai testato tutto per oggi.' : 'Nessun test registrato oggi.') + '</p>') + '</section>' : '';
   return filt + sec('Richieste ricevute', all.filter(s => s.status === 'proposed' && s.b === me))
-    + sec('In corso', all.filter(s => s.status === 'active' && !isDone(s)))
+    + inCorso
     + sec('Richieste inviate', all.filter(s => s.status === 'proposed' && s.a === me))
     + sec('Completati', all.filter(isDone))
     + (arch.length ? '<section class="stack"><div><button class="btn ghost" data-act="toggleArch">' + (S.showArch ? 'Nascondi archiviati' : 'Archiviati (' + arch.length + ')') + '</button></div>'
@@ -1467,6 +1478,8 @@ document.addEventListener('click', async e => {
       const n = await grantSlot(code); toast('Slot sbloccato per ' + nameOf(code) + ' (totale pagati: ' + n + ')');
     } else if (act === 'swapapp') {
       S.swapApp = b.dataset.n || '';
+    } else if (act === 'swaptf') {
+      S.swapTf = b.dataset.v || ''; try { localStorage.setItem(TF_KEY, S.swapTf); } catch (x) { /* il filtro resta solo per questa visita */ }
     } else if (act === 'toggleArch') {
       S.showArch = !S.showArch;
     } else if (act === 'archive' || act === 'unarchive') {
