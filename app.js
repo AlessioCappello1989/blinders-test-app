@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261115a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261116a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -32,7 +32,7 @@ S.lastMsg = new Map();
 function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => { t.hidden = true; }, 3600); }
 function toastErr(e) {
   const c = e && e.code;
-  if (c === 'permission-denied') toast('Operazione non consentita dalle regole di sicurezza.');
+  if (c === 'permission-denied') toast('Operazione non consentita dalle regole di sicurezza' + (e.step ? ' (' + e.step + ')' : '') + '.');
   else if (c === 'unavailable') toast('Connessione assente. Riprova.');
   else toast('Qualcosa è andato storto. Riprova tra poco.');
   console.error(e);
@@ -1404,7 +1404,11 @@ document.addEventListener('click', async e => {
       if (st === 'todo') {
         const opens = {}; Object.keys(u.opens || {}).forEach(k => { if (S.swaps.has(k)) opens[k] = u.opens[k]; });
         opens[id] = opensOf(u, id).concat(dkey(Date.now())).slice(-14);
-        wr = updateDoc(doc(db, 'users', me), { opens, moonsOpen: openMoons(u) + OPEN_MOONS });
+        const uref = doc(db, 'users', me), mo = openMoons(u) + OPEN_MOONS;
+        wr = (async () => {
+          try { await updateDoc(uref, { moonsOpen: mo }); } catch (e) { e.step = 'moonsOpen'; throw e; }
+          try { await updateDoc(uref, { opens }); } catch (e) { e.step = 'opens'; throw e; }
+        })();
         toast('+' + OPEN_MOONS + ' Lune: test di oggi registrato');
       } else if (st === 'done') toast('Test di oggi fatto: attendi la prossima giornata per la ricompensa.');
       else if (st === 'full') toast('Hai già raccolto le Lune di tutti i giorni di questo test.');

@@ -377,6 +377,7 @@ const P = [
   [/^Si sblocca dopo 14 giorni di test: mancano (\d+) giorni\.$/, m => `Unlocks after 14 days of testing: ${m[1]} days left.`],
   [/^Si sblocca dopo 14 giorni di test\. Avvia il tuo test per far partire il conteggio\.$/, () => 'Unlocks after 14 days of testing. Start your test to begin the count.'],
   [/^(\d+) ?\/ ?(\d+) amici$/, m => `${m[1]}/${m[2]} friends`],
+  [/^Operazione non consentita dalle regole di sicurezza \((.+)\)\.$/, m => `Operation not allowed by the security rules (${m[1]}).`],
   [/^Lune guadagnate con gli inviti: (\d+)\. Gli amici contano quando hanno pubblicato la loro app\.$/, m => `Moons earned from invites: ${m[1]}. Friends count once they have published their app.`],
   [/^Ogni amico che si registra con il tuo link e pubblica la sua prima app ti regala 100 🌙\. Massimo (\d+) amici\.$/, m => `Every friend who signs up with your link and publishes their first app gives you 100 🌙. Maximum ${m[1]} friends.`],
   [/^Ogni giorno di test completato ti dà \+1 Luna \(massimo 14 per scambio\)\. Con 20 Lune sblocchi uno slot extra\. Ne hai (\d+)\/20\.$/, m => `Every completed test day gives you +1 Moon (maximum 14 per swap). With 20 Moons you unlock an extra slot. You have ${m[1]}/20.`],
