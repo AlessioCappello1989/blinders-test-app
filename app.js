@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261116c';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261117a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -470,7 +470,9 @@ function swapsView() {
   const names = [...new Set(base.map(mineName).filter(Boolean))];
   if (S.swapApp && names.indexOf(S.swapApp) < 0) S.swapApp = '';
   const every = S.swapApp ? base.filter(s => mineName(s) === S.swapApp) : base, all = every.filter(s => !ar.has(s.id)), arch = every.filter(s => ar.has(s.id) && isDone(s));
-  const filt = names.length > 1 ? '<div class="seg" role="tablist" aria-label="Filtra per app">' + [''].concat(names).map(n => '<button type="button" role="tab" aria-selected="' + (S.swapApp === n) + '" class="' + (S.swapApp === n ? 'on' : '') + '" data-act="swapapp" data-n="' + esc(n) + '">' + (n ? esc(n) : 'Tutte le mie app') + ' <span class="cnt">' + base.filter(s => !n || mineName(s) === n).length + '</span></button>').join('') + '</div>' : '';
+  const cntOf = n => base.filter(s => !n || mineName(s) === n).length;
+  const filt = names.length > 1 ? '<div class="dd' + (S.swapMenu ? ' open' : '') + '"><button type="button" class="ddb" data-act="swapmenu" aria-haspopup="listbox" aria-expanded="' + !!S.swapMenu + '"><span class="ddt"><span class="lab">Filtra per app</span><span class="val">' + (S.swapApp ? esc(S.swapApp) : 'Tutte le mie app') + '</span></span><span class="cnt">' + cntOf(S.swapApp) + '</span><svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg></button>'
+    + (S.swapMenu ? '<div class="menu" role="listbox" aria-label="Filtra per app">' + [''].concat(names).map((n, i) => (i === 1 ? '<div class="sep" role="separator"></div>' : '') + '<button type="button" class="opt" role="option" aria-selected="' + (S.swapApp === n) + '" data-act="swapapp" data-n="' + esc(n) + '"><span class="t">' + (n ? esc(n) : 'Tutte le mie app') + '</span><span class="cnt">' + cntOf(n) + '</span></button>').join('') + '</div>' : '') + '</div>' : '';
   if (!every.length) return '<div class="empty"><h3>Nessuno scambio</h3><p class="muted">Scegli un\'app in Esplora e proponi uno scambio: tu testi la sua, lui testa la tua.</p><div><button class="btn primary" data-act="tab" data-tab="explore">Vai a Esplora</button></div></div>';
   const sec = (t, l) => l.length ? '<section class="stack"><h2>' + t + '</h2>' + l.map(x => swapCard(x)).join('') + '</section>' : '';
   /* In corso: filtro per il test di oggi (registrato con «Apri applicazione»). Si azzera da solo a ogni nuova giornata. */
@@ -1355,6 +1357,9 @@ function drawMsgs() {
 /* ---------- Azioni ---------- */
 document.addEventListener('click', e => { if ($('#bellpn') && !e.target.closest('#bellpn') && !e.target.closest('#bell')) closeBell(); }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBell(); });
+/* Menù «Filtra per app»: si chiude con un tocco fuori o con Esc. */
+document.addEventListener('click', e => { if (S.swapMenu && !e.target.closest('.dd')) { S.swapMenu = false; if (me) render(true); } }, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.swapMenu) { S.swapMenu = false; if (me) render(true); } });
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b || busy) return;
   const act = b.dataset.act, id = b.dataset.id;
@@ -1476,8 +1481,10 @@ document.addEventListener('click', async e => {
       const code = (($('#adm-code') || {}).value || '').trim();
       if (!code || !S.users.has(code)) { toast('Codice non trovato. Controlla di averlo copiato per intero.'); return; }
       const n = await grantSlot(code); toast('Slot sbloccato per ' + nameOf(code) + ' (totale pagati: ' + n + ')');
+    } else if (act === 'swapmenu') {
+      S.swapMenu = !S.swapMenu;
     } else if (act === 'swapapp') {
-      S.swapApp = b.dataset.n || '';
+      S.swapApp = b.dataset.n || ''; S.swapMenu = false;
     } else if (act === 'swaptf') {
       S.swapTf = b.dataset.v || ''; try { localStorage.setItem(TF_KEY, S.swapTf); } catch (x) { /* il filtro resta solo per questa visita */ }
     } else if (act === 'toggleArch') {
