@@ -1,9 +1,9 @@
 import { firebaseConfig, TEST_DAYS } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261116a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261116b';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -1404,9 +1404,13 @@ document.addEventListener('click', async e => {
       if (st === 'todo') {
         const opens = {}; Object.keys(u.opens || {}).forEach(k => { if (S.swaps.has(k)) opens[k] = u.opens[k]; });
         opens[id] = opensOf(u, id).concat(dkey(Date.now())).slice(-14);
-        const uref = doc(db, 'users', me), mo = openMoons(u) + OPEN_MOONS;
+        const uref = doc(db, 'users', me);
         wr = (async () => {
-          try { await updateDoc(uref, { moonsOpen: mo }); } catch (e) { e.step = 'moonsOpen'; throw e; }
+          /* Si parte dal valore salvato sul server, non da quello locale: se fosse rimasto indietro, il salvataggio verrebbe rifiutato perché le Lune non possono diminuire. */
+          let base = openMoons(u), mo = 0;
+          try { const sv = await getDocFromServer(uref); if (sv.exists()) base = Math.max(base, Math.floor(+sv.data().moonsOpen || 0)); } catch (e) { /* senza rete resta il valore locale */ }
+          mo = base + OPEN_MOONS;
+          try { await updateDoc(uref, { moonsOpen: mo }); } catch (e) { e.step = 'moonsOpen ' + openMoons(u) + '>' + base + '>' + mo; throw e; }
           try { await updateDoc(uref, { opens }); } catch (e) { e.step = 'opens'; throw e; }
         })();
         toast('+' + OPEN_MOONS + ' Lune: test di oggi registrato');
