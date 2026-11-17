@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261117c';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261117d';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -1158,7 +1158,7 @@ function swapView(id) {
   if (mGrp) step1 += (s.joined && s.joined[o]) ? '<p class="small"><span class="pill ok">✓ ' + esc(nameOf(o)) + ' è entrato nel gruppo</span></p>'
     : '<p class="small muted">Aspetta che ' + esc(nameOf(o)) + ' entri nel gruppo Google della tua app. Se il gruppo richiede approvazione, accettalo da Google Gruppi.</p>';
   else {
-    if (!(s.ready && s.ready[me])) step1 += '<div class="box mini"><p class="small">Quando hai aggiunto la sua email tra i tester della tua app in Play Console, confermalo: solo allora ' + esc(nameOf(o)) + ' potrà installare e avviare il test.</p><div><button class="btn primary" data-act="ready" data-id="' + esc(id) + '">Ho aggiunto la sua email ai tester</button></div></div>';
+    if (!(s.ready && s.ready[me])) step1 += '<div class="box mini"><p class="small">Quando hai aggiunto la sua email tra i tester della tua app in Play Console, confermalo: solo allora ' + esc(nameOf(o)) + ' potrà installare e avviare il test.</p><div>' + (mineE && theirE ? '<button class="btn primary" data-act="ready" data-id="' + esc(id) + '">Ho aggiunto la sua email ai tester</button>' : '<button class="btn" disabled aria-disabled="true">Ho aggiunto la sua email ai tester</button>') + '</div></div>';
     else step1 += '<p class="small"><span class="pill ok">✓ Hai aggiunto ' + esc(nameOf(o)) + ' ai tester</span></p>';
   }
   }
