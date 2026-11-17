@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261117g';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261117h';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -669,10 +669,12 @@ const msBase = k => k.split(':')[0];
 /* ---------- Presentazione di benvenuto: si mostra una volta ai nuovi iscritti (e da Impostazioni). ---------- */
 const INTRO = [
   { img: 'avatar-bot.png', round: 1, t: 'Benvenuto su IronBlind 👋', p: 'Per pubblicare su Google Play servono 12 tester per 14 giorni. Qui li trovi scambiandoti i test 1 a 1 con altri sviluppatori Android.' },
-  { img: 'profile.jpg', t: 'Crea il tuo profilo 🧩', p: 'Aggiungi la tua app e il link di test su Google Play. La tua email resta privata finché non decidi di condividerla.' },
-  { img: 'explore.jpg', t: 'Scegli chi testare 🔍', p: 'Sfoglia le app in Esplora e proponi uno scambio: tu testi la sua app, lui testa la tua. Decidi tu con chi.' },
-  { img: 'swaps.jpg', t: '14 giorni, passo dopo passo ✅', p: 'Aggiungetevi come tester, installate le app e tenetele per 14 giorni. Alla fine vi lasciate un feedback con le stelle.' },
-  { emoji: '🌙', t: 'Guadagna Lune 🌙', p: 'Ricevi 1 Luna al giorno per ogni scambio attivo, a patto di aprire l\'app. Con 20 Lune sblocchi un\'app in più. Il massimo è 30.' }
+  { img: 'profile.jpg', t: 'Crea il tuo profilo 🧩', p: 'Aggiungi la tua app e il link di test su Google Play, oppure il tuo gruppo Google. La tua email resta privata finché non decidi di condividerla.' },
+  { img: 'explore.jpg', t: 'Scegli chi testare 🔍', p: 'Sfoglia le app in Esplora e proponi uno scambio: tu testi la sua app, lui testa la tua. Le app con più Lune per i tester stanno in cima.' },
+  { img: 'swaps.jpg', t: 'Passo dopo passo ✅', p: 'Condividete le email, aggiungetevi come tester e installate le app. Poi mandate uno screenshot: l\'altro conferma che l\'installazione c\'è.' },
+  { emoji: '📅', t: 'Testa ogni giorno 📅', p: 'Per 14 giorni apri l\'app dal pulsante «Apri applicazione». In Scambi i filtri «Da testare» e «Testati» ti dicono cosa manca oggi.' },
+  { emoji: '🌙', t: 'Guadagna Lune 🌙', p: '1 Luna per ogni giorno di test in cui apri IronBlind, più 5 Lune quando apri l\'app testata (una volta al giorno). Dopo i 14 giorni e il feedback ricevi anche la ricompensa dello sviluppatore.' },
+  { emoji: '🧩', t: 'Usa le Lune 🧩', p: '20 Lune sbloccano un\'app in più, fino a 3. Offri Lune ai tuoi tester per salire in Esplora. Ogni amico che pubblica la sua prima app ti regala 100 Lune, fino a 3 amici.' }
 ];
 let introI = 0;
 function closeIntro() { const m = $('#intro'); if (m) m.remove(); document.removeEventListener('keydown', introKey); }
