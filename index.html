@@ -84,6 +84,16 @@ a{color:var(--accent)}
 .mail code{font:500 13px var(--f-mono);overflow-wrap:anywhere}
 label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:13px}
 .proof{display:block;max-width:100%;max-height:240px;object-fit:contain;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+/* avvisi di stato del passo 2: blu = aspetti l'altra persona, ambra = tocca a te, verde = fatto */
+.nt{border:1px solid;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.nt p{margin:0;font-size:14px;line-height:1.4}
+.nt>p:first-child::before{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;margin-right:8px;font:700 12px/1 var(--f-body);vertical-align:1px;color:#fff}
+.nt.wait{background:color-mix(in srgb,var(--accent) 12%,var(--surface));border-color:color-mix(in srgb,var(--accent) 35%,var(--surface));color:color-mix(in srgb,var(--accent) 80%,var(--ink))}
+.nt.wait>p:first-child::before{content:"⏳";background:var(--accent);color:var(--accent-ink)}
+.nt.act{background:color-mix(in srgb,var(--warn) 14%,var(--surface));border-color:color-mix(in srgb,var(--warn) 45%,var(--surface));border-left-width:5px;color:color-mix(in srgb,var(--warn) 55%,var(--ink))}
+.nt.act>p:first-child::before{content:"!";background:var(--warn)}
+.nt.done{background:color-mix(in srgb,var(--ok) 14%,var(--surface));border-color:color-mix(in srgb,var(--ok) 40%,var(--surface));color:var(--ok);font-weight:600}
+.nt .btn{color:var(--ink)}.nt .btn.primary{color:var(--accent-ink)}
 input,textarea,select{font:400 15px var(--f-body);background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
 textarea{min-height:84px;resize:vertical}
 .field-note{font-weight:400;color:var(--muted);font-size:12px}
@@ -362,6 +372,6 @@ try{
   }
 }catch(e){}
 </script>
-<script type="module" src="./app.js?v=20261117b"></script>
+<script type="module" src="./app.js?v=20261117c"></script>
 </body>
 </html>

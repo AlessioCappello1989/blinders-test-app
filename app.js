@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261117b';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261117c';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -1184,30 +1184,30 @@ function swapView(id) {
   if (S.myProof !== undefined && S.theirProof !== undefined) {
     // Tester: stato della conferma. Proprietario: screenshot da confermare.
     if (el === null) { /* non ho ancora avviato il mio test: niente da mostrare come tester */ }
-    else if (s.conf && s.conf[me]) step2 += '<p class="small"><span class="pill ok">✓ Installazione confermata da ' + esc(nameOf(o)) + '</span></p>';
-    else if (S.myProof && proofLive(S.myProof) && S.myProof.st === 'no') step2 += '<div class="box mini"><p class="small"><b>' + esc(nameOf(o)) + ' non trova la tua installazione.</b> Controlla di aver installato l\'app dal link e allega un nuovo screenshot.</p>'
+    else if (s.conf && s.conf[me]) step2 += '<div class="nt done" role="status"><p class="small">✓ Installazione confermata da ' + esc(nameOf(o)) + '</p></div>';
+    else if (S.myProof && proofLive(S.myProof) && S.myProof.st === 'no') step2 += '<div class="nt act" role="alert"><p class="small"><b>' + esc(nameOf(o)) + ' non trova la tua installazione.</b> Controlla di aver installato l\'app dal link e allega un nuovo screenshot.</p>'
       + (draft ? '<img class="proof" src="' + draft + '" alt="Anteprima dello screenshot"><div><button class="btn primary" data-act="sendProof" data-id="' + esc(id) + '">Invia il nuovo screenshot</button></div>' : '')
-      + '<label class="btn" style="text-align:center">' + (draft ? '📷 Cambia screenshot' : '📷 Allega nuovo screenshot') + '<input id="proofin" type="file" accept="image/*" hidden></label></div>';
-    else if (S.myProof && proofLive(S.myProof)) step2 += '<p class="small muted">Screenshot inviato: aspetta che ' + esc(nameOf(o)) + ' confermi l\'installazione.</p>';
+      + '<label class="btn' + (draft ? '' : ' primary') + '" style="text-align:center">' + (draft ? '📷 Cambia screenshot' : '📷 Allega nuovo screenshot') + '<input id="proofin" type="file" accept="image/*" hidden></label></div>';
+    else if (S.myProof && proofLive(S.myProof)) step2 += '<div class="nt wait" role="status"><p class="small">Screenshot inviato: aspetta che ' + esc(nameOf(o)) + ' confermi l\'installazione.</p></div>';
     if (!ms(s.start && s.start[o])) { /* l'altro non ha ancora avviato */ }
-    else if (s.conf && s.conf[o]) step2 += '<p class="small"><span class="pill ok">✓ Hai confermato che ' + esc(nameOf(o)) + ' ha installato l\'app</span></p>';
-    else if (S.theirProof && proofLive(S.theirProof)) step2 += '<div class="box mini"><p class="small"><b>Screenshot di ' + esc(nameOf(o)) + '</b>: controlla che l\'app sia installata.</p><img class="proof" src="' + S.theirProof.img + '" alt="Screenshot dell\'installazione">'
+    else if (s.conf && s.conf[o]) step2 += '<div class="nt done" role="status"><p class="small">✓ Hai confermato che ' + esc(nameOf(o)) + ' ha installato l\'app</p></div>';
+    else if (S.theirProof && proofLive(S.theirProof)) step2 += '<div class="nt act" role="alert"><p class="small"><b>Screenshot di ' + esc(nameOf(o)) + '</b>: controlla che l\'app sia installata.</p><img class="proof" src="' + S.theirProof.img + '" alt="Screenshot dell\'installazione">'
       + (S.theirProof.st === 'no' ? '<p class="small muted">Hai segnalato che non risulta: aspetta un nuovo screenshot.</p>' : '<div class="row"><button class="btn primary" data-act="proofOk" data-id="' + esc(id) + '">Confermo che ha installato</button><button class="btn ghost" data-act="proofNo" data-id="' + esc(id) + '">Non risulta</button></div>') + '</div>';
   }
   /* Prova di utilizzo su richiesta */
   if (S.myCheck !== undefined && S.theirCheck !== undefined && s.status === 'active') {
     const dU = S.draftU && S.draftU.id === id ? S.draftU.img : null, mc = S.myCheck, tc = S.theirCheck;
     if (mc && (mc.st === 'asked' || mc.st === 'no')) {
-      step2 += '<div class="box mini"><p class="small"><b>' + esc(nameOf(o)) + (mc.st === 'no' ? ' non è convinto della prova.' : ' ti ha chiesto una prova di utilizzo.') + '</b></p><p class="small">Allega uno screenshot dell\'app aperta, con data e ora del telefono ben visibili' + (mc.st === 'asked' ? ' (entro il ' + fmtDT(mc.req + CHECK_HOURS * 36e5) + ').' : '.') + '</p>'
+      step2 += '<div class="nt act" role="alert"><p class="small"><b>' + esc(nameOf(o)) + (mc.st === 'no' ? ' non è convinto della prova.' : ' ti ha chiesto una prova di utilizzo.') + '</b></p><p class="small">Allega uno screenshot dell\'app aperta, con data e ora del telefono ben visibili' + (mc.st === 'asked' ? ' (entro il ' + fmtDT(mc.req + CHECK_HOURS * 36e5) + ').' : '.') + '</p>'
         + (dU ? '<img class="proof" src="' + dU + '" alt="Anteprima dello screenshot"><div><button class="btn primary" data-act="sendUse" data-id="' + esc(id) + '">Invia la prova</button></div>' : '')
-        + '<label class="btn" style="text-align:center">' + (dU ? '📷 Cambia screenshot' : '📷 Allega screenshot') + '<input id="usein" type="file" accept="image/*" hidden></label></div>';
-    } else if (mc && mc.st === 'sent') step2 += '<p class="small muted">Prova di utilizzo inviata: aspetta che ' + esc(nameOf(o)) + ' la confermi.</p>';
+        + '<label class="btn' + (dU ? '' : ' primary') + '" style="text-align:center">' + (dU ? '📷 Cambia screenshot' : '📷 Allega screenshot') + '<input id="usein" type="file" accept="image/*" hidden></label></div>';
+    } else if (mc && mc.st === 'sent') step2 += '<div class="nt wait" role="status"><p class="small">Prova di utilizzo inviata: aspetta che ' + esc(nameOf(o)) + ' la confermi.</p></div>';
     if (ms(s.start && s.start[o]) && !isDone(s)) {
       if (!tc) step2 += '<div class="box mini"><p class="small">Hai un dubbio che ' + esc(nameOf(o)) + ' stia usando la tua app? Puoi chiedere una prova di utilizzo: avrà 24 ore per inviare uno screenshot.</p><div><button class="btn ghost" data-act="askUse" data-id="' + esc(id) + '">Chiedi una prova di utilizzo</button></div></div>';
       else if (tc.st === 'asked') step2 += Date.now() > tc.req + CHECK_HOURS * 36e5
-        ? '<div class="box mini"><p class="small"><b>Prova non inviata.</b> Il tempo a disposizione è scaduto.</p><div class="row"><button class="btn ghost" data-act="askUse" data-id="' + esc(id) + '">Chiedi di nuovo</button></div></div>'
-        : '<p class="small muted">Richiesta inviata: ' + esc(nameOf(o)) + ' ha tempo fino al ' + fmtDT(tc.req + CHECK_HOURS * 36e5) + '.</p>';
-      else if (tc.st === 'sent' && proofLive(tc)) step2 += '<div class="box mini"><p class="small"><b>Prova di utilizzo di ' + esc(nameOf(o)) + '</b>: controlla che l\'app sia aperta e che data e ora siano di oggi.</p><img class="proof" src="' + tc.img + '" alt="Screenshot di utilizzo">'
+        ? '<div class="nt act" role="alert"><p class="small"><b>Prova non inviata.</b> Il tempo a disposizione è scaduto.</p><div class="row"><button class="btn ghost" data-act="askUse" data-id="' + esc(id) + '">Chiedi di nuovo</button></div></div>'
+        : '<div class="nt wait" role="status"><p class="small">Richiesta inviata: ' + esc(nameOf(o)) + ' ha tempo fino al ' + fmtDT(tc.req + CHECK_HOURS * 36e5) + '.</p></div>';
+      else if (tc.st === 'sent' && proofLive(tc)) step2 += '<div class="nt act" role="alert"><p class="small"><b>Prova di utilizzo di ' + esc(nameOf(o)) + '</b>: controlla che l\'app sia aperta e che data e ora siano di oggi.</p><img class="proof" src="' + tc.img + '" alt="Screenshot di utilizzo">'
         + '<div class="row"><button class="btn primary" data-act="useOk" data-id="' + esc(id) + '">Confermo che la usa</button><button class="btn ghost" data-act="useNo" data-id="' + esc(id) + '">Non mi convince</button></div></div>';
       else if (tc.st === 'no') step2 += '<p class="small muted">Hai segnalato che la prova non convince: aspetta un nuovo screenshot.</p><div><button class="btn ghost" data-act="askUse" data-id="' + esc(id) + '">Chiedi di nuovo</button></div>';
     }
