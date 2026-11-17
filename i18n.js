@@ -78,6 +78,7 @@ const E = {
   "Sei stato invitato da un amico: registrati e pubblica la tua prima app e il tuo amico riceve 100 🌙. ": 'A friend invited you: sign up and publish your first app and your friend gets 100 🌙. ',
   "Invita un amico e guadagna Lune": 'Invite a friend and earn Moons',
   'Tutti': 'All', 'Da testare': 'To test', 'Testati': 'Tested', 'Filtra per test di oggi': 'Filter by today\'s test', '✅ Testato oggi': '✅ Tested today',
+  'Nessuno scambio in questa sezione.': 'No swaps in this section.',
   'Hai testato tutto per oggi.': 'You have tested everything for today.', 'Nessun test registrato oggi.': 'No test recorded today.',
   "Quando un amico si registra e pubblica la sua prima app ricevi 100 🌙.": 'When a friend signs up and publishes their first app you get 100 🌙.',
   'Crei il profilo, proponi scambi e chatti con gli altri sviluppatori. Se è la prima volta con email e password, tocca Registrati.': 'Create your profile, propose swaps and chat with other developers. If this is your first time with email and password, tap Sign up.',

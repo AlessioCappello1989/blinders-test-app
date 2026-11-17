@@ -482,12 +482,20 @@ function swapsView() {
   const nDone = prog.filter(testedToday).length, shown = tf === 'todo' ? prog.filter(s => !testedToday(s)) : tf === 'done' ? prog.filter(testedToday) : prog;
   const tfBar = prog.length ? '<div class="seg" role="tablist" aria-label="Filtra per test di oggi">' + [['', 'Tutti', prog.length], ['todo', 'Da testare', prog.length - nDone], ['done', 'Testati', nDone]].map(x => '<button type="button" role="tab" aria-selected="' + (tf === x[0]) + '" class="' + (tf === x[0] ? 'on' : '') + '" data-act="swaptf" data-v="' + x[0] + '">' + x[1] + ' <span class="cnt">' + x[2] + '</span></button>').join('') + '</div>' : '';
   const inCorso = prog.length ? '<section class="stack"><h2>In corso</h2>' + tfBar + (shown.length ? shown.map(x => swapCard(x)).join('') : '<p class="muted">' + (tf === 'todo' ? 'Hai testato tutto per oggi.' : 'Nessun test registrato oggi.') + '</p>') + '</section>' : '';
-  return filt + sec('Richieste ricevute', all.filter(s => s.status === 'proposed' && s.b === me))
-    + inCorso
-    + sec('Richieste inviate', all.filter(s => s.status === 'proposed' && s.a === me))
-    + sec('Completati', all.filter(isDone))
+  /* Filtro per sezione: In corso / Richieste ricevute / Richieste inviate / Completati. */
+  const recv = all.filter(s => s.status === 'proposed' && s.b === me), sent = all.filter(s => s.status === 'proposed' && s.a === me), ended = all.filter(isDone);
+  const SECS = [['run', 'In corso', prog.length], ['recv', 'Richieste ricevute', recv.length], ['sent', 'Richieste inviate', sent.length], ['end', 'Completati', ended.length + arch.length]];
+  if (!SECS.some(x => x[0] === S.swapSec)) S.swapSec = 'run';
+  const secBar = '<div class="seg secbar" role="tablist" aria-label="Sezione">' + SECS.map(x => '<button type="button" role="tab" aria-selected="' + (S.swapSec === x[0]) + '" class="' + (S.swapSec === x[0] ? 'on' : '') + (x[0] === 'recv' && x[2] ? ' hot' : '') + '" data-act="swapsec" data-v="' + x[0] + '">' + x[1] + ' <span class="cnt">' + x[2] + '</span></button>').join('') + '</div>';
+  const none = '<p class="muted">Nessuno scambio in questa sezione.</p>';
+  let body;
+  if (S.swapSec === 'run') body = inCorso || none;
+  else if (S.swapSec === 'recv') body = recv.length ? '<section class="stack">' + recv.map(x => swapCard(x)).join('') + '</section>' : none;
+  else if (S.swapSec === 'sent') body = sent.length ? '<section class="stack">' + sent.map(x => swapCard(x)).join('') + '</section>' : none;
+  else body = (ended.length ? '<section class="stack">' + ended.map(x => swapCard(x)).join('') + '</section>' : (arch.length ? '' : none))
     + (arch.length ? '<section class="stack"><div><button class="btn ghost" data-act="toggleArch">' + (S.showArch ? 'Nascondi archiviati' : 'Archiviati (' + arch.length + ')') + '</button></div>'
       + (S.showArch ? arch.map(x => swapCard(x, true)).join('') : '') + '</section>' : '');
+  return filt + secBar + body;
 }
 
 function fbList(uid) {
@@ -1491,6 +1499,8 @@ document.addEventListener('click', async e => {
       S.swapMenu = !S.swapMenu;
     } else if (act === 'swapapp') {
       S.swapApp = b.dataset.n || ''; S.swapMenu = false;
+    } else if (act === 'swapsec') {
+      S.swapSec = b.dataset.v || 'run';
     } else if (act === 'swaptf') {
       S.swapTf = b.dataset.v || ''; try { localStorage.setItem(TF_KEY, S.swapTf); } catch (x) { /* il filtro resta solo per questa visita */ }
     } else if (act === 'toggleArch') {
