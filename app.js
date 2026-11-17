@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261117d';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261117g';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -486,7 +486,7 @@ function swapsView() {
   const recv = all.filter(s => s.status === 'proposed' && s.b === me), sent = all.filter(s => s.status === 'proposed' && s.a === me), ended = all.filter(isDone);
   const SECS = [['run', 'In corso', prog.length], ['recv', 'Richieste ricevute', recv.length], ['sent', 'Richieste inviate', sent.length], ['end', 'Completati', ended.length + arch.length]];
   if (!SECS.some(x => x[0] === S.swapSec)) S.swapSec = 'run';
-  const secBar = '<div class="seg secbar" role="tablist" aria-label="Sezione">' + SECS.map(x => '<button type="button" role="tab" aria-selected="' + (S.swapSec === x[0]) + '" class="' + (S.swapSec === x[0] ? 'on' : '') + (x[0] === 'recv' && x[2] ? ' hot' : '') + '" data-act="swapsec" data-v="' + x[0] + '">' + x[1] + ' <span class="cnt">' + x[2] + '</span></button>').join('') + '</div>';
+  const secBar = '<div class="secgrid" role="tablist" aria-label="Sezione">' + SECS.map(x => '<button type="button" role="tab" aria-selected="' + (S.swapSec === x[0]) + '" class="' + (S.swapSec === x[0] ? 'on' : '') + (x[0] === 'recv' && x[2] ? ' hot' : '') + '" data-act="swapsec" data-v="' + x[0] + '"><span>' + x[1] + '</span><span class="cnt">' + x[2] + '</span></button>').join('') + '</div>';
   const none = '<p class="muted">Nessuno scambio in questa sezione.</p>';
   let body;
   if (S.swapSec === 'run') body = inCorso || none;
@@ -1372,8 +1372,8 @@ function drawMsgs() {
 document.addEventListener('click', e => { if ($('#bellpn') && !e.target.closest('#bellpn') && !e.target.closest('#bell')) closeBell(); }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBell(); });
 /* Menù «Filtra per app»: si chiude con un tocco fuori o con Esc. */
-document.addEventListener('click', e => { if (S.swapMenu && !e.target.closest('.dd')) { S.swapMenu = false; if (me) render(true); } }, true);
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.swapMenu) { S.swapMenu = false; if (me) render(true); } });
+document.addEventListener('click', e => { if ((S.swapMenu || S.secMenu) && !e.target.closest('.dd')) { S.swapMenu = false; S.secMenu = false; if (me) render(true); } }, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && (S.swapMenu || S.secMenu)) { S.swapMenu = false; S.secMenu = false; if (me) render(true); } });
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b || busy) return;
   const act = b.dataset.act, id = b.dataset.id;
@@ -1496,11 +1496,13 @@ document.addEventListener('click', async e => {
       if (!code || !S.users.has(code)) { toast('Codice non trovato. Controlla di averlo copiato per intero.'); return; }
       const n = await grantSlot(code); toast('Slot sbloccato per ' + nameOf(code) + ' (totale pagati: ' + n + ')');
     } else if (act === 'swapmenu') {
-      S.swapMenu = !S.swapMenu;
+      S.swapMenu = !S.swapMenu; S.secMenu = false;
     } else if (act === 'swapapp') {
       S.swapApp = b.dataset.n || ''; S.swapMenu = false;
     } else if (act === 'swapsec') {
-      S.swapSec = b.dataset.v || 'run';
+      S.swapSec = b.dataset.v || 'run'; S.secMenu = false;
+    } else if (act === 'secmenu') {
+      S.secMenu = !S.secMenu; S.swapMenu = false;
     } else if (act === 'swaptf') {
       S.swapTf = b.dataset.v || ''; try { localStorage.setItem(TF_KEY, S.swapTf); } catch (x) { /* il filtro resta solo per questa visita */ }
     } else if (act === 'toggleArch') {
