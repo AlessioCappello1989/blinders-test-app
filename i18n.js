@@ -256,6 +256,7 @@ const E = {
   'Installazione confermata, screenshot cancellato': 'Installation confirmed, screenshot deleted', 'Segnalato: aspetta un nuovo screenshot': 'Reported: wait for a new screenshot',
   'Allega lo screenshot.': 'Attach the screenshot.', 'Screenshot inviato': 'Screenshot sent', "Allega lo screenshot dell'installazione.": 'Attach the installation screenshot.',
   'Non riesco a leggere la foto: usa uno screenshot.': 'I cannot read the photo: use a screenshot.',
+  'Screenshot caricato: ora tocca il pulsante per inviarlo.': 'Screenshot loaded: now tap the button to send it.',
   'Scambi fermi (solo tu)': 'Stalled swaps (only you)', 'Scambi attivi senza novità da molti giorni. Annullandoli si cancellano anche gli screenshot di installazione.': 'Active swaps with no news for many days. Cancelling them also deletes the installation screenshots.',
   'Giorni di fermo': 'Days idle', 'Cerca': 'Search', 'Nessuno scambio fermo.': 'No stalled swaps.', 'Annulla scambio e cancella foto': 'Cancel swap and delete photo', 'Cancella solo la foto': 'Delete only the photo',
   'Foto cancellate': 'Photos deleted', 'Scambio annullato, foto cancellate': 'Swap cancelled, photos deleted',

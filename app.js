@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261117a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261117b';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -832,7 +832,13 @@ function showMilestone(key) {
 document.addEventListener('change', async e => {
   const t = e.target; if (!t || (t.id !== 'proofin' && t.id !== 'usein') || !t.files || !t.files[0] || !(S.route && S.route.t === 'swap')) return;
   const id = S.route.id, key = t.id === 'usein' ? 'draftU' : 'draft';
-  try { S[key] = { id, img: await compressImage(t.files[0]) }; render(true); } catch (x) { toast('Non riesco a leggere la foto: usa uno screenshot.'); }
+  try {
+    S[key] = { id, img: await compressImage(t.files[0]) }; render(true);
+    /* La foto scelta è solo un'anteprima: va inviata con il pulsante sotto. Lo portiamo in vista così non si perde. */
+    toast('Screenshot caricato: ora tocca il pulsante per inviarlo.');
+    const bt = document.querySelector(key === 'draftU' ? '[data-act="sendUse"]' : '[data-act="sendProof"],[data-act="startTest"]');
+    if (bt) bt.scrollIntoView({ block: 'center', behavior: window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  } catch (x) { toast('Non riesco a leggere la foto: usa uno screenshot.'); }
 });
 document.addEventListener('change', e => { const t = e.target; if (t && t.id === 'langsel') { try { localStorage.setItem(langKey, t.value); } catch (x) { /* nessuna memoria locale */ } startI18n(); render(true); } });
 
