@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261117h';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261118a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -887,12 +887,65 @@ function notifBox() {
       : '<div>' + (on ? '<button type="button" class="btn ghost" data-act="notifOff">Disattiva notifiche</button>' : '<button type="button" class="btn primary" data-act="notifOn">Attiva notifiche</button>') + '</div>')
     + '</section>';
 }
+/* ---------- Promemoria giornaliero alle 15:00 (arriva anche con l'app chiusa, tramite Firebase Cloud Messaging) ---------- */
+/* Chiave pubblica web push: Console Firebase > Impostazioni progetto > Cloud Messaging > Certificati push web. Finché è vuota il riquadro non compare. */
+const VAPID_KEY = 'BCUY7gGov09sAAL_BMKUtQtJFwwN0C8vcN9vM7uVg1GKzw_ZJEPOQU-2pzYFXxu945DFuOgqBvFY5ItpkseIic8';
+const remKey = () => 'ironblind-rem-' + me;
+const remSupported = () => !!VAPID_KEY && notifSupported() && 'PushManager' in window;
+function remOn() { try { return remSupported() && Notification.permission === 'granted' && localStorage.getItem(remKey()) === '1'; } catch (e) { return false; } }
+async function remToken() {
+  const m = await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js');
+  if (!(await m.isSupported())) return '';
+  const reg = await navigator.serviceWorker.ready;
+  return (await m.getToken(m.getMessaging(app), { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg })) || '';
+}
+async function saveRem() {
+  const tok = await remToken(); if (!tok) throw new Error('token');
+  await setDoc(doc(db, 'push', me), { token: tok, lang: lang(), at: serverTimestamp() });
+}
+async function enableRem() {
+  try {
+    if (!remSupported()) { toast('Questo browser non supporta le notifiche.'); return; }
+    const p = await Notification.requestPermission();
+    if (p !== 'granted') { toast('Permesso negato. Puoi attivarlo dalle impostazioni del sito nel browser.'); render(true); return; }
+    await saveRem();
+    try { localStorage.setItem(remKey(), '1'); } catch (e) { /* senza memoria locale non resta attivo */ }
+    toast('Promemoria attivato.');
+  } catch (e) { toast('Non sono riuscito ad attivare il promemoria.'); }
+  render(true);
+}
+async function disableRem() {
+  try { localStorage.removeItem(remKey()); } catch (e) { /* nulla */ }
+  try { await deleteDoc(doc(db, 'push', me)); } catch (e) { /* nessun recapito da togliere */ }
+  toast('Promemoria disattivato.'); render(true);
+}
+/* A ogni accesso rinnova il recapito, che può cambiare. */
+function refreshRem() { if (remOn()) saveRem().catch(() => { /* resta il recapito precedente */ }); }
+function remBox() {
+  if (!remSupported()) return '';
+  const denied = Notification.permission === 'denied', on = remOn();
+  return '<section class="card"><div class="row between"><h3>⏰ Promemoria giornaliero</h3>' + (on ? '<span class="pill ok">Attivo</span>' : '') + '</div>'
+    + '<p class="small muted">Ogni giorno alle 15:00 ti avviso se hai ancora app da testare. Arriva anche con l\'app chiusa.</p>'
+    + (denied ? '<p class="small">Le notifiche sono bloccate per questo sito: abilitale dalle impostazioni del browser.</p>'
+      : '<div>' + (on ? '<button type="button" class="btn ghost" data-act="remOff">Disattiva il promemoria</button>' : '<button type="button" class="btn primary" data-act="remOn">Attiva il promemoria</button>') + '</div>')
+    + '</section>';
+}
+/* Il tocco sul promemoria apre Scambi, sezione In corso, filtro «Da testare». */
+let pendingGo = false;
+try { if (new URLSearchParams(location.search).get('go') === 'todo') pendingGo = true; } catch (e) { /* nessun parametro */ }
+function goTodo() {
+  if (!me) return; pendingGo = false;
+  S.tab = 'swaps'; S.route = null; S.swapSec = 'run'; S.swapTf = 'todo';
+  try { localStorage.setItem(TF_KEY, 'todo'); } catch (e) { /* nulla */ }
+  try { history.replaceState(null, '', location.pathname); } catch (e) { /* nulla */ }
+  render(true); window.scrollTo(0, 0);
+}
 let pendingSwap = null;
 try { const q = new URLSearchParams(location.search).get('swap'); if (q) pendingSwap = q; } catch (e) { /* nessun parametro */ }
 try {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => { /* senza service worker niente notifiche di sistema */ });
-    navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.swap) { pendingSwap = e.data.swap; openPendingSwap(); } });
+    navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.swap) { pendingSwap = e.data.swap; openPendingSwap(); } else if (e.data && e.data.go === 'todo') goTodo(); });
   }
 } catch (e) { /* ambiente senza service worker */ }
 function openPendingSwap() {
@@ -904,7 +957,7 @@ function openPendingSwap() {
 
 function settingsView() {
   return '<section class="card"><h3>⚙️ Impostazioni</h3><p class="small muted">Notifiche, lingua, informazioni sull\'app e account.</p></section>'
-    + notifBox() + langBox() + aboutBox()
+    + notifBox() + remBox() + langBox() + aboutBox()
     + '<section class="card"><h3>Seguici</h3><div class="row"><a class="btn ghost sm" target="_blank" rel="noopener noreferrer" href="https://www.instagram.com/ironblind_test_app">Instagram</a><a class="btn ghost sm" target="_blank" rel="noopener noreferrer" href="https://www.facebook.com/share/18xtgUa4cQ/">Facebook</a><a class="btn ghost sm" target="_blank" rel="noopener noreferrer" href="https://x.com/Ironblind89">X</a></div></section>'
     + adminBox() + deleteBox()
     + '<section class="card"><button type="button" class="btn ghost" data-act="logout">Esci</button></section>';
@@ -1092,6 +1145,7 @@ async function deleteAccount() {
     // 4. Elimina profilo, dati privati e account.
     try { await deleteDoc(doc(db, 'slotRequests', me)); await deleteDoc(doc(db, 'paid', me)); } catch (e) { /* nessuna richiesta da togliere */ }
     try { await deleteDoc(doc(db, 'refs', me)); } catch (e) { /* nessun invito da togliere */ }
+    try { await deleteDoc(doc(db, 'push', me)); } catch (e) { /* nessun promemoria da togliere */ }
     await deleteDoc(doc(db, 'userPrivate', me));
     await deleteDoc(doc(db, 'users', me));
     try { localStorage.removeItem(seenKey()); } catch (e) { /* nessuna memoria locale */ }
@@ -1395,6 +1449,8 @@ document.addEventListener('click', async e => {
     if (act === 'msPreview') { const ks = Object.keys(MS); showMilestone(ks[msPrevI++ % ks.length]); return; }
     if (act === 'notifOn') { enableNotif(); return; }
     if (act === 'notifOff') { disableNotif(); return; }
+    if (act === 'remOn') { enableRem(); return; }
+    if (act === 'remOff') { disableRem(); return; }
     if (act === 'aboutOpen') { openAbout(); return; }
     if (act === 'installOpen') { openInstall(); return; }
     if (act === 'aboutClose') { closeAbout(); return; }
@@ -1797,7 +1853,8 @@ if (!firebaseConfig.apiKey || /INCOLLA/.test(firebaseConfig.apiKey)) {
   db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
   onAuthStateChanged(auth, u => {
     stopData(); me = u ? u.uid : null;
-    if (me) startData();
+    if (me) { startData(); refreshRem(); }
     render(true);
+    if (me && pendingGo) goTodo();
   });
 }
