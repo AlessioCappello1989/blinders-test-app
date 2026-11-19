@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261118a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261119a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -900,8 +900,10 @@ async function remToken() {
   return (await m.getToken(m.getMessaging(app), { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg })) || '';
 }
 async function saveRem() {
-  const tok = await remToken(); if (!tok) throw new Error('token');
-  await setDoc(doc(db, 'push', me), { token: tok, lang: lang(), at: serverTimestamp() });
+  let tok = '';
+  try { tok = await remToken(); } catch (e) { e.step = 'recapito: ' + (e.code || e.name || 'errore'); throw e; }
+  if (!tok) { const e = new Error('token'); e.step = 'recapito: non disponibile su questo browser'; throw e; }
+  try { await setDoc(doc(db, 'push', me), { token: tok, lang: lang(), at: serverTimestamp() }); } catch (e) { e.step = 'salvataggio: ' + (e.code || e.name || 'errore'); throw e; }
 }
 async function enableRem() {
   try {
@@ -911,7 +913,7 @@ async function enableRem() {
     await saveRem();
     try { localStorage.setItem(remKey(), '1'); } catch (e) { /* senza memoria locale non resta attivo */ }
     toast('Promemoria attivato.');
-  } catch (e) { toast('Non sono riuscito ad attivare il promemoria.'); }
+  } catch (e) { toast(e && e.step ? 'Non sono riuscito ad attivare il promemoria (' + e.step + ').' : 'Non sono riuscito ad attivare il promemoria.'); }
   render(true);
 }
 async function disableRem() {
