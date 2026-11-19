@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261119a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261119c';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -281,6 +281,7 @@ function markSeen(id) {
   const all = getSeen(); const lm = S.lastMsg.get(id);
   all[id] = { msg: Math.max(lm ? lm.at : 0, Date.now()), start: true, fb: true, acc: true, ready: true, joined: true };
   try { localStorage.setItem(seenKey(), JSON.stringify(all)); } catch (e) { /* senza memoria locale gli avvisi restano finché non cambia lo stato */ }
+  scheduleReadsSave();
 }
 function unreadInfo(s) {
   const seen = getSeen()[s.id] || {}; const o = s.a === me ? s.b : s.a; const out = []; const lm = S.lastMsg.get(s.id);
@@ -756,12 +757,14 @@ function checkDigest(tries) {
   try {
     if (digestDone || !me) return;
     const u = S.users.get(me); if (!u || !u.nick) return;
+    if (!readsReady && (tries || 0) < 10) { setTimeout(() => checkDigest((tries || 0) + 1), 600); return; } /* aspetto cosa ho già letto dal server */
     if ($('#intro') || $('#about') || $('#ms') || $('#slotm')) { if ((tries || 0) < 12) setTimeout(() => checkDigest((tries || 0) + 1), 1500); return; }
     const need = mine().filter(s => s.status === 'active'); /* aspetto i messaggi di ogni scambio attivo, al massimo qualche secondo */
     if (need.some(s => !msgFirst.has(s.id)) && (tries || 0) < 8) { setTimeout(() => checkDigest((tries || 0) + 1), 700); return; }
     digestDone = true;
     const d = digestItems(); if (!d.items.length) return;
     try { localStorage.setItem(digestKey(), JSON.stringify(d.shown.concat(d.keys).slice(-200))); } catch (e) { /* senza memoria locale le proposte si ripresentano */ }
+    scheduleReadsSave();
     const max = 4, list = d.items.slice(0, max), more = d.items.length - list.length;
     const bn = document.createElement('div'); bn.id = 'digest'; bn.setAttribute('role', 'status');
     bn.innerHTML = '<div class="dg-h"><b>' + (d.items.length === 1 ? '1 novità' : d.items.length + ' novità') + '</b><button type="button" class="dg-x" data-act="dgClose">Chiudi</button></div><ul>'
@@ -775,7 +778,35 @@ function checkDigest(tries) {
 /* ---------- Campanello: novità ancora da vedere (calcolate dai dati già letti, senza storico) ---------- */
 const bellKey = () => 'ironblind-bell-' + me;
 const bellDismissed = () => { try { return JSON.parse(localStorage.getItem(bellKey()) || '[]'); } catch (e) { return []; } };
-const bellDismiss = ids => { try { localStorage.setItem(bellKey(), JSON.stringify(bellDismissed().concat(ids).slice(-200))); } catch (e) { /* senza memoria locale le proposte restano in elenco */ } };
+const bellDismiss = ids => { try { localStorage.setItem(bellKey(), JSON.stringify(bellDismissed().concat(ids).slice(-200))); } catch (e) { /* senza memoria locale le proposte restano in elenco */ } scheduleReadsSave(); };
+/* Cosa hai già letto si salva anche su Firestore (raccolta reads), così non ricompare se cancelli i dati del browser o cambi telefono. */
+let readsReady = false, readsTimer = 0;
+const readsRef = () => doc(db, 'reads', me);
+const lsGet = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
+const readsLocal = () => ({ seen: getSeen(), bell: bellDismissed(), digest: lsGet(digestKey(), []) });
+function scheduleReadsSave() { if (!me || !readsReady) return; clearTimeout(readsTimer); readsTimer = setTimeout(saveReads, 3000); }
+async function saveReads() {
+  if (!me) return;
+  try { const L = readsLocal(); await setDoc(readsRef(), { seen: L.seen, bell: L.bell, digest: L.digest }); } catch (e) { /* offline o regole non aggiornate: resta la memoria locale */ }
+}
+async function loadReads() {
+  const who = me; if (!who) return;
+  try {
+    const sn = await getDoc(readsRef()); if (who !== me) return;
+    const r = sn.exists() ? sn.data() : {}, L = readsLocal(), seen = Object.assign({}, r.seen || {});
+    Object.keys(L.seen).forEach(id => {
+      const a = seen[id] || {}, b = L.seen[id] || {}, m = { msg: Math.max(+a.msg || 0, +b.msg || 0) };
+      ['start', 'fb', 'acc', 'ready', 'joined'].forEach(k => { m[k] = !!(a[k] || b[k]); });
+      seen[id] = m;
+    });
+    const uni = (x, y) => Array.from(new Set((Array.isArray(x) ? x : []).concat(Array.isArray(y) ? y : []))).slice(-200);
+    const bell = uni(r.bell, L.bell), digest = uni(r.digest, L.digest);
+    try { localStorage.setItem(seenKey(), JSON.stringify(seen)); localStorage.setItem(bellKey(), JSON.stringify(bell)); localStorage.setItem(digestKey(), JSON.stringify(digest)); } catch (e) { /* senza memoria locale vale solo il server */ }
+    readsReady = true;
+    if (JSON.stringify([seen, bell, digest]) !== JSON.stringify([r.seen || {}, r.bell || [], r.digest || []])) scheduleReadsSave();
+    updateBell(); render(true);
+  } catch (e) { readsReady = true; /* offline o regole non aggiornate: resta la memoria locale */ }
+}
 function notifItems() {
   const dis = bellDismissed(), items = [];
   mine().forEach(s => {
@@ -901,7 +932,14 @@ async function remToken() {
 }
 async function saveRem() {
   let tok = '';
-  try { tok = await remToken(); } catch (e) { e.step = 'recapito: ' + (e.code || e.name || 'errore'); throw e; }
+  /* Su alcuni telefoni il permesso risulta concesso un attimo dopo la richiesta: riprova qualche volta prima di arrendersi. */
+  for (let i = 0; i < 4 && !tok; i++) {
+    try { tok = await remToken(); }
+    catch (e) {
+      if (i < 3 && /permission/.test(e.code || '')) { await new Promise(r => setTimeout(r, 800)); continue; }
+      e.step = 'recapito: ' + (e.code || e.name || 'errore') + ', permesso ' + (('Notification' in window) ? Notification.permission : 'assente'); throw e;
+    }
+  }
   if (!tok) { const e = new Error('token'); e.step = 'recapito: non disponibile su questo browser'; throw e; }
   try { await setDoc(doc(db, 'push', me), { token: tok, lang: lang(), at: serverTimestamp() }); } catch (e) { e.step = 'salvataggio: ' + (e.code || e.name || 'errore'); throw e; }
 }
@@ -1148,6 +1186,7 @@ async function deleteAccount() {
     try { await deleteDoc(doc(db, 'slotRequests', me)); await deleteDoc(doc(db, 'paid', me)); } catch (e) { /* nessuna richiesta da togliere */ }
     try { await deleteDoc(doc(db, 'refs', me)); } catch (e) { /* nessun invito da togliere */ }
     try { await deleteDoc(doc(db, 'push', me)); } catch (e) { /* nessun promemoria da togliere */ }
+    try { await deleteDoc(doc(db, 'reads', me)); } catch (e) { /* nessuna lettura da togliere */ }
     await deleteDoc(doc(db, 'userPrivate', me));
     await deleteDoc(doc(db, 'users', me));
     try { localStorage.removeItem(seenKey()); } catch (e) { /* nessuna memoria locale */ }
@@ -1854,8 +1893,8 @@ if (!firebaseConfig.apiKey || /INCOLLA/.test(firebaseConfig.apiKey)) {
      Con il rilevamento automatico Firestore passa da solo a una connessione più compatibile. */
   db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
   onAuthStateChanged(auth, u => {
-    stopData(); me = u ? u.uid : null;
-    if (me) { startData(); refreshRem(); }
+    stopData(); me = u ? u.uid : null; readsReady = false; clearTimeout(readsTimer);
+    if (me) { startData(); refreshRem(); loadReads(); }
     render(true);
     if (me && pendingGo) goTodo();
   });
