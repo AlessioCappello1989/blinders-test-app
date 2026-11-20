@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261119c';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261120a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -217,6 +217,13 @@ let moonWrite = false, pingOn = false;
 const myTesting = () => mine().filter(sw => sw.status === 'active' && ms(sw.start && sw.start[me]) && !(sw.fb && sw.fb[me])).length;
 /* Vetrina: app pubblicata su Google Play (link verificato solo nella forma) e app nel Cantiere (test in corso). */
 const PLAY = /^https:\/\/play\.google\.com\//i;
+/* Al salvataggio il link deve essere la pagina di una app (…/store/apps/details?id=nome.pacchetto). Le app già salvate con altri link di play.google.com restano visibili. */
+const PLAY_PAGE = /^https:\/\/play\.google\.com\/store\/apps\/details\?id=[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+(&.*)?$/;
+const urlMark = u => { u = u || ''; try { const x = new URL(u); if (PLAY_PAGE.test(u)) return esc(u); const i = u.indexOf(x.host); return esc(u.slice(0, i)) + '<mark>' + esc(x.host) + '</mark>' + esc(u.slice(i + x.host.length)); } catch (e) { return esc(u); } };
+/* Riquadro visibile solo all'amministratore: link completo e pulsante per togliere l'app dalla vetrina. */
+const linkAdmBox = (uid, a) => !isAdminUser() ? '' : '<div class="admbox"><span class="admt">Solo per te · amministratore</span><div class="admurl">' + urlMark(a.store) + '</div>'
+  + (PLAY_PAGE.test(a.store || '') ? '<span class="pill ok">Link del Play Store</span>' : '<span class="pill bad">Non è un link del Play Store</span>')
+  + '<div class="row"><button type="button" class="btn warn sm" data-act="hideApp" data-k="' + esc(uid + '_' + a.id) + '">Togli dalla vetrina</button></div></div>';
 const isPubApp = (uid, a) => !!(a && a.pub && PLAY.test(a.store || '') && !S.hidden.has(uid + '_' + a.id));
 /* Test dell'app: scambi su IronBlind (prog) più eventuali tester esterni dichiarati dal proprietario (ext: n e data di inizio).
    Google Play conta i 14 giorni solo quando ci sono tutti e 12 i tester: il giorno 1 è quello in cui entra il dodicesimo. */
@@ -386,7 +393,7 @@ function exploreItems() {
     let state = '', extra = '';
     if (pubd) {
       state = '<span class="pill ok">✅ Online su Google Play</span>';
-      extra = '<div class="row"><a class="btn" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(x.a.store) + '">▶ Vedi su Google Play</a>' + (x.own ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div>';
+      extra = '<div class="row"><a class="btn" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(x.a.store) + '">▶ Vedi su Google Play</a>' + (x.own ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div>' + linkAdmBox(x.id, x.a);
     } else if (build) {
       state = '<span class="pill build">🚧 Nel Cantiere</span>';
       const bi = buildInfo(x.a), act2 = Math.max(0, Math.min(12, bi.n));
@@ -438,7 +445,7 @@ function reviewItems() {
     + '<div class="row"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="pill ok">✅ Online su Google Play</span>' + (x.own ? '<span class="pill">La tua app</span>' : '') + '</div>'
     + (x.a.desc ? '<p class="desc">' + esc(x.a.desc) + '</p>' : '')
     + '<div class="row"><a class="btn' + (x.own ? '' : ' primary') + '" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(x.a.store) + '">' + (x.own ? '▶ Vedi su Google Play' : '▶ Apri su Google Play') + '</a>'
-    + (x.own ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div></article>').join('');
+    + (x.own ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div>' + linkAdmBox(x.id, x.a) + '</article>').join('');
 }
 const reviewsView = () => '<section class="card"><h2>Recensioni</h2><div class="rnote"><b>Dai una mano a chi sviluppa.</b> Recensire un\'app della community aiuta e supporta chi l\'ha creata. Non offriamo ricompense: per noi la recensione è un diritto di chi usa l\'app e deve essere il più sincera possibile. Scrivi solo ciò che pensi davvero.</div></section>'
   + '<div class="grid2"><label for="rq">Cerca un\'app<input id="rq" type="search" value="' + esc(S.rq || '') + '" placeholder="Nome, categoria o sviluppatore"></label></div><div id="rlist">' + reviewItems() + '</div>';
@@ -1802,7 +1809,11 @@ document.addEventListener('submit', async e => {
       if (n > 0 && !ds) { toast('Indica la data di inizio del test esterno.'); return; }
       if (n > 0 && new Date(ds + 'T00:00:00').getTime() > Date.now()) { toast('La data di inizio non può essere nel futuro.'); return; }
     }
-    for (const k of ks) { const pc = $('#f-pub-' + k), sl = $('#f-store-' + k); if (pc && pc.checked && !PLAY.test((sl && sl.value || '').trim())) { toast('Per la vetrina serve il link di Google Play (https://play.google.com/...)'); return; } }
+    for (const k of ks) {
+      const pc = $('#f-pub-' + k), sl = $('#f-store-' + k), sv = (sl && sl.value || '').trim();
+      if (pc && pc.checked && !sv) { toast('Per la vetrina serve il link di Google Play (https://play.google.com/...)'); return; }
+      if (sv && !PLAY_PAGE.test(sv)) { toast('Questo non è un link del Play Store. Usa quello della tua app, ad esempio https://play.google.com/store/apps/details?id=it.tuonome.app'); return; }
+    }
     busy = true;
     try {
       const extra = {}, extraLinks = {}, extraGroups = {}; let mainApp = null, mainLink = '', mainGroup = '';

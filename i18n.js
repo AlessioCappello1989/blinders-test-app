@@ -81,6 +81,8 @@ const E = {
   "Invita un amico e guadagna Lune": 'Invite a friend and earn Moons',
   'Tutti': 'All', 'Da testare': 'To test', 'Testati': 'Tested', 'Filtra per test di oggi': 'Filter by today\'s test', '✅ Testato oggi': '✅ Tested today',
   'Nessuno scambio in questa sezione.': 'No swaps in this section.',
+  'Solo per te · amministratore': 'Only for you · administrator', 'Link del Play Store': 'Play Store link', 'Non è un link del Play Store': 'Not a Play Store link',
+  'Questo non è un link del Play Store. Usa quello della tua app, ad esempio https://play.google.com/store/apps/details?id=it.tuonome.app': 'This is not a Play Store link. Use your app\'s link, for example https://play.google.com/store/apps/details?id=com.yourname.app',
   '⏰ Promemoria giornaliero': '⏰ Daily reminder', 'Attivo': 'On',
   "Ogni giorno alle 15:00 ti avviso se hai ancora app da testare. Arriva anche con l'app chiusa.": 'Every day at 3:00 pm (Italy time) I let you know if you still have apps to test. It arrives even when the app is closed.',
   'Attiva il promemoria': 'Turn on the reminder', 'Disattiva il promemoria': 'Turn off the reminder',
