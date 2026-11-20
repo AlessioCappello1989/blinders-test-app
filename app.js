@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261120a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261120b';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -877,16 +877,19 @@ function showMilestone(key) {
   document.body.appendChild(bg); document.addEventListener('keydown', msKey);
   const b = bg.querySelector('[data-act="msClose"]'); if (b) b.focus();
 }
+/* I campi per scegliere la foto vivono fuori dalla pagina che si ridisegna: se l'app si aggiorna mentre la galleria è aperta, la scelta non va persa. */
+['proofin', 'usein'].forEach(i => { if (document.getElementById(i)) return; const f = document.createElement('input'); f.type = 'file'; f.accept = 'image/*'; f.id = i; f.hidden = true; document.body.appendChild(f); });
 document.addEventListener('change', async e => {
-  const t = e.target; if (!t || (t.id !== 'proofin' && t.id !== 'usein') || !t.files || !t.files[0] || !(S.route && S.route.t === 'swap')) return;
-  const id = S.route.id, key = t.id === 'usein' ? 'draftU' : 'draft';
+  const t = e.target; if (!t || (t.id !== 'proofin' && t.id !== 'usein') || !t.files || !t.files[0]) return;
+  if (!(S.route && S.route.t === 'swap')) { toast('Foto ricevuta, ma la scheda dello scambio non è aperta: riaprila e riprova.'); t.value = ''; return; }
+  const id = S.route.id, key = t.id === 'usein' ? 'draftU' : 'draft', fl = t.files[0];
   try {
-    S[key] = { id, img: await compressImage(t.files[0]) }; render(true);
+    S[key] = { id, img: await compressImage(fl) }; t.value = ''; render(true);
     /* La foto scelta è solo un'anteprima: va inviata con il pulsante sotto. Lo portiamo in vista così non si perde. */
     toast('Screenshot caricato: ora tocca il pulsante per inviarlo.');
     const bt = document.querySelector(key === 'draftU' ? '[data-act="sendUse"]' : '[data-act="sendProof"],[data-act="startTest"]');
     if (bt) bt.scrollIntoView({ block: 'center', behavior: window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-  } catch (x) { toast('Non riesco a leggere la foto: usa uno screenshot.'); }
+  } catch (x) { t.value = ''; toast('Non riesco a leggere la foto (' + (x && x.message === 'big' ? 'troppo grande' : x && x.message === 'img' ? 'formato non supportato' : (x && x.message) || 'errore') + '). Prova con uno screenshot dalla Galleria.'); }
 });
 document.addEventListener('change', e => { const t = e.target; if (t && t.id === 'langsel') { try { localStorage.setItem(langKey, t.value); } catch (x) { /* nessuna memoria locale */ } startI18n(); render(true); } });
 
@@ -1290,7 +1293,7 @@ function swapView(id) {
     ? '<p class="small muted">Potrai avviare il test quando avrai il link dell\'app da installare.</p>'
     : (rdy ? '<div class="box mini"><p class="small">Per avviare il test allega uno screenshot della pagina dell\'app su Play Store, con il pulsante "Disinstalla" o "Apri" e il nome dell\'app ben visibili. Controlla che non mostri notifiche o dati personali: lo vede solo ' + esc(nameOf(o)) + ' e viene cancellato dopo la sua conferma.</p>'
         + (shown ? '<img class="proof" src="' + shown + '" alt="Anteprima dello screenshot">' : '')
-        + '<label class="btn" style="text-align:center">' + (shown ? '📷 Cambia screenshot' : '📷 Allega screenshot') + '<input id="proofin" type="file" accept="image/*" hidden></label>'
+        + '<button type="button" class="btn" style="text-align:center" data-act="pickFile" data-k="proofin">' + (shown ? '📷 Cambia screenshot' : '📷 Allega screenshot') + '</button>'
         + (shown ? '<div><button class="btn primary" data-act="startTest" data-id="' + esc(id) + '">Ho installato l\'app, avvia i 14 giorni</button></div>' : '') + '</div>'
       : (oGrp ? '<p class="small muted">Prima di installare entra nel gruppo Google di ' + esc(nameOf(o)) + ' e confermalo nel passo 1: il pulsante di avvio si sblocca dopo la tua conferma.</p>' : '<p class="small muted">Prima di installare aspetta che ' + esc(nameOf(o)) + ' ti aggiunga ai tester di Play Console: il pulsante di avvio si sblocca dopo la sua conferma.</p>'));
   if (S.myProof !== undefined && S.theirProof !== undefined) {
@@ -1299,7 +1302,7 @@ function swapView(id) {
     else if (s.conf && s.conf[me]) step2 += '<div class="nt done" role="status"><p class="small">✓ Installazione confermata da ' + esc(nameOf(o)) + '</p></div>';
     else if (S.myProof && proofLive(S.myProof) && S.myProof.st === 'no') step2 += '<div class="nt act" role="alert"><p class="small"><b>' + esc(nameOf(o)) + ' non trova la tua installazione.</b> Controlla di aver installato l\'app dal link e allega un nuovo screenshot.</p>'
       + (draft ? '<img class="proof" src="' + draft + '" alt="Anteprima dello screenshot"><div><button class="btn primary" data-act="sendProof" data-id="' + esc(id) + '">Invia il nuovo screenshot</button></div>' : '')
-      + '<label class="btn' + (draft ? '' : ' primary') + '" style="text-align:center">' + (draft ? '📷 Cambia screenshot' : '📷 Allega nuovo screenshot') + '<input id="proofin" type="file" accept="image/*" hidden></label></div>';
+      + '<button type="button" class="btn' + (draft ? '' : ' primary') + '" style="text-align:center" data-act="pickFile" data-k="proofin">' + (draft ? '📷 Cambia screenshot' : '📷 Allega nuovo screenshot') + '</button></div>';
     else if (S.myProof && proofLive(S.myProof)) step2 += '<div class="nt wait" role="status"><p class="small">Screenshot inviato: aspetta che ' + esc(nameOf(o)) + ' confermi l\'installazione.</p></div>';
     if (!ms(s.start && s.start[o])) { /* l'altro non ha ancora avviato */ }
     else if (s.conf && s.conf[o]) step2 += '<div class="nt done" role="status"><p class="small">✓ Hai confermato che ' + esc(nameOf(o)) + ' ha installato l\'app</p></div>';
@@ -1312,7 +1315,7 @@ function swapView(id) {
     if (mc && (mc.st === 'asked' || mc.st === 'no')) {
       step2 += '<div class="nt act" role="alert"><p class="small"><b>' + esc(nameOf(o)) + (mc.st === 'no' ? ' non è convinto della prova.' : ' ti ha chiesto una prova di utilizzo.') + '</b></p><p class="small">Allega uno screenshot dell\'app aperta, con data e ora del telefono ben visibili' + (mc.st === 'asked' ? ' (entro il ' + fmtDT(mc.req + CHECK_HOURS * 36e5) + ').' : '.') + '</p>'
         + (dU ? '<img class="proof" src="' + dU + '" alt="Anteprima dello screenshot"><div><button class="btn primary" data-act="sendUse" data-id="' + esc(id) + '">Invia la prova</button></div>' : '')
-        + '<label class="btn' + (dU ? '' : ' primary') + '" style="text-align:center">' + (dU ? '📷 Cambia screenshot' : '📷 Allega screenshot') + '<input id="usein" type="file" accept="image/*" hidden></label></div>';
+        + '<button type="button" class="btn' + (dU ? '' : ' primary') + '" style="text-align:center" data-act="pickFile" data-k="usein">' + (dU ? '📷 Cambia screenshot' : '📷 Allega screenshot') + '</button></div>';
     } else if (mc && mc.st === 'sent') step2 += '<div class="nt wait" role="status"><p class="small">Prova di utilizzo inviata: aspetta che ' + esc(nameOf(o)) + ' la confermi.</p></div>';
     if (ms(s.start && s.start[o]) && !isDone(s)) {
       if (!tc) step2 += '<div class="box mini"><p class="small">Hai un dubbio che ' + esc(nameOf(o)) + ' stia usando la tua app? Puoi chiedere una prova di utilizzo: avrà 24 ore per inviare uno screenshot.</p><div><button class="btn ghost" data-act="askUse" data-id="' + esc(id) + '">Chiedi una prova di utilizzo</button></div></div>';
@@ -1483,6 +1486,7 @@ document.addEventListener('click', async e => {
   const act = b.dataset.act, id = b.dataset.id;
   try {
     if (act === 'login') { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (x) { if (x.code !== 'auth/popup-closed-by-user' && x.code !== 'auth/cancelled-popup-request') toast(x.code === 'auth/unauthorized-domain' ? 'Dominio non autorizzato: aggiungilo in Firebase > Authentication > Impostazioni.' : 'Accesso non riuscito. Riprova.'); } return; }
+    if (act === 'pickFile') { const f = document.getElementById(b.dataset.k); if (f) f.click(); return; }
     if (act === 'slotOpen') { openSlot(); return; }
     if (act === 'slotClose') { closeSlot(); return; }
     if (act === 'askClear') { S.confirmC = b.dataset.k; render(true); return; }
