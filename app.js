@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261120b';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261121a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -1853,9 +1853,9 @@ document.addEventListener('submit', async e => {
       if (old.arch) data.arch = old.arch;
       if (old.testing) data.testing = old.testing;
       if (old.moonsSpent) data.moonsSpent = old.moonsSpent;
-      await setDoc(doc(db, 'users', me), data);
-      const priv = { email, link: mainLink }; if (mainGroup) priv.group = mainGroup; if (Object.keys(extraLinks).length) priv.extraLinks = extraLinks; if (Object.keys(extraGroups).length) priv.extraGroups = extraGroups;
-      await setDoc(doc(db, 'userPrivate', me), priv);
+      try { await setDoc(doc(db, 'users', me), data); } catch (e) { e.step = 'profilo'; throw e; }
+      const priv ={ email, link: mainLink }; if (mainGroup) priv.group = mainGroup; if (Object.keys(extraLinks).length) priv.extraLinks = extraLinks; if (Object.keys(extraGroups).length) priv.extraGroups = extraGroups;
+      try { await setDoc(doc(db, 'userPrivate', me), priv); } catch (e) { e.step = 'link privati'; throw e; }
       const counted = await recordInvite(old, !!mainApp.name);
       S.ico = {};
       toast(counted ? 'Profilo salvato. Il tuo invito è stato registrato: grazie!' : (mainApp.name ? 'Profilo salvato' : 'Profilo salvato. Aggiungi la tua app per comparire in Esplora.'));
