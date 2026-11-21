@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261121b';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261121c';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -1879,7 +1879,12 @@ document.addEventListener('submit', async e => {
       if (old.arch) data.arch = old.arch;
       if (old.testing) data.testing = old.testing;
       if (old.moonsSpent) data.moonsSpent = old.moonsSpent;
-      try { await setDoc(doc(db, 'users', me), data); } catch (e) { const w = ruleProbe(data, old); e.step = 'profilo' + (w ? ': ' + w : ''); throw e; }
+      try { await setDoc(doc(db, 'users', me), data); } catch (e) {
+        let w = ruleProbe(data, old);
+        /* Se in locale tutto torna, confronto con il documento vero sul server (potrebbe essere più avanti di quello in memoria). */
+        if (!w) { try { const sv = (await getDocFromServer(doc(db, 'users', me))).data() || {}; w = ruleProbe(data, sv); if (!w) w = 'dati ok, extra ' + Object.keys(data.extra || {}).join('+') + ', server ' + Object.keys(sv.extra || {}).join('+'); else w = 'server: ' + w; } catch (x) { w = 'server non letto'; } }
+        e.step = 'profilo: ' + w; throw e;
+      }
       const priv ={ email, link: mainLink }; if (mainGroup) priv.group = mainGroup; if (Object.keys(extraLinks).length) priv.extraLinks = extraLinks; if (Object.keys(extraGroups).length) priv.extraGroups = extraGroups;
       try { await setDoc(doc(db, 'userPrivate', me), priv); } catch (e) { e.step = 'link privati'; throw e; }
       const counted = await recordInvite(old, !!mainApp.name);
