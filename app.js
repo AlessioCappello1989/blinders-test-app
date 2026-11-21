@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261121a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261121b';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -274,6 +274,32 @@ function syncMoons() {
   }).catch(e => console.error(e)).finally(() => { moonWrite = false; });
 }
 const slotsShown = u => { let free = freeSlots(u); return SLOTS.filter(k => { if (hasExtra(u, k)) return true; if (free > 0) { free--; return true; } return false; }); };
+/* Diagnostica: ripete in locale le condizioni delle regole del profilo e dice la prima che non torna. */
+function ruleProbe(d, o) {
+  const isI = v => Number.isInteger(v), g = (v, f) => v === undefined ? f : v, len = v => (typeof v === 'string' ? v.length : 0);
+  const chkApp = (a, n) => {
+    if (typeof a.name !== 'string') return n + ' senza nome';
+    if (a.name.length > 50) return n + ' nome>50'; if (len(a.desc) > 500) return n + ' descrizione>500'; if (len(a.want) > 40) return n + ' paese>40';
+    if (['', 'group'].indexOf(g(a.acc, '')) < 0) return n + ' accesso';
+    if (len(a.store) > 300) return n + ' link store>300'; if ('link' in a) return n + ' campo link';
+    if (a.icon && !(typeof a.icon === 'string' && a.icon.length <= 7000 && ICO_RE.test(a.icon))) return n + ' icona';
+    if (!(isI(g(a.reward, 0)) && g(a.reward, 0) >= 0 && g(a.reward, 0) <= 1000)) return n + ' ricompensa';
+    if (g(a.ext && a.ext.n, 0) > 50) return n + ' tester esterni>50'; return '';
+  };
+  try {
+    if (!d.nick || d.nick.length > 30) return 'nome'; if (!d.country) return 'paese'; if (len(d.bio) > 200) return 'bio>200';
+    let r = chkApp(d.app || {}, 'app principale'); if (r) return r;
+    if (d.extra) { const ks = Object.keys(d.extra); for (const k of ks) { if (['x1', 'x2', 'x3'].indexOf(k) < 0) return 'chiave extra ' + k; r = chkApp(d.extra[k], 'app ' + k); if (r) return r; } }
+    if (d.spent && (!Array.isArray(d.spent) || d.spent.length > 100)) return 'spent';
+    const num = (k, max, mod) => { const v = g(d[k], 0); return isI(v) && v >= 0 && v <= max && (!mod || v % mod === 0) ? '' : k + '=' + v; };
+    for (const [k, mx, md] of [['moons', 100000], ['moonsSpent', 1e15, 20], ['moonsRw', 1e7], ['moonsOut', 1e7], ['moonsInv', 300, 100], ['moonsOpen', 1e6, 5]]) { r = num(k, mx, md); if (r) return r; }
+    if (d.opens && (typeof d.opens !== 'object' || Object.keys(d.opens).length > 200)) return 'opens>200';
+    if (d.seen) { const s = d.seen; if (Object.keys(s).some(k => ['at', 'since', 'days'].indexOf(k) < 0)) return 'seen: campo extra'; if (!isI(s.at) || !isI(s.since) || !Array.isArray(s.days) || s.days.length > 40) return 'seen'; }
+    if ([0, 20].indexOf(g(d.bonus, 0)) < 0) return 'bonus=' + d.bonus;
+    for (const k of ['moons', 'moonsSpent', 'moonsRw', 'moonsOpen', 'moonsInv', 'moonsOut', 'bonus']) if (g(d[k], 0) < g(o[k], 0)) return k + ' più basso di quello salvato (' + g(d[k], 0) + '<' + g(o[k], 0) + ')';
+  } catch (x) { return 'controllo: ' + x.message; }
+  return '';
+}
 async function recordInvite(old, hasApp) {
   if (!pendingInvite || !hasApp) return false;
   if (S.myRef || pendingInvite === me || !S.users.get(pendingInvite)) { clearInvite(); return false; }
@@ -1853,7 +1879,7 @@ document.addEventListener('submit', async e => {
       if (old.arch) data.arch = old.arch;
       if (old.testing) data.testing = old.testing;
       if (old.moonsSpent) data.moonsSpent = old.moonsSpent;
-      try { await setDoc(doc(db, 'users', me), data); } catch (e) { e.step = 'profilo'; throw e; }
+      try { await setDoc(doc(db, 'users', me), data); } catch (e) { const w = ruleProbe(data, old); e.step = 'profilo' + (w ? ': ' + w : ''); throw e; }
       const priv ={ email, link: mainLink }; if (mainGroup) priv.group = mainGroup; if (Object.keys(extraLinks).length) priv.extraLinks = extraLinks; if (Object.keys(extraGroups).length) priv.extraGroups = extraGroups;
       try { await setDoc(doc(db, 'userPrivate', me), priv); } catch (e) { e.step = 'link privati'; throw e; }
       const counted = await recordInvite(old, !!mainApp.name);

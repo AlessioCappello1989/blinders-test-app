@@ -391,7 +391,7 @@ const P = [
   [/^Si sblocca dopo 14 giorni di test\. Avvia il tuo test per far partire il conteggio\.$/, () => 'Unlocks after 14 days of testing. Start your test to begin the count.'],
   [/^(\d+) ?\/ ?(\d+) amici$/, m => `${m[1]}/${m[2]} friends`],
   [/^Non riesco a leggere la foto \((.+)\)\. Prova con uno screenshot dalla Galleria\.$/, m => `I cannot read the photo (${m[1].replace('troppo grande', 'too large').replace('formato non supportato', 'unsupported format').replace('errore', 'error')}). Try a screenshot from the Gallery.`],
-  [/^Operazione non consentita dalle regole di sicurezza \((profilo|link privati)\)\.$/, m => `Operation not allowed by the security rules (${m[1] === 'profilo' ? 'profile' : 'private links'}).`],
+  [/^Operazione non consentita dalle regole di sicurezza \((profilo.*|link privati)\)\.$/, m => `Operation not allowed by the security rules (${m[1].replace(/^profilo/, 'profile').replace('link privati', 'private links')}).`],
   [/^Non sono riuscito ad attivare il promemoria \((.+)\)\.$/, m => `I could not turn on the reminder (${m[1].replace('recapito', 'address').replace('permesso', 'permission').replace('salvataggio', 'saving').replace('non disponibile su questo browser', 'not available on this browser')}).`],
   [/^Operazione non consentita dalle regole di sicurezza \((.+)\)\.$/, m => `Operation not allowed by the security rules (${m[1]}).`],
   [/^Lune guadagnate con gli inviti: (\d+)\. Gli amici contano quando hanno pubblicato la loro app\.$/, m => `Moons earned from invites: ${m[1]}. Friends count once they have published their app.`],
