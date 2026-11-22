@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261122a';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261122b';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -595,7 +595,7 @@ function appFields(k, ap, title, bonus) {
     + '<label for="f-link-' + k + '">Link di adesione al test<input id="f-link-' + k + '" type="url" inputmode="url"' + dis + ' value="' + esc(lk) + '" placeholder="https://play.google.com/apps/testing/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te.</span></label></div>'
     + '<label for="f-acc-' + k + '">Come accederanno i tester alla tua app?<select id="f-acc-' + k + '"' + dis + '><option value="">Lista email</option><option value="group"' + (ap.acc === 'group' ? ' selected' : '') + '>Gruppo Google</option></select><span class="field-note">Lista email: aggiungi le email dei tester in Play Console. Gruppo Google: colleghi il gruppo una volta sola e i tester entrano da soli.</span></label>'
     + '<div id="f-grpw-' + k + '"' + (ap.acc === 'group' ? '' : ' hidden') + '><label for="f-grp-' + k + '">Link del gruppo Google<input id="f-grp-' + k + '" type="url" inputmode="url" maxlength="300"' + dis + ' value="' + esc(groupFor(k)) + '" placeholder="https://groups.google.com/g/..."><span class="field-note">Resta privato: lo vede solo chi accetta uno scambio con te. Se il gruppo richiede approvazione, accetta le richieste da Google Gruppi.</span></label></div>'
-    + '<label for="f-want-' + k + '">Tester che ti servono<select id="f-want-' + k + '"' + dis + '>' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
+    + '<label for="f-want-' + k + '">Tester che ti servono<select id="f-want-' + k + '">' + wopts + '</select><span class="field-note">Vedrai e potrai scambiare solo con chi è di quel paese e accetta il tuo.</span></label>'
     + '<label for="f-desc-' + k + '">Cosa deve provare il tester<textarea id="f-desc-' + k + '" maxlength="500"' + dis + ' placeholder="Cosa fa l\'app e cosa vorresti che controllasse">' + esc(ap.desc || '') + '</textarea><span class="field-note" id="c-f-desc-' + k + '">' + (ap.desc || '').length + '/500</span></label>' + pubBox(k, ap) + clr + conclude + '</div>';
 }
 const dateVal = t => { if (!t) return ''; const d = new Date(t), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
@@ -1880,6 +1880,8 @@ document.addEventListener('submit', async e => {
         // Con scambi aperti su quell'app non si cambia: si riscrive quella già salvata.
         const locked = openCount(k) > 0 && !!prev.name;
         const app = locked ? prev : { name: $('#f-app-' + k).value.trim().slice(0, 50), want: $('#f-want-' + k).value, cat: $('#f-cat-' + k).value, desc: $('#f-desc-' + k).value.trim().slice(0, 500) };
+        /* I paesi richiesti si possono cambiare anche con scambi aperti (gli scambi già avviati restano). */
+        { const wsel = $('#f-want-' + k); if (locked && wsel) app.want = wsel.value; }
         const pc = $('#f-pub-' + k), sl = $('#f-store-' + k);
         if (pc) { const st = (sl ? sl.value.trim() : '').slice(0, 300); if (pc.checked) { app.pub = true; app.store = st; } else { delete app.pub; if (st) app.store = st; else delete app.store; } }
         const en = $('#f-extn-' + k);
