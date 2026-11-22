@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261121c';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261122a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -77,7 +77,7 @@ const wantOf = (uid, aid) => { const a = appOf(uid, aid); return (a && a.want) |
 const canTest = (tester, owner, oAid) => { const w = wantOf(owner, oAid); return !w || w === countryOf(tester); };
 const compat = (a, aA, b, bA) => canTest(a, b, bA) && canTest(b, a, aA);
 /* Etichetta e classe che distinguono le app extra dalla principale. */
-const isExtra = aid => !!aid && aid !== 'main';
+const isExtra = aid => !!aid && aid !== 'main' && aid[0] !== 'p';
 const xcls = aid => isExtra(aid) ? ' extra' : '';
 const xtag = aid => isExtra(aid) ? '<span class="pill ok">🧩 App extra</span>' : '';
 const aidOf = (s, uid) => (s.appIds && s.appIds[uid]) || 'main';
@@ -225,6 +225,18 @@ const linkAdmBox = (uid, a) => !isAdminUser() ? '' : '<div class="admbox"><span 
   + (PLAY_PAGE.test(a.store || '') ? '<span class="pill ok">Link del Play Store</span>' : '<span class="pill bad">Non è un link del Play Store</span>')
   + '<div class="row"><button type="button" class="btn warn sm" data-act="hideApp" data-k="' + esc(uid + '_' + a.id) + '">Togli dalla vetrina</button></div></div>';
 const isPubApp = (uid, a) => !!(a && a.pub && PLAY.test(a.store || '') && !S.hidden.has(uid + '_' + a.id));
+/* Vetrina permanente: le app pubblicate restano in Recensioni/Esplora anche dopo aver svuotato o concluso lo slot (raccolta showcase, id uid_idApp, nessun limite). */
+const keptOf = uid => { const l = []; (S.showcase || new Map()).forEach(d => { if (d && d.uid === uid && d.id) l.push(Object.assign({}, d, { pub: true, kept: true })); }); return l; };
+const pubAppsOf = uid => { const live = appsOf(uid), l = live.slice(); keptOf(uid).forEach(a => { if (!live.some(x => x.store === a.store)) l.push(a); }); return l; };
+/* Copia in vetrina l'app che sta per uscire dallo slot, se è pubblicata su Google Play e non è già in vetrina. */
+async function keepApp(a) {
+  if (!a || !a.pub || !PLAY.test(a.store || '') || !a.name) return;
+  if (keptOf(me).some(x => x.store === a.store)) return;
+  const id = 'p' + Date.now().toString(36), d = { uid: me, id, name: a.name, cat: a.cat || 'Altro', desc: a.desc || '', store: a.store, at: Date.now() };
+  if (a.want) d.want = a.want;
+  if (a.icon && ICO_RE.test(a.icon) && a.icon.length <= ICO_MAX) d.icon = a.icon;
+  await setDoc(doc(db, 'showcase', me + '_' + id), d);
+}
 /* Test dell'app: scambi su IronBlind (prog) più eventuali tester esterni dichiarati dal proprietario (ext: n e data di inizio).
    Google Play conta i 14 giorni solo quando ci sono tutti e 12 i tester: il giorno 1 è quello in cui entra il dodicesimo. */
 function buildInfo(a) {
@@ -384,7 +396,7 @@ function exploreItems() {
     const own = id === me;
     if (own && tab === 'all') return;
     if (S.fc && u.country !== S.fc) return;
-    appsOf(id).forEach(a => {
+    (tab === 'pub' ? pubAppsOf(id) : appsOf(id)).forEach(a => {
       if (tab === 'build' && !isBuildApp(id, a)) return;
       if (tab === 'pub' && !isPubApp(id, a)) return;
       if (q && (a.name + ' ' + (u.nick || '') + ' ' + (a.cat || '')).toLowerCase().indexOf(q) < 0) return;
@@ -405,7 +417,8 @@ function exploreItems() {
     let act = '', pickH = '';
     const pubd = isPubApp(x.id, x.a), build = isBuildApp(x.id, x.a);
     if (x.own) act = '';
-    else if (!mineApps.length || !countryOk2()) act = '<button class="btn ghost" data-act="tab" data-tab="profile">Completa prima il tuo profilo</button>';
+    else if (x.a.kept) act = '';
+    else if (!mineApps.length || !countryOk2()) act ='<button class="btn ghost" data-act="tab" data-tab="profile">Completa prima il tuo profilo</button>';
     else if (x.ex) act = '<button class="btn" data-act="swap" data-id="' + esc(x.ex.id) + '">Apri scambio</button>';
     else {
       const elig = mineApps.filter(m => canTest(x.id, me, m.id) && canTest(me, x.id, x.a.id) && !pairOpen(x.id, m.id, x.a.id));
@@ -419,7 +432,7 @@ function exploreItems() {
     let state = '', extra = '';
     if (pubd) {
       state = '<span class="pill ok">✅ Online su Google Play</span>';
-      extra = '<div class="row"><a class="btn" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(x.a.store) + '">▶ Vedi su Google Play</a>' + (x.own ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div>' + linkAdmBox(x.id, x.a);
+      extra = '<div class="row"><a class="btn" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(x.a.store) + '">▶ Vedi su Google Play</a>' + (x.own || x.a.kept ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div>' + linkAdmBox(x.id, x.a);
     } else if (build) {
       state = '<span class="pill build">🚧 Nel Cantiere</span>';
       const bi = buildInfo(x.a), act2 = Math.max(0, Math.min(12, bi.n));
@@ -431,7 +444,7 @@ function exploreItems() {
         + (bi.ext ? '<p class="small muted">di cui ' + bi.ext + (bi.ext === 1 ? ' esterno' : ' esterni') + '</p>' : '')
         + (x.own ? '' : '<div><button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button></div>');
     }
-    const budget = x.own ? '<div><button type="button" class="btn ghost sm" data-act="budget" data-a="' + esc(x.a.id) + '">🌙 <span>Gestione Budget</span></button></div>' : '';
+    const budget = x.own && !x.a.kept ?'<div><button type="button" class="btn ghost sm" data-act="budget" data-a="' + esc(x.a.id) + '">🌙 <span>Gestione Budget</span></button></div>' : '';
     return '<article class="card app' + xcls(x.a.id) + '">' + rwBadge(x.a) + '<div class="row between"><button class="who" data-act="user" data-id="' + esc(x.id) + '">' + av(x.id) + '<span class="n">' + esc(nameOf(x.id)) + '</span></button>' + rate(x.st) + '</div>'
       + '<div><div class="row" style="margin-bottom:4px"><span class="small muted mono">' + (isExtra(x.a.id) ? '' : '📱 ') + 'APP DA TESTARE</span>' + xtag(x.a.id) + (x.own ? '<span class="pill">La tua app</span>' : '') + state + '</div><div class="aprow">' + appIc(x.a) + '<h3 class="appname">' + esc(x.a.name) + '</h3></div><div class="row" style="margin-top:4px"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="chip">' + esc(x.u.country || 'Paese n.d.') + '</span><span class="chip">Cerca: ' + esc(x.a.want || 'tutti i paesi') + '</span><span class="small muted">' + x.st.done + ' tester completati</span></div></div>'
       + (x.a.desc ? '<p class="desc">' + esc(x.a.desc) + '</p>' : '')
@@ -440,7 +453,7 @@ function exploreItems() {
 }
 const countryOk2 = () => !!countryOf(me);
 function xtabs() {
-  let b = 0, p = 0; S.users.forEach((u, id) => appsOf(id).forEach(a => { if (isBuildApp(id, a)) b++; if (isPubApp(id, a)) p++; }));
+  let b = 0, p = 0; S.users.forEach((u, id) => { appsOf(id).forEach(a => { if (isBuildApp(id, a)) b++; }); pubAppsOf(id).forEach(a => { if (isPubApp(id, a)) p++; }); });
   const t = [['all', 'Tutte', 0], ['build', '🚧 Il Cantiere', b], ['pub', '✅ Pubblicate', p]];
   return '<div class="seg" role="tablist" aria-label="Elenco app">' + t.map(x => '<button type="button" role="tab" aria-selected="' + (S.xt === x[0]) + '" class="' + (S.xt === x[0] ? 'on' : '') + '" data-act="xtab" data-t="' + x[0] + '">' + x[1] + (x[2] ? ' <span class="cnt">' + x[2] + '</span>' : '') + '</button>').join('') + '</div>';
 }
@@ -460,7 +473,7 @@ function statsBanner() {
 /* Recensioni: le app già in produzione su Google Play. Nessuna ricompensa legata alle recensioni; si scrive sullo store. */
 function reviewItems() {
   const q = (S.rq || '').trim().toLowerCase(), arr = [];
-  S.users.forEach((u, id) => { if (!u || !u.nick) return; appsOf(id).forEach(a => {
+  S.users.forEach((u, id) => { if (!u || !u.nick) return; pubAppsOf(id).forEach(a => {
     if (!isPubApp(id, a)) return;
     if (q && (a.name + ' ' + u.nick + ' ' + (a.cat || '')).toLowerCase().indexOf(q) < 0) return;
     arr.push({ id, u, a, own: id === me });
@@ -471,7 +484,7 @@ function reviewItems() {
     + '<div class="row"><span class="chip">' + esc(x.a.cat || 'Altro') + '</span><span class="pill ok">✅ Online su Google Play</span>' + (x.own ? '<span class="pill">La tua app</span>' : '') + '</div>'
     + (x.a.desc ? '<p class="desc">' + esc(x.a.desc) + '</p>' : '')
     + '<div class="row"><a class="btn' + (x.own ? '' : ' primary') + '" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(x.a.store) + '">' + (x.own ? '▶ Vedi su Google Play' : '▶ Apri su Google Play') + '</a>'
-    + (x.own ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div>' + linkAdmBox(x.id, x.a) + '</article>').join('');
+    + (x.own || x.a.kept ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div>' + linkAdmBox(x.id, x.a) + '</article>').join('');
 }
 const reviewsView = () => '<section class="card"><h2>Recensioni</h2><div class="rnote"><b>Dai una mano a chi sviluppa.</b> Recensire un\'app della community aiuta e supporta chi l\'ha creata. Non offriamo ricompense: per noi la recensione è un diritto di chi usa l\'app e deve essere il più sincera possibile. Scrivi solo ciò che pensi davvero.</div></section>'
   + '<div class="grid2"><label for="rq">Cerca un\'app<input id="rq" type="search" value="' + esc(S.rq || '') + '" placeholder="Nome, categoria o sviluppatore"></label></div><div id="rlist">' + reviewItems() + '</div>';
@@ -547,6 +560,13 @@ function statBlock(uid, a, multi) {
     + (ex ? '<p class="small muted">' + (exDone ? 'Inclusi ' + ex + ' tester esterni dichiarati da te.' : '🔄 ' + ex + ' tester esterni dichiarati in corso: giorno ' + Math.min(14, exDay) + ' di 14.') + '</p>' : '')
     + '<div class="row between"><span class="small muted">Valutazione media</span>' + rate(st) + '</div></div>';
 }
+const keepNote = ap => ap && ap.pub && PLAY.test(ap.store || '') ? '<p class="small"><b>✓ L\'app resta in vetrina Recensioni perché è già pubblicata.</b> La puoi togliere dal Profilo quando vuoi.</p>' : '';
+/* Profilo: app pubblicate rimaste in vetrina dopo aver svuotato lo slot. */
+function keptCard() {
+  const l = keptOf(me); if (!l.length) return '';
+  return '<section class="card"><h3>✅ <span>Le mie app in vetrina</span></h3><p class="small muted">Sono già pubblicate su Google Play e non occupano nessuno slot.</p>'
+    + l.map(a => '<div class="box"><div class="aprow">' + appIc(a) + '<div style="min-width:0"><b>' + esc(a.name) + '</b><div class="small muted">' + esc(a.cat || 'Altro') + '</div></div></div><div class="row"><button type="button" class="btn ghost sm" data-act="unkeep" data-k="' + esc(me + '_' + a.id) + '">Togli dalla vetrina</button></div></div>').join('') + '</section>';
+}
 function appFields(k, ap, title, bonus) {
   const n = openCount(k), lock = n > 0 && !!ap.name, dis = lock ? ' disabled' : '';
   const wopts = '<option value="">Qualsiasi paese</option>' + COUNTRIES.map(c => '<option value="' + c + '"' + (ap.want === c ? ' selected' : '') + '>Solo ' + c + '</option>').join('');
@@ -557,7 +577,7 @@ function appFields(k, ap, title, bonus) {
   let conclude = '';
   if (k !== 'main' && ap.name && !lock) {
     conclude = S.confirmK === k
-      ? '<div class="box"><p class="small"><b>Concludere questa app?</b> Viene tolta dal profilo e lo slot si azzera. Per usarlo di nuovo serviranno altre Lune. Gli scambi già completati restano.</p><div class="row"><button type="button" class="btn primary sm" data-act="concludeApp" data-k="' + k + '">Sì, concludi</button><button type="button" class="btn ghost sm" data-act="noConclude">Annulla</button></div></div>'
+      ? '<div class="box"><p class="small"><b>Concludere questa app?</b> Viene tolta dal profilo e lo slot si azzera. Per usarlo di nuovo serviranno altre Lune. Gli scambi già completati restano.</p>' + keepNote(ap) + '<div class="row"><button type="button" class="btn primary sm" data-act="concludeApp" data-k="' + k + '">Sì, concludi</button><button type="button" class="btn ghost sm" data-act="noConclude">Annulla</button></div></div>'
       : '<div><button type="button" class="btn ghost sm" data-act="askConclude" data-k="' + k + '">Concludi app e libera lo slot</button></div>';
   }
   const free = !lock && !!ap.name;
@@ -565,7 +585,7 @@ function appFields(k, ap, title, bonus) {
     : (lock ? '<span class="pill warn">Bloccata</span>' : ap.name ? '<span class="pill build">Slot libero</span>' : '<span class="pill ok">Sbloccato · libero</span>');
   /* Slot libero (nessuno scambio aperto): si può svuotare per riusarlo con un'altra app; senza nome non compare più nei contatori. */
   const clr = !free ? '' : S.confirmC === k
-    ? '<div class="box"><p class="small"><b>Svuotare questo slot?</b> Nome, link, descrizione e tester esterni dell\'app vengono cancellati e l\'app non compare più nei contatori. Lo slot resta tuo. Gli scambi già completati e i feedback restano.</p><div class="row"><button type="button" class="btn primary sm" data-act="clearApp" data-k="' + k + '">Sì, svuota</button><button type="button" class="btn ghost sm" data-act="noClear">Annulla</button></div></div>'
+    ? '<div class="box"><p class="small"><b>Svuotare questo slot?</b> Nome, link, descrizione e tester esterni dell\'app vengono cancellati e l\'app non compare più nei contatori. Lo slot resta tuo. Gli scambi già completati e i feedback restano.</p>' + keepNote(ap) + '<div class="row"><button type="button" class="btn primary sm" data-act="clearApp" data-k="' + k + '">Sì, svuota</button><button type="button" class="btn ghost sm" data-act="noClear">Annulla</button></div></div>'
     : '<div><button type="button" class="btn ghost sm" data-act="askClear" data-k="' + k + '">Svuota i campi dello slot</button></div>';
   const rwb = ap.name ? '<div class="rwrow"><span class="small">🌙 <span>Ricompensa per tester:</span> <b>' + (rwReward(ap) ? rwReward(ap) + ' 🌙' : '—') + '</b></span><button type="button" class="btn ghost sm" data-act="budget" data-a="' + k + '"><span>Gestione Budget</span></button></div>' : '';
   return '<div class="slot' + (k === 'main' ? ' main' : '') + '"><div class="row between"><h3>' + title + '</h3>' + pill + '</div>' + note + rwb
@@ -635,6 +655,7 @@ function profileView(uid, edit) {
     + (S.users.get(me) && ap.name && freeSlots(u) === 0 && extraCount(u) < MAX_EXTRA
       ? '<div class="box"><b>Vuoi far testare un\'altra app?</b><p class="small muted">Hai usato lo slot gratuito. Sblocca uno slot con le Lune o subito per ' + SLOT_PRICE + '.</p>' + (S.slotReq ? '<p class="small"><b>Pagamento in verifica:</b> lo slot si sblocca appena confermato.</p>' : '') + '<div><button type="button" class="btn" data-act="slotOpen">+ Aggiungi un\'altra app</button></div></div>' : '')
     + '<div><button class="btn primary" type="submit">Salva profilo</button></div></form>'
+    + keptCard()
     + (mineList.length ? mineList.map(a => statBlock(uid, a, mineList.length > 1)).join('') : statBlock(uid)) + '<section class="card"><h3>Feedback ricevuti</h3>' + fbList(uid) + '</section>' + (isAdminUser() ? '' : '');
 }
 
@@ -1172,7 +1193,7 @@ function staleBox() {
 function reportsBox() {
   const g = new Map(); S.reports.forEach(r => { const k = r.uid + '_' + r.aid; const e = g.get(k) || { uid: r.uid, aid: r.aid, n: 0 }; e.n++; g.set(k, e); });
   if (!g.size && !S.hidden.size) return '';
-  const nm = (uid, aid) => { const a = appOf(uid, aid); return (a ? a.name : 'App') + ' · ' + nameOf(uid); };
+  const nm = (uid, aid) => { const a = appOf(uid, aid) || keptOf(uid).find(x => x.id === aid); return (a ? a.name : 'App') + ' · ' + nameOf(uid); };
   let h = '<section class="card"><h3>Vetrina: segnalazioni (solo tu)</h3>';
   g.forEach((e, k) => { const a = appOf(e.uid, e.aid); h += '<div class="box"><div class="row between"><b>' + esc(nm(e.uid, e.aid)) + '</b><span class="small muted">' + e.n + (e.n === 1 ? ' segnalazione' : ' segnalazioni') + '</span></div>' + (a && a.store ? '<p class="small" style="overflow-wrap:anywhere"><a href="' + esc(a.store) + '" target="_blank" rel="noopener noreferrer">' + esc(a.store) + '</a></p>' : '') + '<div class="row"><button type="button" class="btn primary sm" data-act="hideApp" data-k="' + esc(k) + '">Togli dalla vetrina</button><button type="button" class="btn ghost sm" data-act="dropReports" data-k="' + esc(k) + '">Ignora</button></div></div>'; });
   if (S.hidden.size) { h += '<p class="small muted">Tolte dalla vetrina</p>'; S.hidden.forEach(k => { const i = k.lastIndexOf('_'); h += '<div class="box"><div class="row between"><b>' + esc(nm(k.slice(0, i), k.slice(i + 1))) + '</b><button type="button" class="btn ghost sm" data-act="unhideApp" data-k="' + esc(k) + '">Rimetti in vetrina</button></div></div>'; }); }
@@ -1220,6 +1241,7 @@ async function deleteAccount() {
     for (const d of fbs.docs) await updateDoc(d.ref, { text: '', from: 'deleted' });
     // 4. Elimina profilo, dati privati e account.
     try { await deleteDoc(doc(db, 'slotRequests', me)); await deleteDoc(doc(db, 'paid', me)); } catch (e) { /* nessuna richiesta da togliere */ }
+    for (const a of keptOf(me)) { try { await deleteDoc(doc(db, 'showcase', me + '_' + a.id)); } catch (e) { /* già tolta */ } }
     try { await deleteDoc(doc(db, 'refs', me)); } catch (e) { /* nessun invito da togliere */ }
     try { await deleteDoc(doc(db, 'push', me)); } catch (e) { /* nessun promemoria da togliere */ }
     try { await deleteDoc(doc(db, 'reads', me)); } catch (e) { /* nessuna lettura da togliere */ }
@@ -1668,10 +1690,15 @@ document.addEventListener('click', async e => {
     } else if (act === 'adminDrop') {
       if (!isAdminUser()) return;
       await deleteDoc(doc(db, 'slotRequests', id)); toast('Richiesta eliminata');
+    } else if (act === 'unkeep') {
+      const kk = b.dataset.k || '';
+      if (kk.indexOf(me + '_') !== 0) return;
+      await deleteDoc(doc(db, 'showcase', kk)); toast('App tolta dalla vetrina.');
     } else if (act === 'clearApp') {
       const k = b.dataset.k, u = S.users.get(me);
       if (!u || (k === 'main' ? !(u.app && u.app.name) : !hasExtra(u, k))) { S.confirmC = null; return; }
       if (openCount(k) > 0) { toast('Questa app ha ancora scambi aperti.'); S.confirmC = null; return; }
+      await keepApp(appOf(me, k));
       const nu = Object.assign({}, u); nu.updatedAt = Date.now();
       if (k === 'main') nu.app = { name: '', want: '', cat: 'Altro', desc: '' };
       else { nu.extra = Object.assign({}, u.extra); delete nu.extra[k]; if (!Object.keys(nu.extra).length) delete nu.extra; }
@@ -1685,6 +1712,7 @@ document.addEventListener('click', async e => {
       const k = b.dataset.k, u = S.users.get(me);
       if (!u || !hasExtra(u, k)) { S.confirmK = null; return; }
       if (openCount(k) > 0) { toast('Questa app ha ancora scambi aperti.'); return; }
+      await keepApp(appOf(me, k));
       const nu = Object.assign({}, u); nu.extra = Object.assign({}, u.extra); delete nu.extra[k];
       if (!Object.keys(nu.extra).length) delete nu.extra;
       if (otherCredits(u) > 0) nu.spent = (u.spent || []).concat('#');
@@ -1924,13 +1952,14 @@ function startData() {
   }, () => { S.paid = 0; }));
   dataUnsubs.push(onSnapshot(doc(db, 'slotRequests', me), sn => { S.slotReq = sn.exists() ? sn.data() : null; render(); }, () => { S.slotReq = null; }));
   if (isAdminUser()) dataUnsubs.push(onSnapshot(collection(db, 'slotRequests'), sn => { S.reqs = new Map(sn.docs.map(d => [d.id, read(d)])); render(); }, () => { S.reqs = new Map(); }));
+  dataUnsubs.push(onSnapshot(collection(db, 'showcase'), sn => { S.showcase = new Map(sn.docs.map(d => [d.id, d.data()])); render(); }, () => { S.showcase = new Map(); }));
   dataUnsubs.push(onSnapshot(collection(db, 'hidden'), sn => { S.hidden = new Set(sn.docs.map(d => d.id)); render(); }, () => { S.hidden = new Set(); }));
   if (isAdminUser()) dataUnsubs.push(onSnapshot(collection(db, 'reports'), sn => { S.reports = new Map(sn.docs.map(d => [d.id, read(d)])); render(); }, () => { S.reports = new Map(); }));
   dataUnsubs.push(onSnapshot(doc(db, 'refs', me), sn => { S.myRef = sn.exists() ? sn.data() : null; }, () => { S.myRef = null; }));
   dataUnsubs.push(onSnapshot(query(collection(db, 'refs'), where('by', '==', me)), sn => { S.refs = new Map(sn.docs.map(d => [d.id, read(d)])); render(); }, () => { /* senza inviti non c'è nulla da mostrare */ }));
   dataUnsubs.push(onSnapshot(doc(db, 'userPrivate', me), sn => { S.priv = sn.exists() ? sn.data() : { email: '' }; loaded.priv = true; render(); }, toastErr));
 }
-function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; S.hidden = new Set(); S.reports = new Map(); msgWatch.forEach(u => u()); msgWatch.clear(); msgFirst.clear(); digestDone = false; S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; S.refs = new Map(); S.myRef = undefined; S.paid = 0; S.slotReq = undefined; S.reqs = new Map(); closeSlot(); Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; S.delOpen = false; }
+function stopData() { dataUnsubs.forEach(u => u()); dataUnsubs = []; S.hidden = new Set(); S.showcase = new Map(); S.reports = new Map(); msgWatch.forEach(u => u()); msgWatch.clear(); msgFirst.clear(); digestDone = false; S.lastMsg = new Map(); stopSubs(); S.users = new Map(); S.swaps = new Map(); S.fb = new Map(); S.priv = { email: '' }; S.refs = new Map(); S.myRef = undefined; S.paid = 0; S.slotReq = undefined; S.reqs = new Map(); closeSlot(); Object.keys(loaded).forEach(k => { loaded[k] = false; }); firstRoute = false; S.route = null; S.tab = 'explore'; S.delOpen = false; }
 
 if (!firebaseConfig.apiKey || /INCOLLA/.test(firebaseConfig.apiKey)) {
   gate('Manca la configurazione di Firebase', 'Apri il file firebase-config.js e incolla i valori del tuo progetto Firebase. I passaggi sono nel README.');
