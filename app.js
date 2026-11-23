@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261122b';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261123a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -486,7 +486,7 @@ function reviewItems() {
     + '<div class="row"><a class="btn' + (x.own ? '' : ' primary') + '" style="text-decoration:none" target="_blank" rel="noopener noreferrer" href="' + esc(x.a.store) + '">' + (x.own ? '▶ Vedi su Google Play' : '▶ Apri su Google Play') + '</a>'
     + (x.own || x.a.kept ? '' : '<button type="button" class="btn ghost sm" data-act="report" data-id="' + esc(x.id) + '" data-a="' + esc(x.a.id) + '">Segnala</button>') + '</div>' + linkAdmBox(x.id, x.a) + '</article>').join('');
 }
-const reviewsView = () => '<section class="card"><h2>Recensioni</h2><div class="rnote"><b>Dai una mano a chi sviluppa.</b> Recensire un\'app della community aiuta e supporta chi l\'ha creata. Non offriamo ricompense: per noi la recensione è un diritto di chi usa l\'app e deve essere il più sincera possibile. Scrivi solo ciò che pensi davvero.</div></section>'
+const reviewsView = () => '<section class="card"><h2>Recensioni</h2><div class="rnote"><b>Dai una mano a chi sviluppa.</b> Recensire un\'app della community aiuta e supporta chi l\'ha creata. Non offriamo ricompense: per noi la recensione è un diritto di chi usa l\'app e deve essere il più sincera possibile. Scrivi solo ciò che pensi davvero.</div><div class="rwarn"><b>⚠️ Solo app che hanno superato il test chiuso</b>In questa sezione vanno inserite soltanto le app che hanno già superato il test chiuso di Google Play e sono pubblicate. Le app non ancora pubblicate verranno rimosse dalla vetrina.</div></section>'
   + '<div class="grid2"><label for="rq">Cerca un\'app<input id="rq" type="search" value="' + esc(S.rq || '') + '" placeholder="Nome, categoria o sviluppatore"></label></div><div id="rlist">' + reviewItems() + '</div>';
 /* Le mie app con la ricompensa attuale e l'accesso alla Gestione Budget. */
 function ownRw() {
@@ -628,7 +628,7 @@ function extBox(k, ap) {
 function pubBox(k, ap) {
   if (!ap.name) return '';
   return extBox(k, ap) + '<div class="box"><label class="check" for="f-pub-' + k + '"><input type="checkbox" id="f-pub-' + k + '"' + (ap.pub ? ' checked' : '') + '><span>✅ Questa app è già pubblicata su Google Play</span></label>'
-    + '<label for="f-store-' + k + '">Link su Google Play<input id="f-store-' + k + '" type="url" inputmode="url" maxlength="300" value="' + esc(ap.store || '') + '" placeholder="https://play.google.com/store/apps/details?id=..."><span class="field-note">Se la spunti, l\'app compare nella vetrina «Pubblicate» di Esplora.</span></label></div>';
+    + '<label for="f-store-' + k + '">Link su Google Play<input id="f-store-' + k + '" type="url" inputmode="url" maxlength="300" value="' + esc(ap.store || '') + '" placeholder="https://play.google.com/store/apps/details?id=..."><span class="field-note">Se la spunti, l\'app compare nella vetrina «Pubblicate» di Esplora.</span></label><p class="field-note">Spunta solo se l\'app ha superato il test chiuso ed è online su Google Play. Se la spunti con un\'app non ancora pubblicata, verrà tolta dalla vetrina.</p></div>';
 }
 function profileView(uid, edit) {
   const u = S.users.get(uid) || {}; const ap = u.app || {};
