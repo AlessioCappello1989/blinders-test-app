@@ -288,6 +288,8 @@ const E = {
   '⚠️ Solo app che hanno superato il test chiuso': '⚠️ Only apps that have passed the closed test',
   'In questa sezione vanno inserite soltanto le app che hanno già superato il test chiuso di Google Play e sono pubblicate. Le app non ancora pubblicate verranno rimosse dalla vetrina.': 'Only apps that have already passed the Google Play closed test and are published belong in this section. Apps that are not yet published will be removed from the showcase.',
   "Spunta solo se l'app ha superato il test chiuso ed è online su Google Play. Se la spunti con un'app non ancora pubblicata, verrà tolta dalla vetrina.": 'Tick this only if the app has passed the closed test and is live on Google Play. If you tick it for an app that is not yet published, it will be removed from the showcase.',
+  'Da condividere': 'To share', 'Regola:': 'Rule:', 'Tu': 'You',
+  "se una delle due email manca, l'altra non si vede e il test non parte.": "if either email is missing, the other one stays hidden and the test cannot start.",
   'Le mie app in vetrina':'My showcased apps',
   'Sono già pubblicate su Google Play e non occupano nessuno slot.': 'They are already published on Google Play and do not use any slot.',
   'App tolta dalla vetrina.': 'App removed from the showcase.',

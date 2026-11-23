@@ -122,6 +122,13 @@ textarea{min-height:84px;resize:vertical}
   padding:6px max(6px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px))}
 .nav-in{display:flex;gap:2px;width:100%;max-width:640px}
 .navb{flex:1;background:none;border:0;border-radius:8px;padding:10px 6px;font:600 14px var(--f-body);color:var(--muted);cursor:pointer;position:relative}
+.epair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ewho{border:2px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px;text-align:center;min-width:0;overflow-wrap:anywhere}
+.ewho .ic{font-size:22px;line-height:1}
+.ewho b{font-size:14px}.ewho span.s{font-size:12px;font-weight:600}
+.ewho.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,var(--surface))}.ewho.ok span.s{color:var(--ok)}
+.ewho.no{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface))}.ewho.no span.s{color:var(--accent)}
+.erule{font-size:13.5px;border-left:4px solid color-mix(in srgb,var(--warn) 75%,var(--surface));padding:4px 0 4px 10px;margin:8px 0 0}
 .rwarn{margin-top:10px;border:1px solid color-mix(in srgb,#E3B84F 70%,var(--line));border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.5;background:color-mix(in srgb,#E3B84F 16%,var(--surface))}
 .rwarn b{display:block;margin-bottom:2px}
 .rnote{border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.5;background:color-mix(in srgb,var(--accent) 9%,var(--surface))}
@@ -389,6 +396,6 @@ try{
   }
 }catch(e){}
 </script>
-<script type="module" src="./app.js?v=20261123a"></script>
+<script type="module" src="./app.js?v=20261123b"></script>
 </body>
 </html>
