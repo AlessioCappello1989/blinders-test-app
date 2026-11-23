@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261123b';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261123c';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -554,9 +554,11 @@ function statBlock(uid, a, multi) {
   const st = stats(uid, a);
   /* Tester esterni dichiarati: contano come completati quando sono passati 14 giorni dalla data di inizio, prima sono "in corso". */
   const ex = a && a.ext && a.ext.n > 0 && a.ext.start ? Math.min(50, Math.floor(a.ext.n)) : 0, exDone = ex && Date.now() - a.ext.start >= 14 * DAY ? ex : 0;
-  const done = Math.min(12, st.done + exDone), run = Math.min(12 - done, ex - exDone), exDay = ex && !exDone ? Math.max(1, Math.floor((Date.now() - a.ext.start) / DAY) + 1) : 0;
-  return '<div class="card"><div class="row between"><h3>Tester completati' + (multi && a ? ' · ' + esc(a.name) : '') + '</h3><span class="mono">' + done + '/12</span></div>' + meter(done, run)
-    + '<p class="small muted">Google Play chiede 12 tester per 14 giorni consecutivi. Conta ogni persona che ha testato la tua app per 14 giorni e ha lasciato il feedback.</p>'
+  /* In corso: tester degli scambi che hanno avviato il test sulla mia app e non hanno ancora lasciato il feedback. */
+  let swRun = 0; if (a && uid === me) mine().forEach(sw => { if (sw.status !== 'active' || aidOf(sw, me) !== a.id) return; const o = sw.a === me ? sw.b : sw.a; if (ms(sw.start && sw.start[o]) && !(sw.fb && sw.fb[o])) swRun++; });
+  const done = Math.min(12, st.done + exDone), run = Math.min(12 - done, ex - exDone + swRun), exDay = ex && !exDone ? Math.max(1, Math.floor((Date.now() - a.ext.start) / DAY) + 1) : 0;
+  return '<div class="card"><div class="row between"><h3>Tester completati' + (multi && a ? ' · ' + esc(a.name) : '') + '</h3><span class="mono">' + done + '/12' + (run ? ' <small class="runcnt">+' + run + ' in corso</small>' : '') + '</span></div>' + meter(done, run)
+    + '<p class="small muted">Google Play chiede 12 tester per 14 giorni consecutivi. Conta ogni persona che ha testato la tua app per 14 giorni e ha lasciato il feedback.' + (run ? ' I tester in corso non contano finché non finiscono i 14 giorni e lasciano il feedback.' : '') + '</p>'
     + (ex ? '<p class="small muted">' + (exDone ? 'Inclusi ' + ex + ' tester esterni dichiarati da te.' : '🔄 ' + ex + ' tester esterni dichiarati in corso: giorno ' + Math.min(14, exDay) + ' di 14.') + '</p>' : '')
     + '<div class="row between"><span class="small muted">Valutazione media</span>' + rate(st) + '</div></div>';
 }

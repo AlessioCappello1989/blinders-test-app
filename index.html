@@ -75,7 +75,9 @@ a{color:var(--accent)}
 .meter{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
 .meter i{aspect-ratio:1;border-radius:50%;background:var(--cell)}
 .meter i.on{background:var(--accent)}
-.meter i.run{background:transparent;box-shadow:inset 0 0 0 2px var(--accent);opacity:.7}
+.meter i.run{background:color-mix(in srgb,var(--ok) 22%,var(--surface));box-shadow:inset 0 0 0 2px var(--ok);display:grid;place-items:center;color:var(--ok);font-style:normal;font-size:clamp(7px,2.4vw,10px);line-height:1}
+.meter i.run::after{content:"◔"}
+.runcnt{font:600 13px var(--f-body);color:var(--ok)}
 .step{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
 .step h3{display:flex;align-items:center;gap:8px}
 .step h3 .k{font:500 12px var(--f-mono);color:var(--muted)}
@@ -396,6 +398,6 @@ try{
   }
 }catch(e){}
 </script>
-<script type="module" src="./app.js?v=20261123b"></script>
+<script type="module" src="./app.js?v=20261123c"></script>
 </body>
 </html>
