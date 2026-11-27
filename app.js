@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, deleteUser, reauthenticateWithPopup, reauthenticateWithCredential, EmailAuthProvider } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { initializeFirestore, collection, doc, setDoc, updateDoc, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, writeBatch, deleteDoc, getDocs, getDoc, getDocFromServer } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261123c';
+import { setLangGetter, startI18n, applyDom, tr } from './i18n.js?v=20261127a';
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 864e5;
@@ -790,6 +790,23 @@ function checkNews() {
     openModal('Novità di IronBlind', '<p>Abbiamo aggiornato l\'app:</p><ul class="guide">' + NEWS.items.map(t => '<li>' + esc(t) + '</li>').join('') + '</ul><div><button type="button" class="btn primary" data-act="aboutClose">Ho capito</button></div>');
   } catch (e) { /* le novità non devono bloccare l'app */ }
 }
+/* ---------- Promemoria giornaliero: il robottino ricorda i test ancora da fare oggi (una volta al giorno, alla prima apertura) ---------- */
+const dailyKey = () => 'ironblind-daily-' + me;
+function checkDaily(tries) {
+  try {
+    tries = tries || 0;
+    const u = me && S.users.get(me); if (!u || !u.nick) return;
+    if ($('#intro') || $('#about') || $('#ms') || $('#slotm')) { if (tries < 12) setTimeout(() => checkDaily(tries + 1), 1500); return; }
+    const today = String(dkey(Date.now()));
+    let last = ''; try { last = localStorage.getItem(dailyKey()) || ''; } catch (e) { return; }
+    if (last === today) return;
+    const n = mine().filter(s => openState(s) === 'todo').length;
+    if (!n) { if (tries < 3 && !mine().length) setTimeout(() => checkDaily(tries + 1), 2000); return; }
+    try { localStorage.setItem(dailyKey(), today); } catch (e) { return; }
+    openModal('Promemoria di oggi', '<div class="daily"><img class="daily-bot" src="robot.png" width="72" height="72" alt=""><div class="daily-bub"><b>Hai ancora ' + n + ' test da fare oggi</b><span>Apri l\'app dallo scambio: il test di oggi ti dà +5 🌙.</span></div></div>'
+      + '<div class="row daily-btns"><button type="button" class="btn primary" data-act="dailyGo">Vai ai miei scambi</button><button type="button" class="btn" data-act="aboutClose">Più tardi</button></div>');
+  } catch (e) { /* il promemoria non deve bloccare l'app */ }
+}
 /* ---------- Novità all'apertura: un riepilogo di ciò che è successo ad app chiusa (una volta per apertura) ---------- */
 let digestDone = false, digestTimer = 0;
 const digestKey = () => 'ironblind-digest-' + me;
@@ -1430,7 +1447,7 @@ function render(force) {
   if (!(loaded.users && loaded.swaps && loaded.fb && loaded.priv)) return;
   if (!firstRoute) { firstRoute = true; if (!S.users.get(me)) S.tab = 'profile'; }
   if (S.route && S.route.t === 'swap') markSeen(S.route.id);
-  syncWatch(); syncMoons(); setTimeout(checkIntro, 200); setTimeout(checkMilestones, 400); setTimeout(checkNews, 1200); setTimeout(checkDigest, 2200);
+  syncWatch(); syncMoons(); setTimeout(checkIntro, 200); setTimeout(checkMilestones, 400); setTimeout(checkNews, 1200); setTimeout(checkDigest, 2200); setTimeout(checkDaily, 3500);
   if (!pingOn) { pingOn = true; setInterval(() => { if (me && !document.hidden) syncMoons(); }, 10 * 60 * 1000); document.addEventListener('visibilitychange', () => { if (me && !document.hidden) syncMoons(); }); }
   const rec = mine().filter(s => (s.status === 'proposed' && s.b === me) || (s.status !== 'declined' && unreadOf(s).length)).length;
   document.title = (rec ? '(' + rec + ') ' : '') + 'IronBlind Test App'; updateBell();
@@ -1557,6 +1574,7 @@ document.addEventListener('click', async e => {
     if (act === 'aboutOpen') { openAbout(); return; }
     if (act === 'installOpen') { openInstall(); return; }
     if (act === 'aboutClose') { closeAbout(); return; }
+    if (act === 'dailyGo') { closeAbout(); S.tab = 'swaps'; S.route = null; S.swapSec = 'run'; S.swapTf = 'todo'; try { localStorage.setItem(TF_KEY, 'todo'); } catch (x) { /* il filtro resta solo per questa visita */ } render(true); window.scrollTo(0, 0); return; }
     if (act === 'logout') { await signOut(auth); return; }
     if (act === 'delOpen') { S.delOpen = true; render(true); return; }
     if (act === 'delClose') { S.delOpen = false; render(true); return; }

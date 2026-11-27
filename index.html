@@ -131,6 +131,15 @@ textarea{min-height:84px;resize:vertical}
 .ewho.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,var(--surface))}.ewho.ok span.s{color:var(--ok)}
 .ewho.no{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface))}.ewho.no span.s{color:var(--accent)}
 .erule{font-size:13.5px;border-left:4px solid color-mix(in srgb,var(--warn) 75%,var(--surface));padding:4px 0 4px 10px;margin:8px 0 0}
+.daily{display:flex;gap:12px;align-items:flex-end}
+.daily-bot{width:72px;height:72px;border-radius:16px;flex:none;object-fit:cover;background:#000;animation:dbob 2.4s ease-in-out infinite}
+@keyframes dbob{50%{transform:translateY(-4px)}}
+@media (prefers-reduced-motion: reduce){.daily-bot{animation:none}}
+.daily-bub{background:color-mix(in srgb,var(--accent) 12%,var(--surface));border-radius:14px 14px 14px 4px;padding:10px 12px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.daily-bub b{font-size:16px;line-height:1.3}
+.daily-bub span{font-size:13px;color:var(--muted)}
+.daily-btns{gap:8px;flex-wrap:wrap}
+.daily-btns .btn{flex:1 1 auto}
 .rwarn{margin-top:10px;border:1px solid color-mix(in srgb,#E3B84F 70%,var(--line));border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.5;background:color-mix(in srgb,#E3B84F 16%,var(--surface))}
 .rwarn b{display:block;margin-bottom:2px}
 .rnote{border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.5;background:color-mix(in srgb,var(--accent) 9%,var(--surface))}
@@ -398,6 +407,6 @@ try{
   }
 }catch(e){}
 </script>
-<script type="module" src="./app.js?v=20261123c"></script>
+<script type="module" src="./app.js?v=20261127a"></script>
 </body>
 </html>
